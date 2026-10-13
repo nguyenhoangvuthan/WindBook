@@ -122,7 +122,11 @@ class ReaderHostFragment : Fragment() {
                 current.currentLocator.collect { locator ->
                     callbacks?.onLocatorChanged(
                         locator.toJsonString(),
-                        locator.locations.totalProgression ?: 0.0,
+                        readingProgression(
+                            position = locator.locations.position,
+                            positionCount = boundSession?.positionCount ?: 0,
+                            totalProgression = locator.locations.totalProgression,
+                        ),
                         locator.title,
                     )
                 }

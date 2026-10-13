@@ -42,6 +42,7 @@ class ReadiumEngineTest {
     @Test fun engineOpensEpubSession() = runTest {
         val session = ReaderEngine(services).open(TestBooks.epub(tmp.root), BookFormat.EPUB).getOrThrow()
         assertEquals(BookFormat.EPUB, session.format)
+        assertTrue((session as ReadiumReaderSession).positionCount >= 1)
         session.close()
     }
 

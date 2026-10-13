@@ -57,6 +57,7 @@ android {
     }
 
     buildFeatures { compose = true }
+    androidResources { generateLocaleConfig = true }
     testOptions { unitTests.isIncludeAndroidResources = true }
 }
 

@@ -54,6 +54,11 @@ class ReaderHostFragment : Fragment() {
             BookFormat.PDF -> PdfNavigatorFragment.createDummyFactory(pdfEngineProvider = PdfiumEngineProvider())
         }
         super.onCreate(savedInstanceState)
+        // A restored (dummy) navigator throws if it reaches onResume, so drop it now;
+        // bind() adds a fresh one at the right locator.
+        childFragmentManager.findFragmentByTag(NAVIGATOR_TAG)?.let { restored ->
+            childFragmentManager.commitNow { remove(restored) }
+        }
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =

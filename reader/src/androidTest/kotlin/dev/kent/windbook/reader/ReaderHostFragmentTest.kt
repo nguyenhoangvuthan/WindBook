@@ -47,4 +47,44 @@ class ReaderHostFragmentTest {
         scenario.close()
         session.close()
     }
+    @Test
+    fun recreatingTheHostDoesNotCrashAndRebindsAtTheGivenLocator() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val epub = TestBooks.epub(context.cacheDir, name = "host-recreate.epub")
+        val session = runBlocking {
+            ReaderEngine(ReadiumServices(context)).open(epub, BookFormat.EPUB).getOrThrow()
+        }
+        var firstJson = ""
+        val first = CountDownLatch(1)
+        val scenario = launchFragmentInContainer<ReaderHostFragment>(
+            fragmentArgs = ReaderHostFragment.arguments(BookFormat.EPUB),
+            themeResId = androidx.appcompat.R.style.Theme_AppCompat_DayNight_NoActionBar,
+        )
+        scenario.onFragment { fragment ->
+            fragment.bind(session, null, object : ReaderHostFragment.Callbacks {
+                override fun onLocatorChanged(locatorJson: String, progression: Double, chapterTitle: String?) {
+                    firstJson = locatorJson
+                    first.countDown()
+                }
+                override fun onCenterTap() = Unit
+            })
+        }
+        assertTrue(first.await(15, TimeUnit.SECONDS))
+
+        // Rotation / config change: the restored Readium navigator must never reach onResume.
+        scenario.recreate()
+
+        val again = CountDownLatch(1)
+        scenario.onFragment { fragment ->
+            fragment.bind(session, firstJson, object : ReaderHostFragment.Callbacks {
+                override fun onLocatorChanged(locatorJson: String, progression: Double, chapterTitle: String?) {
+                    again.countDown()
+                }
+                override fun onCenterTap() = Unit
+            })
+        }
+        assertTrue("re-bound navigator never reported a locator", again.await(15, TimeUnit.SECONDS))
+        scenario.close()
+        session.close()
+    }
 }

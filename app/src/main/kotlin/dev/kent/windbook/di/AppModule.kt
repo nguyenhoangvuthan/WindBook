@@ -1,0 +1,58 @@
+package dev.kent.windbook.di
+
+import android.content.Context
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dagger.hilt.components.SingletonComponent
+import dev.kent.windbook.core.data.LibraryPreferences
+import dev.kent.windbook.core.data.LibraryRepository
+import dev.kent.windbook.core.data.db.WindBookDatabase
+import dev.kent.windbook.core.data.files.BookFileStore
+import dev.kent.windbook.core.data.importer.BookImporter
+import dev.kent.windbook.core.data.libraryDataStore
+import dev.kent.windbook.input.KeyEventDispatcher
+import dev.kent.windbook.library.ContentResolverImportSourceFactory
+import dev.kent.windbook.library.ImportSourceFactory
+import dev.kent.windbook.reader.BookOpener
+import dev.kent.windbook.reader.ReaderEngine
+import dev.kent.windbook.reader.ReadiumMetadataExtractor
+import dev.kent.windbook.reader.ReadiumServices
+import javax.inject.Singleton
+
+@Module
+@InstallIn(SingletonComponent::class)
+object AppModule {
+
+    @Provides @Singleton
+    fun database(@ApplicationContext context: Context): WindBookDatabase = WindBookDatabase.create(context)
+
+    @Provides @Singleton
+    fun fileStore(@ApplicationContext context: Context): BookFileStore = BookFileStore(context.filesDir)
+
+    @Provides @Singleton
+    fun readium(@ApplicationContext context: Context): ReadiumServices = ReadiumServices(context)
+
+    @Provides @Singleton
+    fun bookOpener(readium: ReadiumServices): BookOpener = ReaderEngine(readium)
+
+    @Provides @Singleton
+    fun importer(db: WindBookDatabase, files: BookFileStore, readium: ReadiumServices): BookImporter =
+        BookImporter(db.libraryDao(), files, ReadiumMetadataExtractor(readium))
+
+    @Provides @Singleton
+    fun libraryRepository(db: WindBookDatabase, files: BookFileStore): LibraryRepository =
+        LibraryRepository(db.libraryDao(), files)
+
+    @Provides @Singleton
+    fun libraryPreferences(@ApplicationContext context: Context): LibraryPreferences =
+        LibraryPreferences(context.libraryDataStore)
+
+    @Provides @Singleton
+    fun importSources(@ApplicationContext context: Context): ImportSourceFactory =
+        ContentResolverImportSourceFactory(context.contentResolver)
+
+    @Provides @Singleton
+    fun keyEventDispatcher(): KeyEventDispatcher = KeyEventDispatcher()
+}

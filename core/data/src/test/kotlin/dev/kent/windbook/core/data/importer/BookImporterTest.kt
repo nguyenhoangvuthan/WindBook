@@ -138,4 +138,24 @@ class BookImporterTest {
         assertEquals(ImportResult.Failed(ImportError.READ_FAILED), importer().import(broken))
         assertNotNull(store)
     }
+    @Test fun import_coverWriteFailure_failsAndLeavesNoBookFile() = runTest {
+        // A plain file where the covers directory should be makes writeCover throw an IOException.
+        store.coversDir.parentFile!!.mkdirs()
+        store.coversDir.writeText("not a directory")
+
+        val result = importer().import(source(TestBooks.epub(tmp.root)))
+
+        assertTrue(result is ImportResult.Failed)
+        assertTrue(store.booksDir.listFiles().orEmpty().isEmpty())
+        assertNull(db.libraryDao().findById("id1"))
+    }
+
+    @Test fun import_sourceThrowsSecurityException_isReadFailed() = runTest {
+        val denied = object : ImportSource {
+            override val displayName = "x.epub"
+            override val sourceUri = null
+            override fun open(): InputStream = throw SecurityException("permission revoked")
+        }
+        assertEquals(ImportResult.Failed(ImportError.READ_FAILED), importer().import(denied))
+    }
 }

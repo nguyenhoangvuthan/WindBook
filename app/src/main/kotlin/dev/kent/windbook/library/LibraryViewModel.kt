@@ -17,6 +17,7 @@ import dev.kent.windbook.core.model.ReadingStatus
 import dev.kent.windbook.core.model.StatusFilter
 import dev.kent.windbook.core.model.continueReading
 import javax.inject.Inject
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -98,7 +99,15 @@ class LibraryViewModel @Inject constructor(
             var imported = 0
             try {
                 for (uri in uris) {
-                    val source = sources.create(uri)
+                    val source = try {
+                        sources.create(uri)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // One unreadable file must not stop the rest of a multi-file import.
+                        _messages.send(LibraryMessage.ImportFailed(null, ImportError.READ_FAILED))
+                        continue
+                    }
                     when (val result = importer.import(source)) {
                         is ImportResult.Imported -> imported++
                         is ImportResult.Duplicate -> _messages.send(LibraryMessage.AlreadyInLibrary(result.bookId))

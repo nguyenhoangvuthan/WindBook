@@ -12,6 +12,7 @@ import dev.kent.windbook.core.model.ReadingStatus
 import java.io.File
 import java.io.IOException
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -30,8 +31,12 @@ class BookImporter(
         } catch (e: FileTooLargeException) {
             return@withContext ImportResult.Failed(ImportError.TOO_LARGE)
         } catch (e: IOException) {
-            val error = if (files.usableBytes() < LOW_SPACE_BYTES) ImportError.NO_SPACE else ImportError.READ_FAILED
-            return@withContext ImportResult.Failed(error)
+            return@withContext ImportResult.Failed(ioError())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // e.g. SecurityException when a provider revokes access mid-import.
+            return@withContext ImportResult.Failed(ImportError.READ_FAILED)
         }
 
         try {
@@ -51,36 +56,48 @@ class BookImporter(
 
             val id = existing?.id ?: newId()
             val bookFile = files.commit(copied.file, id, format)
-            val meta = metadata.extract(bookFile, format).getOrElse {
+            var coverPath: String? = null
+            try {
+                val meta = metadata.extract(bookFile, format).getOrElse {
+                    bookFile.delete()
+                    return@withContext ImportResult.Failed(ImportError.UNREADABLE)
+                }
+                coverPath = meta.coverWebp?.let { files.writeCover(id, it).absolutePath }
+                val now = clock()
+                val entity = BookEntity(
+                    id = id,
+                    title = meta.title?.takeIf { it.isNotBlank() }?.trim()
+                        ?: source.displayName?.substringBeforeLast('.')?.takeIf { it.isNotBlank() }
+                        ?: "Untitled",
+                    author = meta.author?.takeIf { it.isNotBlank() }?.trim(),
+                    format = format.name,
+                    filePath = bookFile.absolutePath,
+                    fileSize = copied.size,
+                    sha256 = copied.sha256,
+                    coverPath = coverPath,
+                    sourceUri = source.sourceUri,
+                    status = ReadingStatus.TO_READ.name,
+                    addedAt = now,
+                    lastOpenedAt = null,
+                    updatedAt = now,
+                    deletedAt = null,
+                )
+                if (existing != null) {
+                    // Re-import of a tombstoned book: revive the same row.
+                    dao.update(entity)
+                    ImportResult.Imported(id)
+                } else {
+                    insertOrDuplicate(entity, bookFile, coverPath)
+                }
+            } catch (e: CancellationException) {
                 bookFile.delete()
-                return@withContext ImportResult.Failed(ImportError.UNREADABLE)
-            }
-            val coverPath = meta.coverWebp?.let { files.writeCover(id, it).absolutePath }
-            val now = clock()
-            val entity = BookEntity(
-                id = id,
-                title = meta.title?.takeIf { it.isNotBlank() }?.trim()
-                    ?: source.displayName?.substringBeforeLast('.')?.takeIf { it.isNotBlank() }
-                    ?: "Untitled",
-                author = meta.author?.takeIf { it.isNotBlank() }?.trim(),
-                format = format.name,
-                filePath = bookFile.absolutePath,
-                fileSize = copied.size,
-                sha256 = copied.sha256,
-                coverPath = coverPath,
-                sourceUri = source.sourceUri,
-                status = ReadingStatus.TO_READ.name,
-                addedAt = now,
-                lastOpenedAt = null,
-                updatedAt = now,
-                deletedAt = null,
-            )
-            if (existing != null) {
-                // Re-import of a tombstoned book: revive the same row.
-                dao.update(entity)
-                ImportResult.Imported(id)
-            } else {
-                insertOrDuplicate(entity, bookFile, coverPath)
+                files.delete(coverPath)
+                throw e
+            } catch (e: Exception) {
+                // Disk full while writing the cover, database errors…: never leave orphaned files.
+                bookFile.delete()
+                files.delete(coverPath)
+                ImportResult.Failed(if (e is IOException) ioError() else ImportError.UNREADABLE)
             }
         } finally {
             copied.file.delete() // no-op once committed (renamed away)
@@ -98,6 +115,9 @@ class BookImporter(
             files.delete(coverPath)
             ImportResult.Duplicate(winner.id)
         }
+
+    private fun ioError(): ImportError =
+        if (files.usableBytes() < LOW_SPACE_BYTES) ImportError.NO_SPACE else ImportError.READ_FAILED
 
     private companion object {
         const val LOW_SPACE_BYTES = 50L * 1024 * 1024

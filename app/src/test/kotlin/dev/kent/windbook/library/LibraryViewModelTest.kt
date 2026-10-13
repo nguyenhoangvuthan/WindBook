@@ -57,6 +57,7 @@ class LibraryViewModelTest {
     private fun viewModel(scopeForPrefs: kotlinx.coroutines.CoroutineScope): LibraryViewModel {
         val prefs = LibraryPreferences(PreferenceDataStoreFactory.create(scope = scopeForPrefs) { File(tmp.root, "lib.preferences_pb") })
         val sources = ImportSourceFactory { uri ->
+            if (uri.toString().contains("denied")) throw SecurityException("no access")
             val file = files.getValue(uri.toString())
             object : ImportSource {
                 override val displayName = file.name
@@ -134,5 +135,15 @@ class LibraryViewModelTest {
         // delete() runs on viewModelScope and hops to Room's IO dispatcher; wait for the table to reflect it.
         repo.observeLibrary().first { it.isEmpty() }
         assertNull(repo.book(id))
+    }
+    @Test fun oneFailingSourceDoesNotStopTheRest() = runTest {
+        val vm = viewModel(backgroundScope)
+        val denied = Uri.parse("content://test/denied.epub")
+        val dune = uriFor(TestBooks.epub(tmp.root, "Dune.epub"))
+        vm.messages.test {
+            vm.import(listOf(denied, dune))
+            assertEquals(LibraryMessage.ImportFailed(null, ImportError.READ_FAILED), awaitItem())
+            assertEquals(LibraryMessage.Imported(1), awaitItem())
+        }
     }
 }

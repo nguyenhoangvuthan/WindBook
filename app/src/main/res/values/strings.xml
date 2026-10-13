@@ -1,0 +1,47 @@
+<resources>
+    <string name="app_name" translatable="false">WindBook</string>
+    <string name="add_books">Add books</string>
+    <string name="empty_library">Your library is empty. Add EPUB or PDF files to start reading.</string>
+    <string name="continue_reading">Continue reading</string>
+    <string name="search_books">Search title or author</string>
+    <string name="back">Back</string>
+    <string name="importing">Importing…</string>
+    <string name="mark_to_read">Mark as to read</string>
+    <string name="mark_reading">Mark as reading</string>
+    <string name="mark_finished">Mark as finished</string>
+    <string name="delete_book">Delete…</string>
+    <string name="delete_title">Delete \"%1$s\"?</string>
+    <string name="delete_body">The book file, its reading position and cover are removed from WindBook. The original file on your phone is untouched.</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="imported_count">%1$d book(s) added</string>
+    <string name="already_in_library">Already in your library</string>
+    <string name="open">Open</string>
+    <string name="import_failed">Couldn\'t add %1$s: %2$s</string>
+    <string name="unnamed_file">file</string>
+    <string name="reader_error_not_found">This book is no longer in your library.</string>
+    <string name="reader_error_file_missing">The book file is missing. Remove it and add it again.</string>
+    <string name="reader_error_cannot_open">This file can\'t be opened. It may be damaged or protected.</string>
+    <string name="remove_from_library">Remove from library</string>
+    <string name="sort_recent">Recent</string>
+    <string name="sort_title">Title</string>
+    <string name="sort_author">Author</string>
+    <string name="sort_added">Date added</string>
+    <string name="sort_progress">Progress</string>
+    <string name="filter_all">All</string>
+    <string name="filter_reading">Reading</string>
+    <string name="filter_to_read">To read</string>
+    <string name="filter_finished">Finished</string>
+    <string name="err_unsupported">only EPUB and PDF are supported</string>
+    <string name="err_not_epub">this ZIP isn\'t an EPUB</string>
+    <string name="err_corrupt">the file is damaged; try downloading it again</string>
+    <string name="err_too_large">files over 500 MB aren\'t supported</string>
+    <string name="err_unsafe">the EPUB looks unsafe and was blocked</string>
+    <string name="err_no_space">your phone is out of storage</string>
+    <string name="err_read_failed">the file couldn\'t be read</string>
+    <string name="err_unreadable">the book couldn\'t be opened</string>
+    <string name="cd_search">Search</string>
+    <string name="cd_close_search">Close search</string>
+    <string name="cd_sort">Sort</string>
+    <string name="cd_change_layout">Change layout</string>
+</resources>

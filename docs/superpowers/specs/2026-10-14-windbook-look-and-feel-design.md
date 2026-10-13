@@ -92,8 +92,8 @@ Behaviour stays as M1 (F1.4–F1.6, F1.12). Only structure and style change:
 1. Header: "Library" in Literata 700, then "│ N books" in `onSurfaceVariant`. N counts all books, not the filtered set.
 2. A search pill, always visible, replaces the toggle-search in the top app bar. A **Sort** pill sits at its right and opens the existing sort menu, with the selected option marked by a check icon instead of the "✓ " text prefix.
 3. Filter chips (All / Reading / To read / Finished). A grid/list toggle icon sits at the end of the chip row.
-4. The Continue reading card (F1.5): a small cover, the label "CONTINUE READING", the title in Literata, the chapter if known, and a gold progress bar.
-5. Grid: 3 columns on phones (adaptive `minSize` 100 dp), covers 2:3. A thin gold progress bar under covers with progress > 0. "✓ Finished" caption for finished books, author otherwise. Each cover has a **⋯** button that opens the same menu as long-press (status change, delete). Long-press remains.
+4. The Continue reading card (F1.5): a small cover, the label "CONTINUE READING", the title in Literata, the author, and a gold progress bar with the percentage. The chapter is not shown because the library does not store it.
+5. Grid: 3 columns on phones (adaptive `minSize` 100 dp), covers 2:3. A thin gold progress bar under covers with progress > 0. Under each cover: the title on one line (real cover images often have tiny text), then a "✓ Finished" caption for finished books or the author otherwise. Each cover has a **⋯** button that opens the same menu as long-press (status change, delete). Long-press remains.
 6. List layout: the same styling, as a row with a cover thumbnail, title, author, and a progress bar.
 7. FAB: a circular gold "+" (replaces the extended "Add books" FAB). Its content description is "Add books". While importing, it shows a progress indicator.
 8. Empty library: centered serif message plus a filled "Add books" button.

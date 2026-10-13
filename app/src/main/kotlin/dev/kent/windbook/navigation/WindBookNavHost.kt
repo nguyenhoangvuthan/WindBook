@@ -21,7 +21,7 @@ fun WindBookNavHost() {
         ),
         entryProvider = entryProvider {
             entry<LibraryKey> {
-                LibraryRoute(onOpenBook = { id -> backStack.add(ReaderKey(id)) })
+                LibraryRoute(onOpenBook = { id -> backStack.openReader(id) })
             }
             entry<ReaderKey> { key ->
                 ReaderRoute(bookId = key.bookId, onBack = { backStack.removeLastOrNull() })

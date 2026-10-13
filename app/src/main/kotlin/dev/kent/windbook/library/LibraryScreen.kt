@@ -55,7 +55,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -93,25 +93,25 @@ fun LibraryRoute(onOpenBook: (String) -> Unit, viewModel: LibraryViewModel = hil
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
         viewModel.import(uris)
     }
-    val context = LocalContext.current
+    val resources = LocalResources.current
 
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { message ->
             when (message) {
                 is LibraryMessage.Imported ->
-                    snackbar.showSnackbar(context.getString(R.string.imported_count, message.count))
+                    snackbar.showSnackbar(resources.getString(R.string.imported_count, message.count))
                 is LibraryMessage.AlreadyInLibrary -> {
                     val result = snackbar.showSnackbar(
-                        context.getString(R.string.already_in_library),
-                        actionLabel = context.getString(R.string.open),
+                        resources.getString(R.string.already_in_library),
+                        actionLabel = resources.getString(R.string.open),
                     )
                     if (result == SnackbarResult.ActionPerformed) onOpenBook(message.bookId)
                 }
                 is LibraryMessage.ImportFailed -> snackbar.showSnackbar(
-                    context.getString(
+                    resources.getString(
                         R.string.import_failed,
-                        message.name ?: context.getString(R.string.unnamed_file),
-                        context.getString(message.error.messageRes()),
+                        message.name ?: resources.getString(R.string.unnamed_file),
+                        resources.getString(message.error.messageRes()),
                     ),
                 )
             }

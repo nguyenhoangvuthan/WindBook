@@ -49,4 +49,9 @@
     <string name="cd_selected">Đang chọn</string>
     <string name="cd_more_options">Tùy chọn khác cho %1$s</string>
     <string name="finished_caption">Đã đọc xong</string>
+    <string name="tab_reading">Đang đọc</string>
+    <string name="reading_empty_title">Chưa có sách đang đọc</string>
+    <string name="reading_empty_body">Sách bạn mở sẽ hiện ở đây, cuốn mới nhất ở trên cùng.</string>
+    <string name="go_to_library">Đến kệ sách</string>
+    <string name="continue_button">Đọc tiếp</string>
 </resources>

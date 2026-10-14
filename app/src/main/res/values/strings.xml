@@ -51,4 +51,9 @@
     <string name="cd_selected">Selected</string>
     <string name="cd_more_options">More options for %1$s</string>
     <string name="finished_caption">Finished</string>
+    <string name="tab_reading">Reading</string>
+    <string name="reading_empty_title">No book in progress</string>
+    <string name="reading_empty_body">Books you open appear here, newest first.</string>
+    <string name="go_to_library">Go to library</string>
+    <string name="continue_button">Continue</string>
 </resources>

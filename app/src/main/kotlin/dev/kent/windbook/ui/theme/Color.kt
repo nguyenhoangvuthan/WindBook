@@ -1,5 +1,6 @@
 package dev.kent.windbook.ui.theme
 
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
@@ -73,6 +74,9 @@ internal val DarkColors = darkColorScheme(
     surfaceContainerHigh = Color(0xFF342A20),
     surfaceContainerHighest = Color(0xFF3E3227),
 )
+
+/** Fill of reading-progress bars; must stay ≥ 3:1 against its track and the paper (pinned by ColorContrastTest). */
+val ColorScheme.progressFill: Color get() = primary
 
 /** Highlight colours for M4, defined now so the palette stays in one place. */
 object HighlightColors {

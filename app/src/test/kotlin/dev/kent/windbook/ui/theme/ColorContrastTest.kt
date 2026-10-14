@@ -38,6 +38,15 @@ class ColorContrastTest {
         }
         val fab = ratio(scheme.onTertiary, scheme.tertiary)
         assertTrue("$name FAB icon is ${"%.2f".format(fab)}:1, needs 3:1", fab >= 3.0)
+        // Progress bars are the only progress cue under grid covers: graphics need 3:1.
+        listOf(
+            "progressFill/outlineVariant" to scheme.outlineVariant,
+            "progressFill/surface" to scheme.surface,
+            "progressFill/surfaceContainerLow" to scheme.surfaceContainerLow,
+        ).forEach { (pair, bg) ->
+            val r = ratio(scheme.progressFill, bg)
+            assertTrue("$name $pair is ${"%.2f".format(r)}:1, needs 3:1", r >= 3.0)
+        }
     }
 
     @Test fun lightSchemeMeetsContrast() = assertScheme("light", LightColors)

@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
+import dev.kent.windbook.ui.theme.progressFill
 import kotlin.math.roundToInt
 
 /** Thin gold reading-progress bar. */
@@ -16,7 +17,7 @@ fun ProgressLine(progression: Double, modifier: Modifier = Modifier) {
     LinearProgressIndicator(
         progress = { progression.toFloat().coerceIn(0f, 1f) },
         modifier = modifier.fillMaxWidth().height(3.dp),
-        color = MaterialTheme.colorScheme.tertiary,
+        color = MaterialTheme.colorScheme.progressFill,
         trackColor = MaterialTheme.colorScheme.outlineVariant,
         strokeCap = StrokeCap.Round,
         gapSize = 0.dp,

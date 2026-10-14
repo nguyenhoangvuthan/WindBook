@@ -44,9 +44,9 @@ All colours live in `ui/theme/Color.kt` as two `ColorScheme`s. `WindBookTheme` p
 | `onSurfaceVariant` | `#725E48` | `#A89880` | Secondary text, counts, placeholders, unselected tabs |
 | `outlineVariant` | `#E3D3B4` | `#3A3026` | Pill borders, dividers, progress track |
 | `outline` | `#A38B6B` | `#6E5E4A` | Focus/stronger borders |
-| `primary` / `onPrimary` | `#7E5A26` / `#FFFFFF` | `#D2A464` / `#17130F` | Filled buttons with text, selected-tab label and icon, text accents |
+| `primary` / `onPrimary` | `#7E5A26` / `#FFFFFF` | `#D2A464` / `#17130F` | Filled buttons with text, selected-tab label, text accents, progress bar fill (≥ 3:1 on the track and paper) |
 | `primaryContainer` / `onPrimaryContainer` | `#EBCF9C` / `#3B2A1A` | `#5A4426` / `#EFE4CF` | Selected chip, selected tab indicator |
-| `tertiary` / `onTertiary` | `#B8894A` / `#FFFFFF` | `#D2A464` / `#17130F` | FAB (icon only), progress bar fill, "current" markers |
+| `tertiary` / `onTertiary` | `#B8894A` / `#FFFFFF` | `#D2A464` / `#17130F` | FAB (icon only), "current" markers |
 | `error` / `onError` | `#B3261E` / `#FFFFFF` | `#F2B8B5` / `#601410` | Errors (M3 defaults) |
 
 Measured contrast (WCAG, pinned by `ColorContrastTest`): every text colour (`onSurface`, `onSurfaceVariant`, `primary`) is ≥ 4.5:1 on `surface`, `surfaceContainerLow`, `surfaceContainer` and `surfaceContainerHigh` in both schemes. The light `onSurfaceVariant` and `primary` were darkened from the mockup to reach this on the tab bar. White on light `primary` is 6.22. The FAB's white icon on gold is 3.13 (icon only, needs 3:1).

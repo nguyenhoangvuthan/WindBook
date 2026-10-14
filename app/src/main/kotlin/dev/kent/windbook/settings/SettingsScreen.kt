@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
@@ -41,6 +41,8 @@ import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.kent.windbook.R
 import dev.kent.windbook.ui.components.ScreenTitle
+import dev.kent.windbook.ui.components.TabScreenInsets
+import dev.kent.windbook.ui.components.uppercaseForUi
 
 @Composable
 fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel()) {
@@ -60,7 +62,7 @@ fun SettingsScreen(state: SettingsUiState, onLanguageChange: (AppLanguage) -> Un
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .statusBarsPadding()
+            .windowInsetsPadding(TabScreenInsets)
             .verticalScroll(rememberScrollState()),
     ) {
         ScreenTitle(stringResource(R.string.tab_settings))
@@ -99,7 +101,7 @@ fun SettingsScreen(state: SettingsUiState, onLanguageChange: (AppLanguage) -> Un
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showLicences = true }
+                    .clickable(role = Role.Button) { showLicences = true }
                     .padding(horizontal = 16.dp, vertical = 14.dp),
             )
         }
@@ -120,7 +122,7 @@ fun SettingsScreen(state: SettingsUiState, onLanguageChange: (AppLanguage) -> Un
 private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> Unit) {
     val colors = MaterialTheme.colorScheme
     Text(
-        title.uppercase(),
+        title.uppercaseForUi(),
         style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
         color = colors.onSurfaceVariant,
         modifier = Modifier.padding(start = 32.dp, top = 16.dp, bottom = 8.dp),

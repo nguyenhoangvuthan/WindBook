@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -46,6 +46,7 @@ import dev.kent.windbook.library.components.ContinueReadingCard
 import dev.kent.windbook.library.components.FilterRow
 import dev.kent.windbook.library.components.LibraryHeader
 import dev.kent.windbook.ui.components.EmptyState
+import dev.kent.windbook.ui.components.TabScreenInsets
 import dev.kent.windbook.ui.icons.WindBookIcons
 
 data class LibraryActions(
@@ -136,9 +137,11 @@ fun LibraryScreen(
                     bookCount = state.bookCount,
                     query = state.query,
                     sort = state.sort,
+                    layout = state.layout,
                     onQueryChange = actions.onQueryChange,
                     onSortChange = actions.onSortChange,
-                    modifier = Modifier.statusBarsPadding(),
+                    onLayoutChange = actions.onLayoutChange,
+                    modifier = Modifier.windowInsetsPadding(TabScreenInsets),
                 )
             }
         },
@@ -146,6 +149,8 @@ fun LibraryScreen(
             if (!state.isLibraryEmpty) AddBooksFab(importing = state.isImporting, onClick = actions.onImportClick)
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        // The tab bar below owns the bottom inset; keep clear of a side nav bar or cutout in landscape.
+        contentWindowInsets = TabScreenInsets,
     ) { padding ->
         if (state.isLibraryEmpty) {
             EmptyState(
@@ -190,7 +195,7 @@ private fun LibraryContent(state: LibraryUiState, actions: LibraryActions, modif
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            FilterRow(state.filter, state.layout, actions.onFilterChange, actions.onLayoutChange)
+            FilterRow(state.filter, actions.onFilterChange)
         }
         state.continueReading?.takeIf { state.query.isBlank() }?.let { current ->
             item(span = { GridItemSpan(maxLineSpan) }) { ContinueReadingCard(current, actions.onOpenBook) }

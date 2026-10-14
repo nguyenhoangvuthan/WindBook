@@ -1,7 +1,14 @@
 package dev.kent.windbook.library
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
@@ -33,6 +40,7 @@ class LibraryScreenTest {
     private val statuses = mutableListOf<Pair<String, ReadingStatus>>()
     private val queries = mutableListOf<String>()
     private val sorts = mutableListOf<LibrarySort>()
+    private val layouts = mutableListOf<LibraryLayout>()
     private var importClicks = 0
 
     private val actions = LibraryActions(
@@ -41,7 +49,7 @@ class LibraryScreenTest {
         onQueryChange = { queries += it },
         onFilterChange = {},
         onSortChange = { sorts += it },
-        onLayoutChange = {},
+        onLayoutChange = { layouts += it },
         onSetStatus = { id, status -> statuses += id to status },
         onDelete = {},
     )
@@ -137,5 +145,25 @@ class LibraryScreenTest {
     @Test fun fabWhileImportingSaysImporting() {
         compose.setContent { LibraryScreen(library(dune).copy(isImporting = true), actions) }
         compose.onNodeWithContentDescription("Importing…").assertIsDisplayed()
+    }
+
+    @Test fun sortIsAPlainButtonNotASelectableChip() {
+        compose.setContent { LibraryScreen(library(dune), actions) }
+        compose.onNodeWithText("Sort")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
+        compose.onNodeWithText("All").assertIsSelected()
+    }
+
+    @Test fun titleIsAHeadingAndTheSeparatorIsSilent() {
+        compose.setContent { LibraryScreen(library(dune).copy(bookCount = 12), actions) }
+        compose.onNode(isHeading() and hasText("Library")).assertExists()
+        compose.onNodeWithText("│").assertDoesNotExist()
+    }
+
+    @Test fun layoutToggleSwitchesLayout() {
+        compose.setContent { LibraryScreen(library(dune), actions) }
+        compose.onNodeWithContentDescription("Change layout").performClick()
+        assertEquals(listOf(LibraryLayout.LIST), layouts)
     }
 }

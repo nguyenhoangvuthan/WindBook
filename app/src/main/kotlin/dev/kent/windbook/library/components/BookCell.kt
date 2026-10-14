@@ -43,6 +43,7 @@ import dev.kent.windbook.library.LibraryActions
 import dev.kent.windbook.ui.components.BookCover
 import dev.kent.windbook.ui.components.ProgressLine
 import dev.kent.windbook.ui.components.formatPercent
+import dev.kent.windbook.ui.components.uppercaseForUi
 import dev.kent.windbook.ui.icons.WindBookIcons
 
 @Composable
@@ -60,7 +61,7 @@ internal fun ContinueReadingCard(item: LibraryItem, onOpen: (String) -> Unit) {
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    stringResource(R.string.continue_reading).uppercase(),
+                    stringResource(R.string.continue_reading).uppercaseForUi(),
                     style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
                     color = colors.onSurfaceVariant,
                 )
@@ -93,7 +94,7 @@ internal fun BookCell(item: LibraryItem, layout: LibraryLayout, actions: Library
         if (layout == LibraryLayout.GRID) {
             Column(clickable) {
                 Box {
-                    BookCover(book.id, book.title, book.coverPath, Modifier.fillMaxWidth())
+                    BookCover(book.id, book.title, book.coverPath, Modifier.fillMaxWidth(), titleEndInset = 28.dp)
                     MoreButton(book.title, onClick = { menu = true }, modifier = Modifier.align(Alignment.TopEnd))
                 }
                 if (item.progression > 0) {

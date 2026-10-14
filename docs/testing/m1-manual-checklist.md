@@ -23,3 +23,18 @@ Waydroid could not be used: its Android gets no IP (firewalld blocks DHCP on `wa
 | 15 | App language Vietnamese (`cmd locale set-app-locales … vi`) | All UI in Vietnamese | ✅ | |
 | 16 | Neo 3 GT: `adb shell getevent -l`, press shoulder triggers | Record key codes for M3 F3.11 | n/a | |
 | 17 | Cold start `am start -W` | TotalTime < 2000 ms | ✅ 691–921 ms | |
+
+## Look & feel (2026-10-14 redesign)
+
+| # | Step | Expected | Emulator | Neo 3 GT |
+|---|---|---|---|---|
+| L1 | Open the app in light mode | Cream paper background, "Library │ N books" in serif, gold + button | Pass 2026-10-14 | |
+| L2 | Type in the search pill, clear with ✕ | List filters as you type; header count does not change | | |
+| L3 | Tap ⋯ on a cover | Status/delete menu, same as long-press | | |
+| L4 | Switch tabs Library → Reading → Notes → Settings, press Back | Each tab shows its screen; Back returns to Library | Pass 2026-10-14 | |
+| L5 | Reading tab with no book in progress | "No book in progress" and a "Go to library" button that switches tab | | |
+| L6 | Settings → Tiếng Việt | App switches to Vietnamese immediately; survives an app restart | Pass 2026-10-14 | |
+| L7 | Settings → Storage | Book count and total size match the library | Pass 2026-10-14 | |
+| L8 | Open an EPUB in light mode | Page is sepia; centre tap shows bars with the title in capitals | Pass 2026-10-14 | |
+| L9 | Turn on system dark mode | Warm dark chrome; EPUB page turns dark | Pass 2026-10-14 | |
+| L10 | Open a book from the Reading tab, press Back | Returns to the Reading tab | Pass 2026-10-14 | |

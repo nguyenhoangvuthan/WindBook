@@ -37,6 +37,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.kent.windbook.R
 import dev.kent.windbook.ui.components.ScreenTitle
@@ -44,6 +45,10 @@ import dev.kent.windbook.ui.components.ScreenTitle
 @Composable
 fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LifecycleStartEffect(viewModel) {
+        viewModel.refreshLanguage()
+        onStopOrDispose { }
+    }
     SettingsScreen(state, onLanguageChange = viewModel::setLanguage)
 }
 

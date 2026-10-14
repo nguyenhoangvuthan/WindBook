@@ -40,7 +40,16 @@ class SettingsViewModel @Inject constructor(
             freeBytes = files.usableBytes(),
             versionName = appInfo.versionName,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUiState(versionName = appInfo.versionName))
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5_000),
+        SettingsUiState(language = language.value, versionName = appInfo.versionName),
+    )
+
+    /** The language can also change from Android's "App languages" screen while this ViewModel lives on. */
+    fun refreshLanguage() {
+        language.value = locales.current()
+    }
 
     fun setLanguage(choice: AppLanguage) {
         locales.set(choice)

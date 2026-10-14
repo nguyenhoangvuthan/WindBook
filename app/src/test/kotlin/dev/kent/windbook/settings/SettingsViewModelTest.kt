@@ -87,4 +87,22 @@ class SettingsViewModelTest {
             cancelAndIgnoreRemainingEvents()
         }
     }
+
+    @Test fun firstFrameAlreadyShowsTheSavedLanguage() {
+        locales.language = AppLanguage.VIETNAMESE
+        val vm = SettingsViewModel(repo, store, locales, AppInfo("1"))
+        // Before the library emits, the screen must not flash "Automatic".
+        assertEquals(AppLanguage.VIETNAMESE, vm.state.value.language)
+    }
+
+    @Test fun languageChangedInSystemSettingsShowsAfterRefresh() = runTest {
+        val vm = SettingsViewModel(repo, store, locales, AppInfo("1"))
+        locales.language = AppLanguage.ENGLISH // e.g. Android 13+ "App languages" while the tab was open
+        vm.refreshLanguage()
+        vm.state.test {
+            var state = awaitItem()
+            while (state.language != AppLanguage.ENGLISH) state = awaitItem()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 }

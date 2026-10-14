@@ -14,3 +14,6 @@ keystore.properties
 
 # Brainstorming mockups (local only)
 .superpowers/
+
+# Personal library listing (file names of the owner's books)
+metadata_books.json

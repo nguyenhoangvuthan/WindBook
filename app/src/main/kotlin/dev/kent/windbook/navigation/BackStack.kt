@@ -12,3 +12,13 @@ fun MutableList<NavKey>.openReader(bookId: String) {
     removeAll { it == key }
     add(key)
 }
+
+/**
+ * Switches tabs. Library is always the root and at most one other tab sits above it, so
+ * back from any tab returns to Library (Material guidance) and the stack never grows.
+ */
+fun MutableList<NavKey>.selectTab(tab: TopLevelTab) {
+    if (lastOrNull() == tab.key) return
+    while (size > 1) removeAt(lastIndex)
+    if (tab != TopLevelTab.LIBRARY) add(tab.key)
+}

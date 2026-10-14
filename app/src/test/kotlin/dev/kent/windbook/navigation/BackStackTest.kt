@@ -17,4 +17,42 @@ class BackStackTest {
         stack.openReader("a")
         assertEquals(listOf(LibraryKey, ReaderKey("b"), ReaderKey("a")), stack)
     }
+
+    @Test fun selectingATabPutsItAboveLibrary() {
+        val stack = mutableListOf<NavKey>(LibraryKey)
+        stack.selectTab(TopLevelTab.SETTINGS)
+        assertEquals(listOf(LibraryKey, SettingsKey), stack)
+    }
+
+    @Test fun switchingTabsKeepsOnlyOneAboveLibrary() {
+        val stack = mutableListOf<NavKey>(LibraryKey, ReadingKey)
+        stack.selectTab(TopLevelTab.NOTES)
+        assertEquals(listOf(LibraryKey, NotesKey), stack)
+    }
+
+    @Test fun selectingLibraryReturnsToTheRoot() {
+        val stack = mutableListOf<NavKey>(LibraryKey, SettingsKey)
+        stack.selectTab(TopLevelTab.LIBRARY)
+        assertEquals(listOf(LibraryKey), stack)
+    }
+
+    @Test fun reselectingTheCurrentTabDoesNothing() {
+        val stack = mutableListOf<NavKey>(LibraryKey, SettingsKey)
+        stack.selectTab(TopLevelTab.SETTINGS)
+        assertEquals(listOf(LibraryKey, SettingsKey), stack)
+    }
+
+    @Test fun readerOpenedFromReadingTabReturnsToIt() {
+        val stack = mutableListOf<NavKey>(LibraryKey)
+        stack.selectTab(TopLevelTab.READING)
+        stack.openReader("a")
+        stack.removeAt(stack.lastIndex) // system back from the reader
+        assertEquals(ReadingKey, stack.last())
+    }
+
+    @Test fun tabBarShowsOnlyOnTopLevelScreens() {
+        assertEquals(TopLevelTab.SETTINGS, SettingsKey.topLevelTab())
+        assertEquals(TopLevelTab.LIBRARY, LibraryKey.topLevelTab())
+        assertEquals(null, ReaderKey("a").topLevelTab())
+    }
 }

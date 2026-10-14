@@ -23,7 +23,7 @@ class ReaderOverlayTest {
                 canMarkFinished = false, onMarkFinished = {}, onBack = { backs++ },
             )
         }
-        compose.onNodeWithText("Dune").assertIsDisplayed()
+        compose.onNodeWithText("DUNE").assertIsDisplayed()
         compose.onNodeWithText("Book One · 37%").assertIsDisplayed()
         compose.onNodeWithText("Mark as finished").assertDoesNotExist()
         compose.onNodeWithContentDescription("Back").performClick()
@@ -49,6 +49,17 @@ class ReaderOverlayTest {
                 canMarkFinished = false, onMarkFinished = {}, onBack = {},
             )
         }
-        compose.onNodeWithText("Dune").assertDoesNotExist()
+        compose.onNodeWithText("DUNE").assertDoesNotExist()
+    }
+
+    @Test fun titleIsUppercasedKeepingVietnameseDiacritics() {
+        compose.setContent {
+            ReaderOverlay(
+                visible = true, title = "Đắc nhân tâm", chapterTitle = null, progression = 0.1,
+                canMarkFinished = false, onMarkFinished = {}, onBack = {},
+            )
+        }
+        compose.onNodeWithText("ĐẮC NHÂN TÂM").assertIsDisplayed()
+        compose.onNodeWithText("10%").assertIsDisplayed()
     }
 }

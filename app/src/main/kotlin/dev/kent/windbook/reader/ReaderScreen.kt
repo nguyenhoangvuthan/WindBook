@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,11 +17,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,8 +34,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -44,8 +47,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.kent.windbook.R
 import dev.kent.windbook.input.KeyEventDispatcher
 import dev.kent.windbook.input.LocalKeyEventDispatcher
+import dev.kent.windbook.ui.components.ProgressLine
+import dev.kent.windbook.ui.components.formatPercent
 import dev.kent.windbook.ui.icons.WindBookIcons
-import kotlin.math.roundToInt
 
 @Composable
 fun ReaderRoute(bookId: String, onBack: () -> Unit) {
@@ -86,6 +90,7 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit) {
 @Composable
 private fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewModel) {
     val dispatcher = LocalKeyEventDispatcher.current
+    val darkTheme = isSystemInDarkTheme()
     val hostRef = remember { mutableStateOf<ReaderHostFragment?>(null) }
     val callbacks = remember(viewModel) {
         object : ReaderHostFragment.Callbacks {
@@ -101,7 +106,12 @@ private fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewModel
     ) { fragment ->
         hostRef.value = fragment
         // A re-created fragment (rotation) must open where the reader is now, not where the book was opened.
-        fragment.bind(state.session, viewModel.latestLocatorJson ?: state.initialLocatorJson, callbacks)
+        fragment.bind(
+            session = state.session,
+            initialLocatorJson = viewModel.latestLocatorJson ?: state.initialLocatorJson,
+            callbacks = callbacks,
+            darkTheme = darkTheme,
+        )
     }
 
     DisposableEffect(dispatcher) {
@@ -138,34 +148,46 @@ fun ReaderOverlay(
     onMarkFinished: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val bar = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.97f)
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
         Box(Modifier.fillMaxSize()) {
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.94f))
+                    .background(bar)
                     .statusBarsPadding()
                     .padding(horizontal = 4.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 IconButton(onClick = onBack) { Icon(WindBookIcons.Back, contentDescription = stringResource(R.string.back)) }
-                Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    title.uppercase(),
+                    style = MaterialTheme.typography.titleSmall.copy(letterSpacing = 0.08.em),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.weight(1f),
+                )
+                // Balances the back button so the title is truly centred.
+                Spacer(Modifier.width(48.dp))
             }
             Column(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.94f))
-                    .navigationBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                    .background(bar)
+                    .navigationBarsPadding(),
             ) {
-                LinearProgressIndicator(progress = { progression.toFloat() }, modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(8.dp))
-                val percent = "${(progression * 100).roundToInt()}%"
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                ProgressLine(progression)
+                Row(
+                    Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    val percent = formatPercent(progression)
                     Text(
                         text = chapterTitle?.let { "$it · $percent" } ?: percent,
                         style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),

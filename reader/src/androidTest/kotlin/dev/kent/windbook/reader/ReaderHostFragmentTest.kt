@@ -8,7 +8,9 @@ import dev.kent.windbook.testing.TestBooks
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.readium.r2.navigator.preferences.Theme
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -38,7 +40,7 @@ class ReaderHostFragmentTest {
                     locatorSeen.countDown()
                 }
                 override fun onCenterTap() = Unit
-            })
+            }, darkTheme = false)
         }
 
         assertTrue("navigator never reported a locator", locatorSeen.await(15, TimeUnit.SECONDS))
@@ -67,7 +69,7 @@ class ReaderHostFragmentTest {
                     first.countDown()
                 }
                 override fun onCenterTap() = Unit
-            })
+            }, false)
         }
         assertTrue(first.await(15, TimeUnit.SECONDS))
 
@@ -81,9 +83,45 @@ class ReaderHostFragmentTest {
                     again.countDown()
                 }
                 override fun onCenterTap() = Unit
-            })
+            }, false)
         }
         assertTrue("re-bound navigator never reported a locator", again.await(15, TimeUnit.SECONDS))
+        scenario.close()
+        session.close()
+    }
+
+    @Test
+    fun darkModeBindsEpubWithDarkTheme() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val epub = TestBooks.epub(context.cacheDir, name = "host-theme.epub")
+        val session = runBlocking {
+            ReaderEngine(ReadiumServices(context)).open(epub, BookFormat.EPUB).getOrThrow()
+        }
+        val seen = CountDownLatch(1)
+        val scenario = launchFragmentInContainer<ReaderHostFragment>(
+            fragmentArgs = ReaderHostFragment.arguments(BookFormat.EPUB),
+            themeResId = androidx.appcompat.R.style.Theme_AppCompat_DayNight_NoActionBar,
+        )
+        scenario.onFragment { fragment ->
+            fragment.bind(session, null, object : ReaderHostFragment.Callbacks {
+                override fun onLocatorChanged(locatorJson: String, progression: Double, chapterTitle: String?) = seen.countDown()
+                override fun onCenterTap() = Unit
+            }, darkTheme = true)
+        }
+        assertTrue(seen.await(15, TimeUnit.SECONDS))
+        scenario.onFragment { assertEquals(Theme.DARK, it.epubTheme) }
+
+        // Light mode after a config change (system dark mode toggled off): the re-bound navigator is SEPIA.
+        scenario.recreate()
+        val again = CountDownLatch(1)
+        scenario.onFragment { fragment ->
+            fragment.bind(session, null, object : ReaderHostFragment.Callbacks {
+                override fun onLocatorChanged(locatorJson: String, progression: Double, chapterTitle: String?) = again.countDown()
+                override fun onCenterTap() = Unit
+            }, darkTheme = false)
+        }
+        assertTrue(again.await(15, TimeUnit.SECONDS))
+        scenario.onFragment { assertEquals(Theme.SEPIA, it.epubTheme) }
         scenario.close()
         session.close()
     }

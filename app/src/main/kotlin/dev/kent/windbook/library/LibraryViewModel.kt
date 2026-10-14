@@ -38,6 +38,8 @@ data class LibraryUiState(
     val layout: LibraryLayout = LibraryLayout.GRID,
     val isImporting: Boolean = false,
     val isLibraryEmpty: Boolean = true,
+    /** Every book in the library, ignoring search and filter (header count). */
+    val bookCount: Int = 0,
 )
 
 sealed interface LibraryMessage {
@@ -76,6 +78,7 @@ class LibraryViewModel @Inject constructor(
             sort = sort,
             layout = layout,
             isLibraryEmpty = all.isEmpty(),
+            bookCount = all.size,
         )
     }.combine(importing) { state, busy -> state.copy(isImporting = busy) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())

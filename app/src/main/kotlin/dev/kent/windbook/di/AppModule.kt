@@ -19,6 +19,9 @@ import dev.kent.windbook.reader.BookOpener
 import dev.kent.windbook.reader.ReaderEngine
 import dev.kent.windbook.reader.ReadiumMetadataExtractor
 import dev.kent.windbook.reader.ReadiumServices
+import dev.kent.windbook.settings.AppCompatLocaleController
+import dev.kent.windbook.settings.AppInfo
+import dev.kent.windbook.settings.AppLocaleController
 import javax.inject.Singleton
 
 @Module
@@ -55,4 +58,11 @@ object AppModule {
 
     @Provides @Singleton
     fun keyEventDispatcher(): KeyEventDispatcher = KeyEventDispatcher()
+
+    @Provides @Singleton
+    fun appLocales(): AppLocaleController = AppCompatLocaleController()
+
+    @Provides @Singleton
+    fun appInfo(@ApplicationContext context: Context): AppInfo =
+        AppInfo(context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty())
 }

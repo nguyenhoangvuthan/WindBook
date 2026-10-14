@@ -23,6 +23,7 @@ import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.navigator.pdf.PdfNavigatorFactory
 import org.readium.r2.navigator.pdf.PdfNavigatorFragment
+import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.navigator.util.DirectionalNavigationAdapter
 import org.readium.r2.shared.ExperimentalReadiumApi
 
@@ -70,12 +71,12 @@ class ReaderHostFragment : Fragment() {
         pendingBind = null
     }
 
-    fun bind(session: ReaderSession, initialLocatorJson: String?, callbacks: Callbacks) {
+    fun bind(session: ReaderSession, initialLocatorJson: String?, callbacks: Callbacks, darkTheme: Boolean) {
         this.callbacks = callbacks
         val readium = session as ReadiumReaderSession
         if (readium === boundSession) return
         if (view == null) {
-            pendingBind = { bind(session, initialLocatorJson, callbacks) }
+            pendingBind = { bind(session, initialLocatorJson, callbacks, darkTheme) }
             return
         }
         boundSession = readium
@@ -83,7 +84,10 @@ class ReaderHostFragment : Fragment() {
 
         childFragmentManager.fragmentFactory = when (readium.format) {
             BookFormat.EPUB -> EpubNavigatorFactory(readium.publication)
-                .createFragmentFactory(initialLocator = initialLocator)
+                .createFragmentFactory(
+                    initialLocator = initialLocator,
+                    initialPreferences = initialEpubPreferences(darkTheme),
+                )
             BookFormat.PDF -> PdfNavigatorFactory(readium.publication, PdfiumEngineProvider())
                 .createFragmentFactory(initialLocator = initialLocator)
         }
@@ -103,6 +107,10 @@ class ReaderHostFragment : Fragment() {
         val overflowable = navigator as? OverflowableNavigator ?: return false
         return if (forward) overflowable.goForward() else overflowable.goBackward()
     }
+
+    /** The theme the EPUB navigator is rendering with; null for PDF or before bind. */
+    internal val epubTheme: Theme?
+        get() = (navigator as? EpubNavigatorFragment)?.settings?.value?.theme
 
     private fun attachListeners() {
         val current = navigator ?: return

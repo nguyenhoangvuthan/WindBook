@@ -1,6 +1,6 @@
 <resources>
     <!-- AppCompat parent: Readium navigator fragments need an AppCompat context. -->
     <style name="Theme.WindBook" parent="Theme.AppCompat.DayNight.NoActionBar">
-        <item name="android:windowBackground">@color/ic_launcher_background</item>
+        <item name="android:windowBackground">@color/window_background</item>
     </style>
 </resources>

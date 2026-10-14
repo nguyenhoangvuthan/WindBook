@@ -89,6 +89,8 @@ class LibraryViewModelTest {
             vm.onQueryChange("emm")
             while (state.items.size != 1) state = awaitItem()
             assertEquals("Emma", state.items.single().book.title)
+            // The header count is the whole library, not the search result.
+            assertEquals(2, state.bookCount)
             cancelAndIgnoreRemainingEvents()
         }
     }

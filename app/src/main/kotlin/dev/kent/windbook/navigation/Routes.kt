@@ -8,3 +8,12 @@ data object LibraryKey : NavKey
 
 @Serializable
 data class ReaderKey(val bookId: String) : NavKey
+
+@Serializable
+data object ReadingKey : NavKey
+
+@Serializable
+data object NotesKey : NavKey
+
+@Serializable
+data object SettingsKey : NavKey

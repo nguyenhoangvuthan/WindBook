@@ -39,8 +39,14 @@
     <string name="err_no_space">điện thoại đã hết bộ nhớ</string>
     <string name="err_read_failed">không đọc được tệp</string>
     <string name="err_unreadable">không mở được sách</string>
-    <string name="cd_search">Tìm kiếm</string>
-    <string name="cd_close_search">Đóng tìm kiếm</string>
-    <string name="cd_sort">Sắp xếp</string>
     <string name="cd_change_layout">Đổi kiểu hiển thị</string>
+    <string name="tab_library">Kệ sách</string>
+    <plurals name="book_count">
+        <item quantity="other">%d cuốn</item>
+    </plurals>
+    <string name="sort">Sắp xếp</string>
+    <string name="cd_clear_search">Xoá tìm kiếm</string>
+    <string name="cd_selected">Đang chọn</string>
+    <string name="cd_more_options">Tùy chọn khác cho %1$s</string>
+    <string name="finished_caption">Đã đọc xong</string>
 </resources>

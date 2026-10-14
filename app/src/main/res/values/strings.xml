@@ -40,8 +40,15 @@
     <string name="err_no_space">your phone is out of storage</string>
     <string name="err_read_failed">the file couldn\'t be read</string>
     <string name="err_unreadable">the book couldn\'t be opened</string>
-    <string name="cd_search">Search</string>
-    <string name="cd_close_search">Close search</string>
-    <string name="cd_sort">Sort</string>
     <string name="cd_change_layout">Change layout</string>
+    <string name="tab_library">Library</string>
+    <plurals name="book_count">
+        <item quantity="one">%d book</item>
+        <item quantity="other">%d books</item>
+    </plurals>
+    <string name="sort">Sort</string>
+    <string name="cd_clear_search">Clear search</string>
+    <string name="cd_selected">Selected</string>
+    <string name="cd_more_options">More options for %1$s</string>
+    <string name="finished_caption">Finished</string>
 </resources>

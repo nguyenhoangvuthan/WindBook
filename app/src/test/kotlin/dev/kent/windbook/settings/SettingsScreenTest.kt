@@ -1,5 +1,9 @@
 package dev.kent.windbook.settings
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -38,5 +42,11 @@ class SettingsScreenTest {
         compose.setContent { SettingsScreen(state, onLanguageChange = {}) }
         compose.onNodeWithText("Open-source licences").performScrollTo().performClick()
         compose.onNodeWithText("Literata", substring = true).assertIsDisplayed()
+    }
+
+    @Test fun licencesRowIsAnnouncedAsAButton() {
+        compose.setContent { SettingsScreen(state, onLanguageChange = {}) }
+        compose.onNodeWithText("Open-source licences").performScrollTo()
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
     }
 }

@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
@@ -37,6 +37,7 @@ import dev.kent.windbook.ui.components.BookCover
 import dev.kent.windbook.ui.components.EmptyState
 import dev.kent.windbook.ui.components.ProgressLine
 import dev.kent.windbook.ui.components.ScreenTitle
+import dev.kent.windbook.ui.components.TabScreenInsets
 import dev.kent.windbook.ui.components.formatPercent
 
 @Composable
@@ -47,7 +48,7 @@ fun ReadingRoute(onOpenBook: (String) -> Unit, onBrowseLibrary: () -> Unit, view
 
 @Composable
 fun ReadingScreen(state: ReadingUiState, onOpenBook: (String) -> Unit, onBrowseLibrary: () -> Unit) {
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding()) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).windowInsetsPadding(TabScreenInsets)) {
         ScreenTitle(stringResource(R.string.tab_reading))
         val current = state.current
         when {

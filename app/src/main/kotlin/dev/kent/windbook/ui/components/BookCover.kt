@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import dev.kent.windbook.ui.theme.CoverShape
@@ -29,14 +30,17 @@ private val GeneratedCoverInk = Color(0xFF3B2A1A)
 internal fun generatedCoverTint(bookId: String): Color =
     GeneratedCoverTints[Math.floorMod(bookId.hashCode(), GeneratedCoverTints.size)]
 
-/** 2:3 book cover with a soft shadow. Decorative: callers show the title as text next to it. */
+/**
+ * 2:3 book cover with a soft shadow. Decorative: callers show the title as text next to it.
+ * [titleEndInset] keeps a generated cover's title clear of a button overlaid on its top-end corner.
+ */
 @Composable
-fun BookCover(bookId: String, title: String, coverPath: String?, modifier: Modifier = Modifier) {
+fun BookCover(bookId: String, title: String, coverPath: String?, modifier: Modifier = Modifier, titleEndInset: Dp = 0.dp) {
     val shaped = modifier.aspectRatio(2f / 3f).shadow(4.dp, CoverShape).clip(CoverShape)
     if (coverPath != null) {
         AsyncImage(model = File(coverPath), contentDescription = null, contentScale = ContentScale.Crop, modifier = shaped)
     } else {
-        Box(shaped.background(generatedCoverTint(bookId)).padding(8.dp).clearAndSetSemantics {}) {
+        Box(shaped.background(generatedCoverTint(bookId)).padding(start = 8.dp, top = 8.dp, bottom = 8.dp, end = 8.dp + titleEndInset).clearAndSetSemantics {}) {
             Text(
                 title,
                 style = MaterialTheme.typography.titleSmall,

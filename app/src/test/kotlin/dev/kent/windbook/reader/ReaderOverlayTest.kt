@@ -10,6 +10,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 class ReaderOverlayTest {
@@ -61,5 +62,17 @@ class ReaderOverlayTest {
         }
         compose.onNodeWithText("ĐẮC NHÂN TÂM").assertIsDisplayed()
         compose.onNodeWithText("10%").assertIsDisplayed()
+    }
+
+    @Config(qualifiers = "tr")
+    @Test fun titleIsUppercasedWithTheAppLanguageRules() {
+        // Turkish dotted i: locale-less uppercasing gives "ISTANBUL", the correct form is "İSTANBUL".
+        compose.setContent {
+            ReaderOverlay(
+                visible = true, title = "istanbul", chapterTitle = null, progression = 0.1,
+                canMarkFinished = false, onMarkFinished = {}, onBack = {},
+            )
+        }
+        compose.onNodeWithText("İSTANBUL").assertIsDisplayed()
     }
 }

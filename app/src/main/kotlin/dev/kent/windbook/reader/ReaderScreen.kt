@@ -49,6 +49,7 @@ import dev.kent.windbook.input.KeyEventDispatcher
 import dev.kent.windbook.input.LocalKeyEventDispatcher
 import dev.kent.windbook.ui.components.ProgressLine
 import dev.kent.windbook.ui.components.formatPercent
+import dev.kent.windbook.ui.components.uppercaseForUi
 import dev.kent.windbook.ui.icons.WindBookIcons
 
 @Composable
@@ -161,7 +162,7 @@ fun ReaderOverlay(
             ) {
                 IconButton(onClick = onBack) { Icon(WindBookIcons.Back, contentDescription = stringResource(R.string.back)) }
                 Text(
-                    title.uppercase(),
+                    title.uppercaseForUi(),
                     style = MaterialTheme.typography.titleSmall.copy(letterSpacing = 0.08.em),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

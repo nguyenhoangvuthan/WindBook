@@ -54,4 +54,18 @@
     <string name="reading_empty_body">Sách bạn mở sẽ hiện ở đây, cuốn mới nhất ở trên cùng.</string>
     <string name="go_to_library">Đến kệ sách</string>
     <string name="continue_button">Đọc tiếp</string>
+    <string name="tab_notes">Ghi chú</string>
+    <string name="notes_empty_title">Highlight của bạn sẽ nằm ở đây</string>
+    <string name="notes_empty_body">Những đoạn bạn highlight và ghi chú khi đọc sẽ hiện ở màn hình này.</string>
+    <string name="tab_settings">Cài đặt</string>
+    <string name="settings_language">Ngôn ngữ</string>
+    <string name="language_system">Tự động (theo hệ thống)</string>
+    <string name="settings_storage">Bộ nhớ</string>
+    <string name="storage_books">Số sách</string>
+    <string name="storage_files">Dung lượng sách</string>
+    <string name="storage_free">Còn trống trên máy</string>
+    <string name="settings_about">Giới thiệu</string>
+    <string name="version">Phiên bản %1$s</string>
+    <string name="licences">Giấy phép mã nguồn mở</string>
+    <string name="close">Đóng</string>
 </resources>

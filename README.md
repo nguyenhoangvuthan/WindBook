@@ -84,9 +84,20 @@ Use **one** of the options below. When it's ready, `adb devices` must list exact
 ### A. Android emulator (easiest)
 
 ```bash
-~/Android/Sdk/emulator/emulator -avd Medium_Phone_API_37.0 &
+~/Android/Sdk/emulator/emulator -avd Neo3GT_API_36 -gpu swiftshader_indirect &
 adb wait-for-device && adb shell getprop sys.boot_completed   # repeat until it prints 1
 ```
+
+`Neo3GT_API_36` matches the target phone: Android 16 (API 36), 1080×2400, 420 dpi, 4 GB RAM. Create it once:
+
+```bash
+~/Android/Sdk/cmdline-tools/latest/bin/sdkmanager "system-images;android-36;google_apis_playstore;x86_64"
+echo no | ~/Android/Sdk/cmdline-tools/latest/bin/avdmanager create avd -n Neo3GT_API_36 \
+  -k "system-images;android-36;google_apis_playstore;x86_64" -d medium_phone
+# then set hw.ramSize=4096 in ~/.android/avd/Neo3GT_API_36.avd/config.ini
+```
+
+`-gpu swiftshader_indirect` renders in software. Use it if the emulator closes by itself with `gfxstream ... null ctx` in its log.
 
 ### B. Waydroid
 

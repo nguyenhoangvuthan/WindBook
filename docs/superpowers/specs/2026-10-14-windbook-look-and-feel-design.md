@@ -61,7 +61,7 @@ Highlight colours (M4, defined now in `Color.kt` so M4 does not invent them): ye
 - Literata serves the `display*`, `headline*` and `title*` styles: screen titles, book titles, card titles. Weights: 700 for screen titles, 600 for titles.
 - `body*` and `label*` use the system sans (`FontFamily.Default`).
 - All sizes are in `sp`, so the system font scale applies (main spec F2.15).
-- Book title in the reader top bar: Literata 600, `labelLarge` size, uppercased in code (`uppercase(locale)`), letter spacing 0.08 em. This avoids depending on an OpenType small-caps feature.
+- Book title in the reader top bar: Literata 600, `labelLarge` size, uppercased in code with the app language's rules (`uppercaseForUi()`, never `Locale.ROOT`, so Turkish "i" becomes "İ"), letter spacing 0.08 em. The same helper is used for every all-caps label. This avoids depending on an OpenType small-caps feature.
 - Section labels in sheets (e.g. "BRIGHTNESS & BACKGROUND"): `labelSmall`, uppercase via string resources, letter spacing 0.12 em, `onSurfaceVariant`.
 
 ### 3.3 Shapes and elevation
@@ -81,7 +81,8 @@ Covers without an image get a generated cover: a tinted paper background, chosen
 - New top-level keys in `navigation/Routes.kt`: `ReadingKey`, `NotesKey`, `SettingsKey`, next to `LibraryKey`. `ReaderKey` is unchanged.
 - **Tab rule:** the back stack holds at most one top-level key above `LibraryKey`. Selecting a tab gives `[LibraryKey]` for Library, or `[LibraryKey, <tab>]` for any other tab. Back from a non-Library tab returns to Library (M3 guidance). Re-selecting the current tab does nothing. This is a pure function `MutableList<NavKey>.selectTab(key)` in `BackStack.kt`, unit-tested like `openReader`.
 - The bottom `NavigationBar` shows only when the top entry is a top-level key. On `ReaderKey` it is hidden, and the reader stays immersive as in M1.
-- Tabs: Library (shelf icon), Reading (open book), Notes (pencil/note), Settings (gear). Selected state uses `primary` for the icon and label, with a `primaryContainer` indicator.
+- Insets: the tab bar owns the bottom inset. Every tab screen pads `safeDrawing` on the top and both sides (`TabScreenInsets`), so landscape with 3-button navigation or a camera cutout never covers content.
+- Tabs: Library (shelf icon), Reading (open book), Notes (pencil/note), Settings (gear). Selected state: `onPrimaryContainer` icon on a `primaryContainer` indicator (the Material 3 default pairing), `primary` label.
 
 ## 5. Screens
 
@@ -91,7 +92,7 @@ Behaviour stays as M1 (F1.4–F1.6, F1.12). Only structure and style change:
 
 1. Header: "Library" in Literata 700, then "│ N books" in `onSurfaceVariant`. N counts all books, not the filtered set.
 2. A search pill, always visible, replaces the toggle-search in the top app bar. A **Sort** pill sits at its right and opens the existing sort menu, with the selected option marked by a check icon instead of the "✓ " text prefix.
-3. Filter chips (All / Reading / To read / Finished). A grid/list toggle icon sits at the end of the chip row.
+3. Filter chips (All / Reading / To read / Finished) in a scrolling row that fades only on the side with hidden chips. The grid/list toggle sits in the search row after Sort, so the four chips fit on a phone in Vietnamese. Sort is an action button (TalkBack: "button"); filters are toggles ("selected").
 4. The Continue reading card (F1.5): a small cover, the label "CONTINUE READING", the title in Literata, the author, and a gold progress bar with the percentage. The chapter is not shown because the library does not store it.
 5. Grid: 3 columns on phones (adaptive `minSize` 100 dp), covers 2:3. A thin gold progress bar under covers with progress > 0. Under each cover: the title on one line (real cover images often have tiny text), then a "✓ Finished" caption for finished books or the author otherwise. Each cover has a **⋯** button that opens the same menu as long-press (status change, delete). Long-press remains.
 6. List layout: the same styling, as a row with a cover thumbnail, title, author, and a progress bar.
@@ -100,7 +101,7 @@ Behaviour stays as M1 (F1.4–F1.6, F1.12). Only structure and style change:
 
 ### 5.2 Reading tab (new)
 
-- A list of books with status READING, newest `lastOpenedAt` first. The newest is a large card (cover, title, author, chapter, progress, "Continue" button). The others are list rows with a progress bar.
+- A list of books with status READING, newest `lastOpenedAt` first. The newest is a large card (cover, title, author, progress, "Continue" button). The chapter is added in M3, which stores the chapter title with the reading position. The others are list rows with a progress bar.
 - Empty state: "No book in progress" plus a button that switches to the Library tab.
 - Data: a new `ReadingViewModel` over `LibraryRepository.observeLibrary()`, filtered and sorted in the ViewModel. No DAO change.
 

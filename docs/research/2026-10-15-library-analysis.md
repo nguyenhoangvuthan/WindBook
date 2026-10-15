@@ -59,6 +59,21 @@ Language is measured from each record's `text_sample`: the share of letters that
 | Slides (landscape) | A small page in the middle of a portrait screen. |
 | Double-tap zoom (any PDF) | Zooms about 1.8× but crops both sides, so every line needs a horizontal pan. |
 
+## After the PDF display work (same emulator), 2026-10-15
+
+| Sample | After |
+|---|---|
+| Technical EPUB | First line clear of the top edge. |
+| Vietnamese EPUB that links a missing stylesheet | Opens and reads. Before: the app crashed on open. |
+| LaTeX PDF (504×657 pt) | Fills the width with margins cropped. Body text is 1.26× the uncropped page (the book's text block is 75 % of the page width, so cropping cannot gain more without cutting text). |
+| calibre Vietnamese PDF (Letter) | Body text 1.20× the uncropped page. Still small; reading it comfortably needs zoom or reflow. |
+| Scanned textbook (24 MB, 2654×4329 pt pages) | **First page 1.3 s after the tap, 195 MB PSS; 267 MB after scrolling 51 pages.** Cropped margins appear about 3.5 s after opening. |
+| Slides (landscape) | One whole slide at a time on a dark surround; cover shown whole in the library. |
+| Comic PDF | Switched once to page by page; reopens that way. |
+| Double-tap zoom 2.5× | Scrolls sideways while zoomed; text turns sharp once the zoom settles. |
+
+Why the scan was slow before: Readium's PDF parser renders a cover at the page's full device-pixel size when it opens a PDF (≈ 15 500 × 25 000 px for this scan). WindBook now opens PDFs with the framework `PdfRenderer` only. The importer still extracts PDF metadata through Readium, so importing a large scan still pays that cost.
+
 ## Consequences for the design
 
 1. **Vietnamese EPUB is now the largest single group (368 books).** Most are calibre conversions with a 1.2 line height, and almost none has a PDF twin. Four of them were checked on the emulator with publisher styles (1.2 without and with an embedded font, 1.5, unset): stacked diacritics never touch the line above. Line-height controls therefore stay in M2 (F2.4).

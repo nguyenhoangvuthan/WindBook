@@ -37,3 +37,16 @@ Waydroid could not be used: its Android gets no IP (firewalld blocks DHCP on `wa
 | L8 | Open an EPUB in light mode | Page is sepia; centre tap shows bars with the title in capitals | Pass 2026-10-14 | |
 | L9 | Turn on system dark mode | Warm dark chrome; EPUB page turns dark | Pass 2026-10-14 | |
 | L10 | Open a book from the Reading tab, press Back | Returns to the Reading tab | Pass 2026-10-14 | |
+
+## PDF display (2026-10-15)
+
+| # | Step | Expected | Emulator | Neo 3 GT |
+|---|---|---|---|---|
+| P1 | Open a portrait PDF (LaTeX/InDesign book) | Fills the width, white margins cropped, scrolls vertically, no sideways panning | Pass 2026-10-15 (body text 1.26× the uncropped page; LaTeX book) | |
+| P2 | Pinch to 3×, scroll down, wait 0.2 s | Text sharp; no sideways jumps when scrolling down | Pass 2026-10-15 with double-tap 2.5× (adb can't pinch): soft at 0.3 s, sharp tile by 2 s | |
+| P3 | Open the scanned textbook, scroll 30 pages | First page ≤ 1.5 s; `dumpsys meminfo` TOTAL PSS < 400 MB | Pass 2026-10-15: first page 1.32 s after the tap (log), ~1.4 s (screen recording); PSS 195 MB open, 267 MB after 51 pages | |
+| P4 | Comic PDF → View → Page by page; reopen | Opens page by page next time; edge taps turn pages | Pass 2026-10-15 | |
+| P5 | Slides PDF | Opens page by page, whole slide visible | Pass 2026-10-15 | |
+| P6 | View → Crop margins off | Whole page with margins; choice remembered | Pass 2026-10-15 | |
+| P7 | EPUB | First and last lines clear of the screen edges and camera | Pass 2026-10-15 | |
+| P8 | EPUB that links a file missing from the book | Opens and reads; `adb logcat -b crash` empty | Pass 2026-10-15 | |

@@ -10,7 +10,7 @@ The owner reads on a 6.8" phone. The library (re-measured 2026-10-15) holds 703 
 This spec replaces PDF display with WindBook's own renderer and adds three small EPUB/library fixes: EPUB edge spacing, no crash on missing EPUB resources, and landscape covers.
 
 **Success criteria**
-1. Opening a portrait PDF shows its content at the full screen width with white margins cropped. On the measured LaTeX book, body text is at least 30 % larger than before.
+1. Opening a portrait PDF shows its content at the full screen width with white margins cropped. On the measured LaTeX book, body text is at least 30 % larger than before. *(Measured 2026-10-15: 26 % on the LaTeX book and 20 % on the calibre PDF. Their text blocks fill 75–80 % of the page width, so cropping alone cannot reach 30 %.)*
 2. Reading never needs horizontal panning at the default zoom.
 3. The 24 MB scanned textbook shows its first page in ≤ 1.5 s and stays under 400 MB PSS after scrolling 30 pages (emulator `Neo3GT_API_36` and the phone).
 4. Comic PDFs and slides can be read one whole page at a time, and the book remembers that choice.
@@ -63,7 +63,7 @@ Line height is therefore a reading preference, not a rendering fault. It stays w
 | **Page by page** | Books whose first pages are landscape (slides) | One page at a time, fitted whole (contain), dark surround `#141210`. Margins not cropped by default. | Swipe or edge tap (outer 25 %) turns the page. The middle 50 % toggles the overlay. Double-tap zooms 2.5× at the tap point. Volume/page keys turn the page. |
 
 - **The default is computed from the median aspect of pages 1–5.** Comic PDFs are portrait too, so they open in vertical scroll. The owner switches them once (§3.4) and the choice is remembered.
-- **Readium's PDF navigator is no longer used for display.** Readium still opens the publication: metadata, cover and `positions()` for locators.
+- **Readium no longer opens PDFs for reading.** Its PDF parser renders a cover at the first page's full device-pixel size on open, which took 36 s and about 1.5 GB for the 24 MB scan (measured 2026-10-15). WindBook opens PDFs with `PdfRenderer` only and builds locators itself (§3.5). The importer still uses Readium for PDF metadata.
 
 ### 3.2 Margin cropping
 
@@ -101,7 +101,7 @@ A change applies immediately, keeps the current page, and is saved to `book_pref
 
 ### 3.5 Positions and progress
 
-- Page index `i` (0-based) maps to `publication.positions()[i]`, encoded with the existing locator JSON. Saved data keeps the same format as M1.
+- Page index `i` (0-based) maps to a locator in the exact shape M1's Readium navigator saved: `href` `publication.pdf`, `type` `application/pdf`, `fragments` `["page=i+1"]`, `position` `i+1`, `progression` = `totalProgression` = `i / pageCount`. Saved data keeps the same format as M1.
 - Restoring reads `locations.position` (1-based) from the saved locator. A missing or invalid value opens page 0.
 - Progress uses the existing `readingProgression(position = i + 1, positionCount = pageCount)`. "Mark finished" therefore works on the last page.
 - Chapter title: none for PDFs yet. The outline arrives in M3.
@@ -140,7 +140,7 @@ WindBook therefore passes Readium an `OfflineHttpClient` (in `:reader`, both to 
 | `BookPreferencesDao`, entity, `Migration(1, 2)`, repository methods | `:core:data` | Persistence |
 | `OfflineHttpClient` | `:reader` | Readium `HttpClient` that fails every request softly. `ReadiumServices` uses it instead of `DefaultHttpClient`. |
 | `PdfDocumentHandle` | `:reader` | Opens a framework `PdfRenderer` on the single-thread dispatcher. Exposes page count, page sizes (points) and `render(page, crop, widthPx, region?)` returning a Bitmap. |
-| `PdfReaderSession : ReaderSession` | `:reader` | Holds the Readium publication and `PdfDocumentHandle`. Exposes `pageCount`, `locatorJsonFor(page)`, `pageOf(locatorJson)`. `ReaderEngine` creates it for PDFs. |
+| `PdfReaderSession : ReaderSession` | `:reader` | Holds the `PdfDocumentHandle` (no Readium publication, §3.1). Exposes `pageCount`, `locatorJsonFor(page)`, `pageOf(locatorJson)`. `ReaderEngine` creates it for PDFs. |
 | `PdfPageCache` | `:reader` | Bitmap LRU, prefetch and cancellation |
 | `PdfReaderView` | `:app` (`reader/pdf/`) | Compose. `LazyColumn` (vertical) or `HorizontalPager` (paged). Zoom/pan state, tap and key handling, reports page changes. |
 | `ReaderScreen` / `ReaderViewModel` | `:app` | EPUB → existing `ReaderHostFragment`. PDF → `PdfReaderView`. The ViewModel loads and saves `BookDisplayPrefs`, and the overlay shows the View menu. |

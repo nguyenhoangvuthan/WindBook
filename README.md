@@ -221,11 +221,7 @@ Do the steps in order. Write ✅ / ❌ (and a note) in the matching row of [docs
 - Or with adb: `adb shell cmd locale set-app-locales dev.kent.windbook --locales vi` (back to English: `--locales en`).
 - Expect: all buttons and menus in Vietnamese ("Thêm sách", "Đọc tiếp", "Tất cả"…).
 
-**16. Shoulder triggers (Neo 3 GT only)**
-- Run `adb shell getevent -l`, then press the left trigger, the right trigger, volume up and volume down. Stop with Ctrl+C.
-- Expect: nothing to pass or fail. Copy the output into the checklist note; Milestone 3 uses it to map the triggers to page turns.
-
-**17. Startup time**
+**16. Startup time**
 - Press Home, kill the app (`adb shell am force-stop dev.kent.windbook`), then run:
   ```bash
   adb shell am start -W dev.kent.windbook/.MainActivity | grep TotalTime

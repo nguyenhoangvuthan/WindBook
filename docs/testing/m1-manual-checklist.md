@@ -21,8 +21,7 @@ Waydroid could not be used: its Android gets no IP (firewalld blocks DHCP on `wa
 | 13 | Long-press → Mark as finished; filter "Finished" | Book listed under Finished | ➖ Compose UI test only | |
 | 14 | Long-press → Delete… → Delete, re-add | Disappears; re-add starts at 0% | ➖ unit tests only | |
 | 15 | App language Vietnamese (`cmd locale set-app-locales … vi`) | All UI in Vietnamese | ✅ | |
-| 16 | Neo 3 GT: `adb shell getevent -l`, press shoulder triggers | Record key codes for M3 F3.11 | n/a | |
-| 17 | Cold start `am start -W` | TotalTime < 2000 ms | ✅ 691–921 ms | |
+| 16 | Cold start `am start -W` | TotalTime < 2000 ms | ✅ 691–921 ms | |
 
 ## Look & feel (2026-10-14 redesign)
 

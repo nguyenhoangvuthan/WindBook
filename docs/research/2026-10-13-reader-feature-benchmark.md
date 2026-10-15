@@ -72,7 +72,7 @@ Codes: **KN** Kindle · **PB** Play Books · **KB** Kobo · **M+** Moon+ · **RE
 | 2 | **One-tap lookup card**: offline dictionary + **offline EN↔VI translation** + pronounce + highlight + save word, in one pop-up | Kindle/Play Books translate needs internet. KOReader works offline but with a clunky UI. Most split these across menus | KOReader |
 | 3 | **Words with context → spaced-repetition review** (captured from v1) | Only KOReader/Kindle do this, and neither is a modern phone-native app for your own files | KOReader vocabulary builder |
 | 4 | **One-tap Markdown/Obsidian export**, offline, no account | Readwise needs a subscription and the cloud. Others export plain text or HTML | Readwise, KOReader |
-| 5 | **Shoulder-trigger page turns** on gaming phones (Neo 3 GT), plus volume keys | No reader supports gaming-phone triggers | Moon+ (volume keys only) |
+| 5 | ~~**Shoulder-trigger page turns**~~ (dropped 2026-10-15); volume keys remain | No reader supports gaming-phone triggers | Moon+ (volume keys only) |
 | 6 | **Footnote pop-up + "back to where I was" + time left in chapter**, together in a modern UI | Each exists somewhere, never all three in a clean phone UI | Kindle (own store only) |
 | 7 | **Presets-first UI with Moon+-level "Advanced"** | Power users get control. Everyone else never sees a wall of settings | — |
 | 8 | **(v2) Spoiler-safe "Ask this book" on *your own files* with *your own key*** | Kindle's version only works on Kindle-store books. Readwise's AI isn't position-aware | Kindle, Readwise |
@@ -126,7 +126,7 @@ Codes: **KN** Kindle · **PB** Play Books · **KB** Kobo · **M+** Moon+ · **RE
 | Immersive full screen; tap centre = controls | all | **v1** |
 | Configurable tap zones (left/right/top/bottom) | KOReader, Moon+ | **v1** (defaults) / v1.x (custom) |
 | **Volume keys** page turn | Moon+, Kindle | **v1** |
-| **Shoulder-trigger page turn** (device-specific) | — | **v1** if `getevent` shows key events, else document the Game Space mapping |
+| ~~**Shoulder-trigger page turn**~~ (device-specific) | — | **Dropped** by the owner on 2026-10-15 |
 | Page-turn animation: none / slide (Readium 3.2+) | Apple Books | **v1** (default *none*) |
 | Status footer: time left in chapter / book, clock, battery | Kindle, KOReader | **v1** ("time left" needs reading speed from sessions) |
 | TOC with current-chapter marker + per-chapter progress | KOReader | **v1** |
@@ -245,7 +245,7 @@ Codes: **KN** Kindle · **PB** Play Books · **KB** Kobo · **M+** Moon+ · **RE
 
 ## 4. What WindBook v1 is, in one paragraph
 
-A native, private EPUB/PDF reader that opens instantly, never loses your place, and has the most comfortable reading surface on an AMOLED phone. It offers curated themes, Literata, font-weight boost, low-flicker dimming, footnote pop-ups, volume/shoulder-key paging and time-left estimates. Long-press gives an offline dictionary, offline English↔Vietnamese translation and a highlight, and notes export to Markdown in one tap. No account, no ads, no cloud. Everything else (stats, TTS, vocabulary review, OPDS, AI) builds on data v1 already records.
+A native, private EPUB/PDF reader that opens instantly, never loses your place, and has the most comfortable reading surface on an AMOLED phone. It offers curated themes, Literata, font-weight boost, low-flicker dimming, footnote pop-ups, volume-key paging and time-left estimates. Long-press gives an offline dictionary, offline English↔Vietnamese translation and a highlight, and notes export to Markdown in one tap. No account, no ads, no cloud. Everything else (stats, TTS, vocabulary review, OPDS, AI) builds on data v1 already records.
 
 ---
 

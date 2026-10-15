@@ -132,8 +132,8 @@ Each milestone ends with a signed APK the owner installs and uses. Each gets its
 - F3.7 In-book search for EPUB via Readium search service. Results list with context snippets. Jump + highlight result.
 - F3.8 Full-screen image viewer with pinch zoom (EPUB tap on image, Readium `TapEvent.targetElement`).
 - F3.9 Auto-scroll in scroll mode: speed slider, tap to pause.
-- F3.10 Custom tap zones (3×3 grid → action) and key bindings ("press a key to assign"). This covers volume keys and any shoulder-trigger key codes.
-- F3.11 Shoulder triggers: if `getevent` shows the triggers emit key events, map them by default. Otherwise, document the Game Space mapping to edge taps.
+- F3.10 Custom tap zones (3×3 grid → action) and key bindings ("press a key to assign"). This covers volume keys and hardware page-turn keys.
+- ~~F3.11 Shoulder triggers~~: dropped by the owner on 2026-10-15. WindBook does not support the Neo 3 GT shoulder triggers.
 
 ### M4 – Highlights & notes
 - F4.1 Text selection menu: Highlight (5 colours), Underline, Note, Copy, Look up (→ M5), Share.
@@ -219,6 +219,5 @@ Each milestone ends with a signed APK the owner installs and uses. Each gets its
 | Readium Compose navigators are alpha | Use fragment navigators embedded via `AndroidFragment`. Revisit when stable |
 | PdfiumAndroid unmaintained, comes from JitPack | Isolated behind `:reader`. androidx.pdf migration path in M8 |
 | ML Kit translation needs Google Play services for the model download; Waydroid has none | Test translation on the real phone. Feature degrades with a clear message |
-| Shoulder triggers may not emit key events | Generic key binding (F3.10) + Game Space fallback doc |
 | KOReader xpointer ↔ Readium Locator mismatch | Percentage-based mapping. Documented as approximate |
 | AGP 9 built-in Kotlin with Hilt/KSP plugin compatibility | Pinned versions verified together in M1 Task 1. Readium 3.4.0 itself builds with the same Kotlin/KSP line |

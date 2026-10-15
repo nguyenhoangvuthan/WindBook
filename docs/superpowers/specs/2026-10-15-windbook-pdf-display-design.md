@@ -21,10 +21,22 @@ This spec replaces PDF display with WindBook's own renderer and adds two small E
 | Question | Decision |
 |---|---|
 | Scope | A + B together: smart defaults **and** WindBook's own PDF renderer with margin cropping. PDF reflow (C) is deferred. |
-| Renderer | **PdfiumAndroid 1.9.8**, already shipped with Readium (`com.shockwave.pdfium.PdfiumCore`). It renders any page region into a bitmap (`renderPageBitmap` with offset and draw size), reads the outline for M3 and opens permission-restricted files. No new dependency. |
+| Renderer | **`android.graphics.pdf.PdfRenderer`** (framework, PDFium inside). It renders any page region through a transform `Matrix` and **closes each page after rendering**. No new dependency. Chosen over PdfiumAndroid 1.9.8 after a measured spike (§2.1). |
 | Per-book choices | Stored in the database table `book_preferences` that the main spec planned for M2. It is pulled forward, with Room schema v1 → v2. |
 | Comic archives and image folders | Out of scope. Storage only, never scanned into the app. |
 | EPUB | Keep publisher styles. Only add top/bottom spacing and cutout safety. |
+
+### 2.1 Renderer spike (emulator `Neo3GT_API_36`, 2026-10-15)
+
+Each page was rendered at 1080 px wide, 40 pages per book.
+
+| Book | PdfiumAndroid 1.9.8 (Readium's engine) | Framework `PdfRenderer` |
+|---|---|---|
+| Scanned textbook, 24 MB | First page 213 ms; **PSS grows ~11 MB per page, 566 MB after 40 pages**. No public `closePage`, so pages stay open until the document closes. | First page 223 ms; **PSS flat at ~63 MB** |
+| LaTeX book | 75 MB after 40 pages | 61 MB after 40 pages |
+| Owner-restricted PDF (RC4, copy disallowed, no open password) | — | Opens and renders (189 ms) |
+
+PdfiumAndroid would exhaust memory on a 300+ page scan, so the framework renderer is used. PdfiumAndroid stays only as Readium's internal dependency. The M3 outline can read bookmarks through it without rendering.
 
 ## 3. Behaviour
 
@@ -56,8 +68,8 @@ Analysis runs off the main thread after the first page is shown. Until it finish
 
 ### 3.3 Rendering and memory
 
-- All PdfiumCore calls run on one dedicated single-thread dispatcher, because PDFium is not thread-safe. The document is opened from a `ParcelFileDescriptor` and closed with the session.
-- **Base bitmaps:** each page is rendered at the viewport width in pixels, mapping its crop box to the bitmap (`renderPageBitmap` with negative start offsets and the full-page draw size). `RGB_565` is used for page bitmaps.
+- All `PdfRenderer` calls run on one dedicated single-thread dispatcher: it allows one open page at a time and is not thread-safe. The document is opened from a `ParcelFileDescriptor` and closed with the session. Every render opens the page, renders it and closes it again.
+- **Base bitmaps:** each page is rendered at the viewport width in pixels, with a `Matrix` (scale + translate) that maps its crop box onto the bitmap. `PdfRenderer` requires `ARGB_8888`, and bitmaps are filled white before rendering because PDF pages are transparent.
 - **Zoomed detail:** after a zoom gesture settles (150 ms), only the visible part of each visible page is re-rendered at zoomed resolution (a viewport-sized tile) and drawn over the scaled base bitmap.
 - **Cache:** an LRU of bitmaps bounded at min(48 MB, maxMemory / 6). Pages within ±2 of the viewport are prefetched. Renders for pages scrolled out of range are cancelled.
 - A page that fails to render shows a grey box with "This page can't be shown". Its neighbours are unaffected.
@@ -105,7 +117,7 @@ A cover image whose width exceeds its height is drawn whole (`ContentScale.Fit`)
 | `PdfLayout`, `BookDisplayPrefs`, `defaultPdfLayout(pageAspects)` | `:core:model` | Pure types and the default rule |
 | `MarginDetector` | `:core:model` | Pure Kotlin. Input: luminance `ByteArray`, width, height. Output: content box. Also `bookCropBox(samples)` (percentiles, clamps). |
 | `BookPreferencesDao`, entity, `Migration(1, 2)`, repository methods | `:core:data` | Persistence |
-| `PdfDocumentHandle` | `:reader` | Opens PdfiumCore on the single-thread dispatcher. Exposes page count, page sizes and `render(page, crop, widthPx, region?)` returning a Bitmap. |
+| `PdfDocumentHandle` | `:reader` | Opens a framework `PdfRenderer` on the single-thread dispatcher. Exposes page count, page sizes (points) and `render(page, crop, widthPx, region?)` returning a Bitmap. |
 | `PdfReaderSession : ReaderSession` | `:reader` | Holds the Readium publication and `PdfDocumentHandle`. Exposes `pageCount`, `locatorJsonFor(page)`, `pageOf(locatorJson)`. `ReaderEngine` creates it for PDFs. |
 | `PdfPageCache` | `:reader` | Bitmap LRU, prefetch and cancellation |
 | `PdfReaderView` | `:app` (`reader/pdf/`) | Compose. `LazyColumn` (vertical) or `HorizontalPager` (paged). Zoom/pan state, tap and key handling, reports page changes. |

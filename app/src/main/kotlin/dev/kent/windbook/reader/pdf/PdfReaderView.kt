@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -51,6 +52,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.kent.windbook.R
 import dev.kent.windbook.core.model.CropBox
@@ -60,6 +62,7 @@ import dev.kent.windbook.input.KeyEventDispatcher
 import dev.kent.windbook.input.LocalKeyEventDispatcher
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -122,6 +125,12 @@ private fun VerticalPages(
     val hScroll = rememberScrollState()
     val scope = rememberCoroutineScope()
     var zoom by remember { mutableFloatStateOf(1f) }
+    val details = remember { mutableStateMapOf<Int, Pair<PixelRegion, ImageBitmap>>() }
+    var pinching by remember { mutableStateOf(false) }
+    LaunchedEffect(zoom) {
+        delay(150)
+        pinching = false
+    }
     val density = LocalDensity.current
 
     LaunchedEffect(listState) {
@@ -132,6 +141,28 @@ private fun VerticalPages(
         val viewportW = constraints.maxWidth
         val viewportH = constraints.maxHeight
         val pageWidthPx = (viewportW * zoom).roundToInt()
+
+        LaunchedEffect(zoom, pageWidthPx) {
+            details.clear()
+            if (zoom <= 1.05f) return@LaunchedEffect
+            snapshotFlow {
+                Triple(listState.isScrollInProgress || hScroll.isScrollInProgress || pinching, listState.layoutInfo.visibleItemsInfo.map { it.index to it.offset }, hScroll.value)
+            }.distinctUntilChanged().collect { (moving, visible, scrollX) ->
+                if (moving) return@collect
+                delay(150)
+                for ((page, offsetY) in visible) {
+                    val crop = cropFor(page)
+                    val pageH = renderedHeight(source.pageSize(page), crop, pageWidthPx)
+                    val top = (-offsetY).coerceAtLeast(0)
+                    val bottom = (viewportH - offsetY).coerceAtMost(pageH)
+                    if (bottom <= top) continue
+                    val region = PixelRegion(scrollX, top, viewportW.coerceAtMost(pageWidthPx - scrollX), bottom - top)
+                    if (details[page]?.first == region) continue
+                    runCatching { source.render(page, crop, pageWidthPx, region) }
+                        .onSuccess { details[page] = region to it.asImageBitmap() }
+                }
+            }
+        }
 
         PageTurnKeys { forward ->
             scope.launch { listState.animateScrollBy(viewportH * 0.9f * if (forward) 1 else -1) }
@@ -159,6 +190,7 @@ private fun VerticalPages(
                 .fillMaxSize()
                 .testTag(PDF_VERTICAL_TAG)
                 .pinchZoom { change, centroid ->
+                    pinching = true
                     val next = (zoom * change).coerceIn(1f, MAX_ZOOM)
                     val ratio = next / zoom
                     if (ratio != 1f) {
@@ -197,15 +229,18 @@ private fun VerticalPages(
                     }
                     val crop = cropFor(page)
                     val heightPx = renderedHeight(source.pageSize(page), crop, pageWidthPx)
-                    PageBitmap(
-                        source = source,
-                        page = page,
-                        crop = crop,
-                        renderWidthPx = viewportW,
-                        modifier = Modifier
-                            .width(with(density) { pageWidthPx.toDp() })
-                            .height(with(density) { heightPx.toDp() }),
-                    )
+                    Box(Modifier.width(with(density) { pageWidthPx.toDp() }).height(with(density) { heightPx.toDp() })) {
+                        PageBitmap(source, page, crop, renderWidthPx = viewportW, modifier = Modifier.fillMaxSize())
+                        details[page]?.let { (region, tile) ->
+                            Image(
+                                tile,
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .offset { IntOffset(region.x, region.y) }
+                                    .size(with(density) { region.width.toDp() }, with(density) { region.height.toDp() }),
+                            )
+                        }
+                    }
                 }
             }
         }

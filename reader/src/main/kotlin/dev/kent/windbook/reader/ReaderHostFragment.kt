@@ -14,15 +14,12 @@ import androidx.lifecycle.repeatOnLifecycle
 import dev.kent.windbook.core.model.BookFormat
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import org.readium.adapter.pdfium.navigator.PdfiumEngineProvider
 import org.readium.r2.navigator.Navigator
 import org.readium.r2.navigator.OverflowableNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.input.InputListener
 import org.readium.r2.navigator.input.TapEvent
-import org.readium.r2.navigator.pdf.PdfNavigatorFactory
-import org.readium.r2.navigator.pdf.PdfNavigatorFragment
 import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.navigator.util.DirectionalNavigationAdapter
 import org.readium.r2.shared.ExperimentalReadiumApi
@@ -50,10 +47,8 @@ class ReaderHostFragment : Fragment() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val format = BookFormat.valueOf(requireArguments().getString(ARG_FORMAT, BookFormat.EPUB.name))
-        childFragmentManager.fragmentFactory = when (format) {
-            BookFormat.EPUB -> EpubNavigatorFragment.createDummyFactory()
-            BookFormat.PDF -> PdfNavigatorFragment.createDummyFactory(pdfEngineProvider = PdfiumEngineProvider())
-        }
+        require(format == BookFormat.EPUB) { "ReaderHostFragment hosts EPUB only; PDFs use PdfReaderView" }
+        childFragmentManager.fragmentFactory = EpubNavigatorFragment.createDummyFactory()
         super.onCreate(savedInstanceState)
         // A restored (dummy) navigator throws if it reaches onResume, so drop it now;
         // bind() adds a fresh one at the right locator.
@@ -82,22 +77,14 @@ class ReaderHostFragment : Fragment() {
         boundSession = readium
         val initialLocator = initialLocatorJson?.toLocatorOrNull()
 
-        childFragmentManager.fragmentFactory = when (readium.format) {
-            BookFormat.EPUB -> EpubNavigatorFactory(readium.publication)
-                .createFragmentFactory(
-                    initialLocator = initialLocator,
-                    initialPreferences = initialEpubPreferences(darkTheme),
-                )
-            BookFormat.PDF -> PdfNavigatorFactory(readium.publication, PdfiumEngineProvider())
-                .createFragmentFactory(initialLocator = initialLocator)
-        }
-        val navigatorClass = when (readium.format) {
-            BookFormat.EPUB -> EpubNavigatorFragment::class.java
-            BookFormat.PDF -> PdfNavigatorFragment::class.java
-        }
+        childFragmentManager.fragmentFactory = EpubNavigatorFactory(readium.publication)
+            .createFragmentFactory(
+                initialLocator = initialLocator,
+                initialPreferences = initialEpubPreferences(darkTheme),
+            )
         childFragmentManager.commitNow {
             childFragmentManager.findFragmentByTag(NAVIGATOR_TAG)?.let { remove(it) }
-            add(R.id.windbook_navigator_container, navigatorClass, Bundle(), NAVIGATOR_TAG)
+            add(R.id.windbook_navigator_container, EpubNavigatorFragment::class.java, Bundle(), NAVIGATOR_TAG)
         }
         attachListeners()
     }

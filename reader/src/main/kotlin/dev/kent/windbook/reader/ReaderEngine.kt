@@ -14,19 +14,13 @@ class ReaderEngine(private val services: ReadiumServices) : BookOpener {
     override suspend fun open(file: File, format: BookFormat): Result<ReaderSession> =
         withContext(Dispatchers.IO) {
             if (!file.exists()) return@withContext Result.failure(ReaderException("Missing file: $file"))
-            services.openPublication(file).mapCatching { publication ->
-                val positions = publication.positions()
-                when (format) {
-                    BookFormat.EPUB -> ReadiumReaderSession(format, publication, positionCount = positions.size)
-                    BookFormat.PDF -> try {
-                        // Locators come from Readium positions; a PDF without them can't be resumed.
-                        if (positions.isEmpty()) throw ReaderException("PDF has no positions")
-                        PdfReaderSession(publication, PdfDocumentHandle.open(file), positions)
-                    } catch (e: Exception) {
-                        publication.close()
-                        throw ReaderException("PDF can't be rendered: ${e.message}")
-                    }
+            when (format) {
+                BookFormat.EPUB -> services.openPublication(file).map { publication ->
+                    ReadiumReaderSession(format, publication, positionCount = publication.positions().size)
                 }
+                // Not through Readium: its PDF parser renders a full-size cover on open (see PdfReaderSession).
+                BookFormat.PDF -> runCatching { PdfReaderSession(PdfDocumentHandle.open(file)) }
+                    .recoverCatching { throw ReaderException("PDF can't be rendered: ${it.message}") }
             }
         }
 }

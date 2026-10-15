@@ -40,6 +40,16 @@ class PdfEngineDeviceTest {
         session.close()
     }
 
+    /** Readium's PDF parser renders a full-size cover on open: ~1.5 GB and 36 s for the owner's scanned textbook. */
+    @Test fun hugeScannedPagesOpenWithinTheFirstPageBudget() = runBlocking {
+        val file = PdfFixtures.boxed(context.cacheDir, "huge.pdf", pages = 3, pageW = 2654, pageH = 4329)
+        val started = android.os.SystemClock.elapsedRealtime()
+        val session = engine.open(file, BookFormat.PDF).getOrThrow() as PdfSession
+        val elapsed = android.os.SystemClock.elapsedRealtime() - started
+        session.close()
+        assertTrue("open took $elapsed ms", elapsed < 1500)
+    }
+
     @Test fun corruptPdfFailsToOpen() = runBlocking {
         val junk = context.cacheDir.resolve("corrupt.pdf").apply { writeText("%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n") }
         assertTrue(engine.open(junk, BookFormat.PDF).isFailure)

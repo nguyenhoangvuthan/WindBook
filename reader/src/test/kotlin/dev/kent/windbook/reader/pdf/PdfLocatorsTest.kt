@@ -1,5 +1,6 @@
 package dev.kent.windbook.reader.pdf
 
+import dev.kent.windbook.reader.toJsonString
 import dev.kent.windbook.reader.toLocatorOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -22,5 +23,16 @@ class PdfLocatorsTest {
     @Test fun positionBeyondTheEndIsClamped() {
         val json = """{"href":"x","type":"application/pdf","locations":{"position":999}}"""
         assertEquals(9, pageIndexOf(json.toLocatorOrNull(), pageCount = 10))
+    }
+
+    @Test fun ownLocatorsMatchTheM1Format() {
+        // Same fields M1's Readium navigator saved, so old and new progress read the same way.
+        val locator = pdfLocator(page = 23, pageCount = 258)
+        assertEquals("publication.pdf", locator.href.toString())
+        assertEquals("application/pdf", locator.mediaType.toString())
+        assertEquals(24, locator.locations.position)
+        assertEquals(listOf("page=24"), locator.locations.fragments)
+        assertEquals(23.0 / 258, locator.locations.totalProgression!!, 1e-9)
+        assertEquals(23, pageIndexOf(locator.toJsonString().toLocatorOrNull(), pageCount = 258))
     }
 }

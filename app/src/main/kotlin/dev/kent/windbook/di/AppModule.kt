@@ -6,6 +6,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import dev.kent.windbook.core.data.DisplayPreferencesRepository
 import dev.kent.windbook.core.data.LibraryPreferences
 import dev.kent.windbook.core.data.LibraryRepository
 import dev.kent.windbook.core.data.db.WindBookDatabase
@@ -47,6 +48,10 @@ object AppModule {
     @Provides @Singleton
     fun libraryRepository(db: WindBookDatabase, files: BookFileStore): LibraryRepository =
         LibraryRepository(db.libraryDao(), files)
+
+    @Provides @Singleton
+    fun displayPreferences(db: WindBookDatabase): DisplayPreferencesRepository =
+        DisplayPreferencesRepository(db.bookPreferencesDao())
 
     @Provides @Singleton
     fun libraryPreferences(@ApplicationContext context: Context): LibraryPreferences =

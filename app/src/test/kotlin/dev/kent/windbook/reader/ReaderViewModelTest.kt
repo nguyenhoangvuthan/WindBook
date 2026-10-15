@@ -2,6 +2,7 @@ package dev.kent.windbook.reader
 
 import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
+import dev.kent.windbook.core.data.DisplayPreferencesRepository
 import dev.kent.windbook.core.data.LibraryRepository
 import dev.kent.windbook.core.data.db.BookEntity
 import dev.kent.windbook.core.data.db.WindBookDatabase
@@ -30,6 +31,7 @@ class ReaderViewModelTest {
 
     private lateinit var db: WindBookDatabase
     private lateinit var library: LibraryRepository
+    private lateinit var prefs: DisplayPreferencesRepository
     private lateinit var bookFile: File
 
     private class FakeSession(override val format: BookFormat) : ReaderSession {
@@ -42,6 +44,7 @@ class ReaderViewModelTest {
     @Before fun setUp() = runTest {
         db = WindBookDatabase.inMemory(ApplicationProvider.getApplicationContext(), AndroidSQLiteDriver())
         library = LibraryRepository(db.libraryDao(), BookFileStore(tmp.newFolder("app")))
+        prefs = DisplayPreferencesRepository(db.bookPreferencesDao())
         bookFile = tmp.newFile("a.epub")
         db.libraryDao().insert(
             BookEntity("a", "Dune", null, "EPUB", bookFile.absolutePath, 1, "sha", null, null, "TO_READ", 1, null, 1, null),
@@ -56,35 +59,35 @@ class ReaderViewModelTest {
     @Test fun ready_containsSavedLocator() = runTest {
         library.saveProgress("a", """{"href":"c3"}""", 0.6)
 
-        val state = ReaderViewModel("a", library, opener).awaitSettled() as ReaderUiState.Ready
+        val state = ReaderViewModel("a", library, opener, prefs).awaitSettled() as ReaderUiState.Ready
 
         assertEquals("Dune", state.title)
         assertEquals("""{"href":"c3"}""", state.initialLocatorJson)
     }
 
     @Test fun opening_marksBookReading() = runTest {
-        ReaderViewModel("a", library, opener).awaitSettled()
+        ReaderViewModel("a", library, opener, prefs).awaitSettled()
         assertEquals(ReadingStatus.READING, library.book("a")!!.status)
     }
 
     @Test fun unknownBook_isNotFound() = runTest {
-        assertEquals(ReaderUiState.Error(ReaderError.NOT_FOUND), ReaderViewModel("zzz", library, opener).awaitSettled())
+        assertEquals(ReaderUiState.Error(ReaderError.NOT_FOUND), ReaderViewModel("zzz", library, opener, prefs).awaitSettled())
     }
 
     @Test fun missingFile_isFileMissing() = runTest {
         bookFile.delete()
-        assertEquals(ReaderUiState.Error(ReaderError.FILE_MISSING), ReaderViewModel("a", library, opener).awaitSettled())
+        assertEquals(ReaderUiState.Error(ReaderError.FILE_MISSING), ReaderViewModel("a", library, opener, prefs).awaitSettled())
     }
 
     @Test fun openerFailure_isCannotOpenAndBookStaysToRead() = runTest {
         val failing = BookOpener { _, _ -> Result.failure(IllegalStateException("broken")) }
-        assertEquals(ReaderUiState.Error(ReaderError.CANNOT_OPEN), ReaderViewModel("a", library, failing).awaitSettled())
+        assertEquals(ReaderUiState.Error(ReaderError.CANNOT_OPEN), ReaderViewModel("a", library, failing, prefs).awaitSettled())
         assertEquals(ReadingStatus.TO_READ, library.book("a")!!.status)
     }
 
     @Test fun latestLocator_startsFromSavedAndFollowsChanges() = runTest {
         library.saveProgress("a", """{"href":"c3"}""", 0.6)
-        val vm = ReaderViewModel("a", library, opener)
+        val vm = ReaderViewModel("a", library, opener, prefs)
         vm.awaitSettled()
         assertEquals("""{"href":"c3"}""", vm.latestLocatorJson)
 
@@ -95,7 +98,7 @@ class ReaderViewModelTest {
     }
 
     @Test fun nearTheEnd_offersMarkFinished() = runTest {
-        val vm = ReaderViewModel("a", library, opener)
+        val vm = ReaderViewModel("a", library, opener, prefs)
         vm.awaitSettled()
         assertEquals(false, vm.canMarkFinished.value)
 
@@ -115,7 +118,7 @@ class ReaderViewModelTest {
 
     @Test fun removeBook_deletesThenCallsBack() = runTest {
         bookFile.delete()
-        val vm = ReaderViewModel("a", library, opener)
+        val vm = ReaderViewModel("a", library, opener, prefs)
         vm.awaitSettled()
         val removed = kotlinx.coroutines.CompletableDeferred<Unit>()
 
@@ -126,7 +129,7 @@ class ReaderViewModelTest {
     }
 
     @Test fun rapidLocatorChanges_persistLastLocator() = runTest {
-        val vm = ReaderViewModel("a", library, opener)
+        val vm = ReaderViewModel("a", library, opener, prefs)
         vm.awaitSettled()
 
         repeat(100) { i -> vm.onLocatorChanged("""{"href":"c","i":$i}""", i / 100.0, null) }
@@ -144,7 +147,7 @@ class ReaderViewModelTest {
     }
 
     @Test fun toggleOverlay_flips() = runTest {
-        val vm = ReaderViewModel("a", library, opener)
+        val vm = ReaderViewModel("a", library, opener, prefs)
         val before = vm.overlayVisible.value
         vm.toggleOverlay()
         assertEquals(!before, vm.overlayVisible.value)

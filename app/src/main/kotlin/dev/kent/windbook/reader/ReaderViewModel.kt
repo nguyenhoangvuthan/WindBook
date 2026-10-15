@@ -6,8 +6,13 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.kent.windbook.core.data.DisplayPreferencesRepository
 import dev.kent.windbook.core.data.LibraryRepository
+import dev.kent.windbook.core.model.BookDisplayPrefs
+import dev.kent.windbook.core.model.EffectiveDisplay
+import dev.kent.windbook.core.model.PdfLayout
 import dev.kent.windbook.core.model.ReadingStatus
+import dev.kent.windbook.core.model.resolve
 import java.io.File
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -37,6 +42,7 @@ class ReaderViewModel @AssistedInject constructor(
     @Assisted private val bookId: String,
     private val library: LibraryRepository,
     private val opener: BookOpener,
+    private val displayPrefs: DisplayPreferencesRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<ReaderUiState>(ReaderUiState.Loading)
@@ -50,6 +56,13 @@ class ReaderViewModel @AssistedInject constructor(
 
     private val _overlayVisible = MutableStateFlow(false)
     val overlayVisible: StateFlow<Boolean> = _overlayVisible.asStateFlow()
+
+    private val _pdfDisplay = MutableStateFlow<EffectiveDisplay?>(null)
+
+    /** How a PDF is shown (null for EPUB or while loading). */
+    val pdfDisplay: StateFlow<EffectiveDisplay?> = _pdfDisplay.asStateFlow()
+
+    private var currentPrefs = BookDisplayPrefs()
 
     private val finished = MutableStateFlow(false)
 
@@ -97,6 +110,15 @@ class ReaderViewModel @AssistedInject constructor(
                 session = opened
                 latestLocatorJson = savedLocator
                 library.markOpened(bookId)
+                if (opened is PdfSession) {
+                    val firstPages = opened.firstPageSizes()
+                    viewModelScope.launch {
+                        displayPrefs.observe(bookId).collect { prefs ->
+                            currentPrefs = prefs
+                            _pdfDisplay.value = prefs.resolve(firstPages)
+                        }
+                    }
+                }
                 _state.value = ReaderUiState.Ready(opened, book.title, savedLocator)
             }
             .onFailure { _state.value = ReaderUiState.Error(ReaderError.CANNOT_OPEN) }
@@ -110,6 +132,28 @@ class ReaderViewModel @AssistedInject constructor(
     }
 
     fun toggleOverlay() = _overlayVisible.update { !it }
+
+    fun setPdfLayout(layout: PdfLayout) = updatePrefs { it.copy(pdfLayout = layout) }
+
+    fun setCropMargins(enabled: Boolean) = updatePrefs { it.copy(cropMargins = enabled) }
+
+    private fun updatePrefs(change: (BookDisplayPrefs) -> BookDisplayPrefs) {
+        val next = change(currentPrefs)
+        viewModelScope.launch { displayPrefs.set(bookId, next) }
+    }
+
+    /** PDF pages are 0-based; progress uses page / pageCount so the last page reaches 100 %. */
+    fun onPdfPageChanged(page: Int) {
+        val pdf = session as? PdfSession ?: return
+        onLocatorChanged(
+            locatorJson = pdf.locatorJsonFor(page),
+            progression = readingProgression(position = page + 1, positionCount = pdf.pageCount, totalProgression = null),
+            chapterTitle = null,
+        )
+    }
+
+    /** Where a (re-)created PDF view starts: the newest position, else the saved one. */
+    fun initialPdfPage(): Int = (session as? PdfSession)?.pageOf(latestLocatorJson) ?: 0
 
     fun markFinished() {
         finished.value = true

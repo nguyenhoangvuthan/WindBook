@@ -18,7 +18,8 @@ Language is measured from each record's `text_sample`: the share of letters that
 
 ### EPUB
 
-- The `language` field is wrong or missing for 117 EPUBs: 103 tagged `en` contain Vietnamese text, and 14 have no tag. WindBook must not rely on it to pick Vietnamese typography.
+- When measured, the catalog's `language` field was wrong or missing for 117 EPUBs: 103 tagged `en` contained Vietnamese text, and 14 had no tag. The owner is correcting the catalog labels. The `dc:language` inside the EPUB files stays as published, so WindBook must not rely on it to pick Vietnamese typography.
+- **100 EPUBs (15 %, 71 of them Vietnamese) reference a file that is not in the book**, most often a stylesheet. On the emulator, opening such a book crashed WindBook (see the PDF display spec, §3.8).
 - 324 of the 368 Vietnamese EPUBs were produced by calibre and 38 by Sigil. 105 embed their own fonts (English: 11 of 294).
 - Body line height set by the publisher stylesheet (most common value in the book):
 
@@ -60,10 +61,11 @@ Language is measured from each record's `text_sample`: the share of letters that
 
 ## Consequences for the design
 
-1. **Vietnamese EPUB is now the largest single group (368 books).** Most are calibre conversions with a 1.2 line height, and almost none has a PDF twin. How they read with publisher styles decides whether Vietnamese-friendly spacing belongs in the PDF display work or stays in M2.
-2. Reflowing PDFs still helps few books. English prose often has an EPUB twin, technical books break when reflowed, and scans have no text. It stays deferred.
-3. Auto-cropped margins, fit to width and continuous vertical scroll help the ~550 typeset and calibre PDFs (87 of them Vietnamese).
-4. The 49 scans (median 26 MB, up to 485 MB and 2 141 pages, some with pages over 1 500 pt) need screen-sized rendering with a bounded cache. The current navigator is too slow and too memory-hungry.
-5. Comic PDFs and slides want one page at a time, fitted whole.
-6. Large books (120 typeset PDFs over 500 pages) make an outline (TOC) and page jump important (M3).
-7. Importing 17 GB of books by copying doubles storage. Folder import that reads files in place, prefers the EPUB twin, skips non-book files and ignores the comics archives is worth pulling forward from M6.
+1. **Vietnamese EPUB is now the largest single group (368 books).** Most are calibre conversions with a 1.2 line height, and almost none has a PDF twin. Four of them were checked on the emulator with publisher styles (1.2 without and with an embedded font, 1.5, unset): stacked diacritics never touch the line above. Line-height controls therefore stay in M2 (F2.4).
+2. **An EPUB that references a missing file must not crash the app.** WindBook has no INTERNET permission, yet Readium tries to fetch such files over HTTP.
+3. Reflowing PDFs still helps few books. English prose often has an EPUB twin, technical books break when reflowed, and scans have no text. It stays deferred.
+4. Auto-cropped margins, fit to width and continuous vertical scroll help the ~550 typeset and calibre PDFs (87 of them Vietnamese).
+5. The 49 scans (median 26 MB, up to 485 MB and 2 141 pages, some with pages over 1 500 pt) need screen-sized rendering with a bounded cache. The current navigator is too slow and too memory-hungry.
+6. Comic PDFs and slides want one page at a time, fitted whole.
+7. Large books (120 typeset PDFs over 500 pages) make an outline (TOC) and page jump important (M3).
+8. Importing 17 GB of books by copying doubles storage. Folder import that reads files in place, prefers the EPUB twin, skips non-book files and ignores the comics archives is worth pulling forward from M6.

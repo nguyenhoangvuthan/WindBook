@@ -1,10 +1,13 @@
 package dev.kent.windbook.reader
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import dev.kent.windbook.core.model.EffectiveDisplay
+import dev.kent.windbook.core.model.PdfLayout
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -74,5 +77,45 @@ class ReaderOverlayTest {
             )
         }
         compose.onNodeWithText("İSTANBUL").assertIsDisplayed()
+    }
+
+    @Test fun epubHasNoViewButton() {
+        compose.setContent {
+            ReaderOverlay(
+                visible = true, title = "Dune", chapterTitle = null, progression = 0.1,
+                canMarkFinished = false, onMarkFinished = {}, onBack = {},
+            )
+        }
+        compose.onNodeWithContentDescription("View").assertDoesNotExist()
+    }
+
+    @Test fun pdfViewMenuSwitchesLayout() {
+        val layouts = mutableListOf<PdfLayout>()
+        compose.setContent {
+            ReaderOverlay(
+                visible = true, title = "Doc", chapterTitle = null, progression = 0.1,
+                canMarkFinished = false, onMarkFinished = {}, onBack = {},
+                pdfDisplay = EffectiveDisplay(PdfLayout.VERTICAL, cropMargins = true),
+                onPdfLayoutChange = { layouts += it },
+            )
+        }
+        compose.onNodeWithContentDescription("View").performClick()
+        compose.onNodeWithText("Page by page").performClick()
+        assertEquals(listOf(PdfLayout.PAGED), layouts)
+    }
+
+    @Test fun cropItemShowsAndTogglesState() {
+        val crops = mutableListOf<Boolean>()
+        compose.setContent {
+            ReaderOverlay(
+                visible = true, title = "Doc", chapterTitle = null, progression = 0.1,
+                canMarkFinished = false, onMarkFinished = {}, onBack = {},
+                pdfDisplay = EffectiveDisplay(PdfLayout.VERTICAL, cropMargins = true),
+                onCropMarginsChange = { crops += it },
+            )
+        }
+        compose.onNodeWithContentDescription("View").performClick()
+        compose.onNodeWithText("Crop margins").assertIsOn().performClick()
+        assertEquals(listOf(false), crops)
     }
 }

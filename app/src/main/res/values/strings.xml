@@ -73,4 +73,9 @@
     <string name="licences">Open-source licences</string>
     <string name="licences_body" translatable="false">Literata typeface: SIL Open Font License 1.1\nReadium Kotlin Toolkit: BSD 3-Clause\nAndroidX, Hilt, Coil, Kotlin: Apache License 2.0</string>
     <string name="close">Close</string>
+    <string name="cd_view_mode">View</string>
+    <string name="layout_vertical">Vertical scroll</string>
+    <string name="layout_paged">Page by page</string>
+    <string name="crop_margins">Crop margins</string>
+    <string name="page_render_failed">This page can\'t be shown</string>
 </resources>

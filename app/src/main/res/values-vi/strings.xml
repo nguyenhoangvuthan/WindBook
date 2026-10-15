@@ -68,4 +68,9 @@
     <string name="version">Phiên bản %1$s</string>
     <string name="licences">Giấy phép mã nguồn mở</string>
     <string name="close">Đóng</string>
+    <string name="cd_view_mode">Chế độ xem</string>
+    <string name="layout_vertical">Cuộn dọc</string>
+    <string name="layout_paged">Lật từng trang</string>
+    <string name="crop_margins">Cắt lề trắng</string>
+    <string name="page_render_failed">Không hiển thị được trang này</string>
 </resources>

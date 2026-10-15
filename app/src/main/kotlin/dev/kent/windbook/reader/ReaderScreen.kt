@@ -19,10 +19,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,10 +35,16 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -45,6 +56,8 @@ import androidx.fragment.compose.AndroidFragment
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.kent.windbook.R
+import dev.kent.windbook.core.model.EffectiveDisplay
+import dev.kent.windbook.core.model.PdfLayout
 import dev.kent.windbook.input.KeyEventDispatcher
 import dev.kent.windbook.input.LocalKeyEventDispatcher
 import dev.kent.windbook.ui.components.ProgressLine
@@ -148,6 +161,9 @@ fun ReaderOverlay(
     canMarkFinished: Boolean,
     onMarkFinished: () -> Unit,
     onBack: () -> Unit,
+    pdfDisplay: EffectiveDisplay? = null,
+    onPdfLayoutChange: (PdfLayout) -> Unit = {},
+    onCropMarginsChange: (Boolean) -> Unit = {},
 ) {
     val bar = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.97f)
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
@@ -169,8 +185,12 @@ fun ReaderOverlay(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f),
                 )
-                // Balances the back button so the title is truly centred.
-                Spacer(Modifier.width(48.dp))
+                if (pdfDisplay != null) {
+                    ViewMenu(pdfDisplay, onPdfLayoutChange, onCropMarginsChange)
+                } else {
+                    // Balances the back button so the title is truly centred.
+                    Spacer(Modifier.width(48.dp))
+                }
             }
             Column(
                 Modifier
@@ -198,6 +218,46 @@ fun ReaderOverlay(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ViewMenu(
+    display: EffectiveDisplay,
+    onLayoutChange: (PdfLayout) -> Unit,
+    onCropChange: (Boolean) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { open = true }) {
+            Icon(WindBookIcons.ViewMode, contentDescription = stringResource(R.string.cd_view_mode))
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            listOf(PdfLayout.VERTICAL to R.string.layout_vertical, PdfLayout.PAGED to R.string.layout_paged).forEach { (layout, label) ->
+                DropdownMenuItem(
+                    text = { Text(stringResource(label)) },
+                    leadingIcon = { RadioButton(selected = display.layout == layout, onClick = null) },
+                    onClick = {
+                        open = false
+                        if (display.layout != layout) onLayoutChange(layout)
+                    },
+                )
+            }
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.crop_margins)) },
+                leadingIcon = { Checkbox(checked = display.cropMargins, onCheckedChange = null) },
+                onClick = {
+                    open = false
+                    onCropChange(!display.cropMargins)
+                },
+                // TalkBack hears "Crop margins, checkbox, checked".
+                modifier = Modifier.semantics {
+                    role = Role.Checkbox
+                    toggleableState = ToggleableState(display.cropMargins)
+                },
+            )
         }
     }
 }

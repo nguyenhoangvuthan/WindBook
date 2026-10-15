@@ -53,3 +53,20 @@ data class BookWithProgressRow(
     @Embedded val book: BookEntity,
     val progression: Double,
 )
+
+@Entity(
+    tableName = "book_preferences",
+    foreignKeys = [
+        ForeignKey(
+            entity = BookEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["book_id"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+)
+data class BookPreferencesEntity(
+    @PrimaryKey @ColumnInfo(name = "book_id") val bookId: String,
+    val json: String,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
+)

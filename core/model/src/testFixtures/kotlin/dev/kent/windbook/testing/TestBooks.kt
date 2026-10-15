@@ -13,7 +13,11 @@ object TestBooks {
         name: String = "book.epub",
         title: String = "Test Book",
         author: String = "Ada Writer",
+        missingManifestItem: Boolean = false,
     ): File {
+        // Like many calibre books: the manifest lists a stylesheet the ZIP doesn't contain, and the chapter links it.
+        val missingItem = if (missingManifestItem) """<item id="css" href="Styles/missing.css" media-type="text/css"/>""" else ""
+        val missingLink = if (missingManifestItem) """<link rel="stylesheet" type="text/css" href="Styles/missing.css"/>""" else ""
         val file = File(dir, name)
         ZipOutputStream(file.outputStream()).use { zip ->
             // OCF: "mimetype" first and stored uncompressed.
@@ -34,7 +38,7 @@ object TestBooks {
             )
             zip.text(
                 "OEBPS/content.opf",
-                """<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="uid">urn:uuid:${name.hashCode()}</dc:identifier><dc:title>$title</dc:title><dc:creator>$author</dc:creator><dc:language>en</dc:language><meta property="dcterms:modified">2026-01-01T00:00:00Z</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/></manifest><spine><itemref idref="c1"/></spine></package>""",
+                """<?xml version="1.0" encoding="UTF-8"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="uid">urn:uuid:${name.hashCode()}</dc:identifier><dc:title>$title</dc:title><dc:creator>$author</dc:creator><dc:language>en</dc:language><meta property="dcterms:modified">2026-01-01T00:00:00Z</meta></metadata><manifest><item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/><item id="c1" href="c1.xhtml" media-type="application/xhtml+xml"/>$missingItem</manifest><spine><itemref idref="c1"/></spine></package>""",
             )
             zip.text(
                 "OEBPS/nav.xhtml",
@@ -42,7 +46,7 @@ object TestBooks {
             )
             zip.text(
                 "OEBPS/c1.xhtml",
-                """<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Chapter One</title></head><body><h1>Chapter One</h1><p>Hello WindBook.</p></body></html>""",
+                """<?xml version="1.0" encoding="UTF-8"?><html xmlns="http://www.w3.org/1999/xhtml"><head><title>Chapter One</title>$missingLink</head><body><h1>Chapter One</h1><p>Hello WindBook.</p></body></html>""",
             )
         }
         return file

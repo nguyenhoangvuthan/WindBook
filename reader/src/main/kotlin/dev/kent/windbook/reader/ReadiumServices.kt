@@ -6,7 +6,7 @@ import org.readium.adapter.pdfium.document.PdfiumDocumentFactory
 import org.readium.r2.shared.publication.Publication
 import org.readium.r2.shared.util.asset.AssetRetriever
 import org.readium.r2.shared.util.getOrElse
-import org.readium.r2.shared.util.http.DefaultHttpClient
+import org.readium.r2.shared.util.http.HttpClient
 import org.readium.r2.shared.util.pdf.PdfDocumentFactory
 import org.readium.r2.shared.util.toUrl
 import org.readium.r2.streamer.PublicationOpener
@@ -17,7 +17,8 @@ class ReadiumServices(
     context: Context,
     pdfFactory: PdfDocumentFactory<*>? = PdfiumDocumentFactory(context),
 ) {
-    private val httpClient = DefaultHttpClient()
+    // Never DefaultHttpClient: see OfflineHttpClient.
+    private val httpClient: HttpClient = OfflineHttpClient
 
     private val assetRetriever = AssetRetriever(context.contentResolver, httpClient)
 

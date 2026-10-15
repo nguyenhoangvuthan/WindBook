@@ -12,4 +12,9 @@ class ReaderThemeTest {
     @Test fun lightAppOpensEpubInSepia() = assertEquals(Theme.SEPIA, initialEpubPreferences(darkTheme = false).theme)
 
     @Test fun darkAppOpensEpubInDark() = assertEquals(Theme.DARK, initialEpubPreferences(darkTheme = true).theme)
+
+    @Test fun epubPageBackgroundMatchesTheTheme() {
+        assertEquals(Theme.SEPIA.backgroundColor, epubPageBackground(darkTheme = false))
+        assertEquals(Theme.DARK.backgroundColor, epubPageBackground(darkTheme = true))
+    }
 }

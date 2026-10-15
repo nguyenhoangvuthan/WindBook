@@ -1,5 +1,6 @@
 package dev.kent.windbook.ui.components
 
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import org.junit.Assert.assertEquals
@@ -26,5 +27,10 @@ class BookCoverTest {
     @Test fun percentIsRounded() {
         assertEquals("42%", formatPercent(0.4249))
         assertEquals("100%", formatPercent(0.999))
+    }
+
+    @Test fun landscapeCoversFitWholeAndPortraitCoversFill() {
+        assertEquals(ContentScale.Fit, coverScaleFor(720f, 540f))
+        assertEquals(ContentScale.Crop, coverScaleFor(400f, 600f))
     }
 }

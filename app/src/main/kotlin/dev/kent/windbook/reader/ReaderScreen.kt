@@ -11,13 +11,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -38,6 +44,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -60,6 +67,7 @@ import dev.kent.windbook.core.model.EffectiveDisplay
 import dev.kent.windbook.core.model.PdfLayout
 import dev.kent.windbook.input.KeyEventDispatcher
 import dev.kent.windbook.input.LocalKeyEventDispatcher
+import dev.kent.windbook.reader.pdf.PdfReaderView
 import dev.kent.windbook.ui.components.ProgressLine
 import dev.kent.windbook.ui.components.formatPercent
 import dev.kent.windbook.ui.components.uppercaseForUi
@@ -87,7 +95,23 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit) {
             onRemove = { viewModel.removeBook(onRemoved = onBack) },
         )
         is ReaderUiState.Ready -> Box(Modifier.fillMaxSize()) {
-            ReaderSurface(current, viewModel)
+            val pdf = current.session as? PdfSession
+            val pdfDisplay by viewModel.pdfDisplay.collectAsStateWithLifecycle()
+            if (pdf != null) {
+                pdfDisplay?.let { display ->
+                    val initialPage = remember(pdf) { viewModel.initialPdfPage() }
+                    PdfReaderView(
+                        source = pdf.pages,
+                        layout = display.layout,
+                        cropMargins = display.cropMargins,
+                        initialPage = initialPage,
+                        onPageChanged = viewModel::onPdfPageChanged,
+                        onCenterTap = viewModel::toggleOverlay,
+                    )
+                }
+            } else {
+                ReaderSurface(current, viewModel)
+            }
             ReaderOverlay(
                 visible = overlay,
                 title = current.title,
@@ -96,6 +120,9 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit) {
                 canMarkFinished = canMarkFinished,
                 onMarkFinished = viewModel::markFinished,
                 onBack = onBack,
+                pdfDisplay = if (pdf != null) pdfDisplay else null,
+                onPdfLayoutChange = viewModel::setPdfLayout,
+                onCropMarginsChange = viewModel::setCropMargins,
             )
         }
     }
@@ -115,7 +142,13 @@ private fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewModel
     }
 
     AndroidFragment<ReaderHostFragment>(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(epubPageBackground(darkTheme)))
+            // Text never touches the screen edge or sits under a punch-hole camera (spec §3.6).
+            .windowInsetsPadding(
+                WindowInsets.displayCutout.only(WindowInsetsSides.Vertical).union(WindowInsets(top = 16.dp, bottom = 16.dp)),
+            ),
         arguments = ReaderHostFragment.arguments(state.session.format),
     ) { fragment ->
         hostRef.value = fragment

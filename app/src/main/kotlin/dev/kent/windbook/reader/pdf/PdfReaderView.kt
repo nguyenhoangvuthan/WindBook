@@ -97,9 +97,12 @@ fun PdfReaderView(
     val cropFor: (Int) -> CropBox = { page ->
         if (!cropMargins) CropBox.FULL else pageCrops[page] ?: plan?.boxFor(page) ?: CropBox.FULL
     }
-    val resolveCrop: suspend (Int) -> Unit = { page ->
-        val p = plan
-        if (cropMargins && p != null && page !in pageCrops) pageCrops[page] = source.pageCrop(page, p)
+    // A new lambda once the plan lands: pages already on screen re-run their effect and get their own box.
+    val resolveCrop: suspend (Int) -> Unit = remember(source, cropMargins, plan) {
+        { page ->
+            val p = plan
+            if (cropMargins && p != null && page !in pageCrops) pageCrops[page] = source.pageCrop(page, p)
+        }
     }
     val report: (Int) -> Unit = { page ->
         currentPage = page
@@ -134,7 +137,11 @@ private fun VerticalPages(
     val density = LocalDensity.current
 
     LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }.distinctUntilChanged().collect(onPageChanged)
+        snapshotFlow {
+            // Pages are shorter than the screen, so at the end the last page is never the first visible one.
+            if (listState.canScrollForward) listState.firstVisibleItemIndex
+            else listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: listState.firstVisibleItemIndex
+        }.distinctUntilChanged().collect(onPageChanged)
     }
 
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
@@ -149,6 +156,9 @@ private fun VerticalPages(
                 Triple(listState.isScrollInProgress || hScroll.isScrollInProgress || pinching, listState.layoutInfo.visibleItemsInfo.map { it.index to it.offset }, hScroll.value)
             }.distinctUntilChanged().collect { (moving, visible, scrollX) ->
                 if (moving) return@collect
+                // Only visible pages keep a tile (spec §3.3); the rest would pile up while reading zoomed in.
+                val onScreen = visible.map { it.first }.toSet()
+                details.keys.filter { it !in onScreen }.forEach { details.remove(it) }
                 delay(150)
                 for ((page, offsetY) in visible) {
                     val crop = cropFor(page)
@@ -223,7 +233,7 @@ private fun VerticalPages(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(count = source.pageCount, key = { it }) { page ->
-                    LaunchedEffect(page) {
+                    LaunchedEffect(page, resolveCrop) {
                         source.measure(page)
                         resolveCrop(page)
                     }
@@ -288,7 +298,7 @@ private fun PagedPages(
             key = { it },
             modifier = Modifier.fillMaxSize().testTag(PDF_PAGED_TAG),
         ) { page ->
-            LaunchedEffect(page) {
+            LaunchedEffect(page, resolveCrop) {
                 source.measure(page)
                 resolveCrop(page)
             }

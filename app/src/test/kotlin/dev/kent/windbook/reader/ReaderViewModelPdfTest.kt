@@ -112,6 +112,15 @@ class ReaderViewModelPdfTest {
         assertEquals(7, second.initialPdfPage())
     }
 
+    /** Review #6: a page that fails while sizing the first pages must show "can't open", not crash the app. */
+    @Test fun brokenFirstPagesShowCannotOpenInsteadOfCrashing() = runTest {
+        val broken = object : PdfSession by FakePdf(PageSize(400f, 600f)) {
+            override suspend fun firstPageSizes(): List<PageSize> = throw IllegalStateException("bad page")
+        }
+        val model = ReaderViewModel("a", library, BookOpener { _, _ -> Result.success(broken) }, prefs)
+        assertEquals(ReaderUiState.Error(ReaderError.CANNOT_OPEN), model.state.first { it !is ReaderUiState.Loading })
+    }
+
     /** Saving hops to Room's IO dispatcher; poll in real time (runTest's virtual clock would skip the waits). */
     private suspend fun LibraryRepository.savedLocatorFlowFirst(id: String, matches: (String?) -> Boolean) =
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {

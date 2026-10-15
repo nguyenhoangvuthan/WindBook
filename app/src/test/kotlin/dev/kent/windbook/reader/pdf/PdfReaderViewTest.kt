@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeUp
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.doubleClick
 import dev.kent.windbook.core.model.CropBox
 import dev.kent.windbook.core.model.CropPlan
 import dev.kent.windbook.core.model.PageSize
@@ -21,6 +22,8 @@ import dev.kent.windbook.input.LocalKeyEventDispatcher
 import dev.kent.windbook.reader.pdf.PDF_PAGED_TAG
 import dev.kent.windbook.reader.pdf.PDF_VERTICAL_TAG
 import dev.kent.windbook.reader.pdf.PdfReaderView
+import java.lang.ref.WeakReference
+import kotlinx.coroutines.delay
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -52,11 +55,11 @@ class PdfReaderViewTest {
     private val pages = mutableListOf<Int>()
     private var taps = 0
 
-    private fun show(source: PdfPageSource = book, layout: PdfLayout, initialPage: Int = 0) {
+    private fun show(source: PdfPageSource = book, layout: PdfLayout, initialPage: Int = 0, cropMargins: Boolean = false) {
         compose.setContent {
             CompositionLocalProvider(LocalKeyEventDispatcher provides dispatcher) {
                 PdfReaderView(
-                    source = source, layout = layout, cropMargins = false, initialPage = initialPage,
+                    source = source, layout = layout, cropMargins = cropMargins, initialPage = initialPage,
                     onPageChanged = { pages += it }, onCenterTap = { taps++ },
                 )
             }
@@ -143,5 +146,62 @@ class PdfReaderViewTest {
         repeat(2) { compose.onNodeWithTag(PDF_VERTICAL_TAG).performTouchInput { swipeUp() } }
         compose.waitForIdle()
         assertTrue("landscape page rendered: ${mixed.rendered}", 2 in mixed.rendered)
+    }
+
+    /** Review #3: a page fitted to the width is shorter than the screen, so the last page is never the first visible one. */
+    @Test fun scrollingToTheEndReportsTheLastPage() {
+        show(layout = PdfLayout.VERTICAL)
+        repeat(30) { compose.onNodeWithTag(PDF_VERTICAL_TAG).performTouchInput { swipeUp() } }
+        compose.waitForIdle()
+        assertEquals(19, pages.last())
+    }
+
+    @Test fun reopeningOnTheLastPageKeepsTheLastPage() {
+        show(layout = PdfLayout.VERTICAL, initialPage = 19)
+        assertEquals(19, pages.last())
+    }
+
+    /** Review #1: pages already on screen when the (slow) book crop plan lands still get their own, wider box. */
+    @Test fun visiblePagesGetTheirOwnCropOnceThePlanArrives() {
+        val source = object : PdfPageSource by FakeSource(List(10) { PageSize(400f, 600f) }) {
+            val asked = mutableListOf<Int>()
+            val crops = mutableListOf<Pair<Int, CropBox>>()
+            override suspend fun cropPlan(): CropPlan {
+                delay(300)
+                return CropBox(0.2f, 0.2f, 0.8f, 0.8f).let { CropPlan(it, it) }
+            }
+            // A full-bleed cover: its own content fills the page.
+            override suspend fun pageCrop(page: Int, plan: CropPlan): CropBox = CropBox.FULL.also { asked += page }
+            override suspend fun render(page: Int, crop: CropBox, widthPx: Int, region: PixelRegion?): Bitmap {
+                if (region == null) crops += page to crop
+                return Bitmap.createBitmap(region?.width ?: widthPx, region?.height ?: renderedHeight(pageSize(page), crop, widthPx), Bitmap.Config.ARGB_8888)
+            }
+        }
+        show(source = source, layout = PdfLayout.VERTICAL, cropMargins = true)
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        assertTrue("pageCrop asked for: ${source.asked}", 0 in source.asked)
+        assertEquals(CropBox.FULL, source.crops.last { it.first == 0 }.second)
+    }
+
+    /** Review #2: zoomed detail tiles of pages scrolled away must not stay in memory. */
+    @Test fun zoomTilesOfPagesScrolledAwayAreReleased() {
+        val tiles = mutableListOf<WeakReference<Bitmap>>()
+        val source = object : PdfPageSource by FakeSource(List(40) { PageSize(400f, 600f) }) {
+            override suspend fun render(page: Int, crop: CropBox, widthPx: Int, region: PixelRegion?): Bitmap =
+                Bitmap.createBitmap(region?.width ?: widthPx, region?.height ?: renderedHeight(pageSize(page), crop, widthPx), Bitmap.Config.ARGB_8888)
+                    .also { if (region != null) tiles += WeakReference(it) }
+        }
+        show(source = source, layout = PdfLayout.VERTICAL)
+        compose.onNodeWithTag(PDF_VERTICAL_TAG).performTouchInput { doubleClick(center) }
+        compose.mainClock.advanceTimeBy(1_000)
+        repeat(25) {
+            compose.onNodeWithTag(PDF_VERTICAL_TAG).performTouchInput { swipeUp() }
+            compose.mainClock.advanceTimeBy(1_000)
+            compose.waitForIdle()
+        }
+        repeat(3) { System.gc() }
+        val alive = tiles.count { it.get() != null }
+        assertTrue("tiles rendered: ${tiles.size}, still alive: $alive", tiles.size > 5 && alive <= 4)
     }
 }

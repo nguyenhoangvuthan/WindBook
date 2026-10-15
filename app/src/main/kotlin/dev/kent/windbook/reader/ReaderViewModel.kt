@@ -14,6 +14,7 @@ import dev.kent.windbook.core.model.PdfLayout
 import dev.kent.windbook.core.model.ReadingStatus
 import dev.kent.windbook.core.model.resolve
 import java.io.File
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -111,7 +112,17 @@ class ReaderViewModel @AssistedInject constructor(
                 latestLocatorJson = savedLocator
                 library.markOpened(bookId)
                 if (opened is PdfSession) {
-                    val firstPages = opened.firstPageSizes()
+                    // A broken page while sizing the first pages means the book can't be shown, not a crash.
+                    val firstPages = try {
+                        opened.firstPageSizes()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        opened.close()
+                        session = null
+                        _state.value = ReaderUiState.Error(ReaderError.CANNOT_OPEN)
+                        return@onSuccess
+                    }
                     viewModelScope.launch {
                         displayPrefs.observe(bookId).collect { prefs ->
                             currentPrefs = prefs

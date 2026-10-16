@@ -23,6 +23,7 @@ import dev.kent.windbook.reader.pdf.PDF_PAGED_TAG
 import dev.kent.windbook.reader.pdf.PDF_VERTICAL_TAG
 import dev.kent.windbook.reader.pdf.PdfReaderView
 import java.lang.ref.WeakReference
+import kotlin.math.abs
 import kotlinx.coroutines.delay
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -39,12 +40,14 @@ class PdfReaderViewTest {
 
     private class FakeSource(private val sizes: List<PageSize>) : PdfPageSource {
         val rendered = mutableListOf<Int>()
+        val regions = mutableListOf<Pair<Int, PixelRegion>>()
         override val pageCount = sizes.size
         override fun pageSize(page: Int) = sizes[page]
         override suspend fun measure(page: Int) = sizes[page]
         override suspend fun cropPlan() = CropPlan.NONE
         override suspend fun pageCrop(page: Int, plan: CropPlan) = CropBox.FULL
         override suspend fun render(page: Int, crop: CropBox, widthPx: Int, region: PixelRegion?): Bitmap {
+            if (region != null) regions += widthPx to region
             rendered += page
             return Bitmap.createBitmap(region?.width ?: widthPx, region?.height ?: renderedHeight(sizes[page], crop, widthPx), Bitmap.Config.ARGB_8888)
         }
@@ -54,16 +57,31 @@ class PdfReaderViewTest {
     private val dispatcher = KeyEventDispatcher()
     private val pages = mutableListOf<Int>()
     private var taps = 0
+    private val zooms = mutableListOf<Pair<Float, Float>>()
 
-    private fun show(source: PdfPageSource = book, layout: PdfLayout, initialPage: Int = 0, cropMargins: Boolean = false) {
+    private fun show(
+        source: PdfPageSource = book,
+        layout: PdfLayout,
+        initialPage: Int = 0,
+        cropMargins: Boolean = false,
+        initialZoom: Float = 1f,
+        initialZoomX: Float = 0f,
+    ) {
         compose.setContent {
             CompositionLocalProvider(LocalKeyEventDispatcher provides dispatcher) {
                 PdfReaderView(
                     source = source, layout = layout, cropMargins = cropMargins, initialPage = initialPage,
                     onPageChanged = { pages += it }, onCenterTap = { taps++ },
+                    initialZoom = initialZoom, initialZoomX = initialZoomX,
+                    onZoomChanged = { zoom, x -> zooms += zoom to x },
                 )
             }
         }
+        compose.waitForIdle()
+    }
+
+    private fun settle() {
+        compose.mainClock.advanceTimeBy(1_000)
         compose.waitForIdle()
     }
 
@@ -203,5 +221,40 @@ class PdfReaderViewTest {
         repeat(3) { System.gc() }
         val alive = tiles.count { it.get() != null }
         assertTrue("tiles rendered: ${tiles.size}, still alive: $alive", tiles.size > 5 && alive <= 4)
+    }
+
+    @Test fun restoresTheSavedZoomAndHorizontalPosition() {
+        show(layout = PdfLayout.VERTICAL, initialZoom = 2f, initialZoomX = 0.5f)
+        settle()
+        val (zoomedWidth, region) = book.regions.last()
+        val viewport = zoomedWidth / 2
+        // Half of the scrollable width, which is one viewport at 2×.
+        assertTrue("tile at x=${region.x}, viewport $viewport", abs(region.x - viewport / 2) <= 2)
+        assertTrue("an unchanged zoom is not saved again: $zooms", zooms.isEmpty())
+    }
+
+    @Test fun zoomingReportsTheZoomForTheBook() {
+        show(layout = PdfLayout.VERTICAL)
+        compose.onNodeWithTag(PDF_VERTICAL_TAG).performTouchInput { doubleClick(center) }
+        settle()
+        val (zoom, x) = zooms.last()
+        assertEquals(2.5f, zoom, 0.01f)
+        assertTrue("zoomX $x", x in 0f..1f)
+    }
+
+    @Test fun volumeKeysReadAZoomedPageInReadingOrder() {
+        show(layout = PdfLayout.VERTICAL, initialZoom = 2f)
+        fun press() {
+            pressVolumeDown()
+            settle()
+        }
+        press()
+        assertEquals(0.9f, zooms.last().second, 0.02f) // right by 90 % of the screen
+        press()
+        assertEquals(1f, zooms.last().second, 0.02f) // stops at the right edge
+        press()
+        assertEquals(0f, zooms.last().second, 0.02f) // back to the left edge, one screen down
+        repeat(6) { press() }
+        assertTrue("pages: $pages", pages.last() >= 1)
     }
 }

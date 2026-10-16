@@ -20,23 +20,40 @@ class DisplayPreferencesRepository(
     }
 }
 
-/** JSON so M2 can add per-book fields without another migration; unknown keys are kept on write. */
+/** JSON so later milestones can add per-book fields without another migration; unknown keys are kept on write. */
 internal object BookPreferencesCodec {
     private const val LAYOUT = "pdfLayout"
     private const val CROP = "cropMargins"
+    private const val ZOOM = "pdfZoom"
+    private const val ZOOM_X = "pdfZoomX"
+    private const val REFLOW_SIZE = "pdfReflowSize"
 
     fun decode(json: String?): BookDisplayPrefs {
         val obj = json?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return BookDisplayPrefs()
         val layout = obj.optString(LAYOUT).takeIf { it.isNotEmpty() && !obj.isNull(LAYOUT) }
             ?.let { runCatching { PdfLayout.valueOf(it) }.getOrNull() }
-        val crop = if (obj.has(CROP) && !obj.isNull(CROP)) obj.optBoolean(CROP) else null
-        return BookDisplayPrefs(layout, crop)
+        val crop = if (obj.present(CROP)) obj.optBoolean(CROP) else null
+        return BookDisplayPrefs(
+            pdfLayout = layout,
+            cropMargins = crop,
+            zoom = obj.floatOrNull(ZOOM),
+            zoomX = obj.floatOrNull(ZOOM_X),
+            reflowSize = if (obj.present(REFLOW_SIZE)) obj.optInt(REFLOW_SIZE) else null,
+        )
     }
 
     fun encode(previous: String?, prefs: BookDisplayPrefs): String {
         val obj = previous?.let { runCatching { JSONObject(it) }.getOrNull() } ?: JSONObject()
         obj.put(LAYOUT, prefs.pdfLayout?.name ?: JSONObject.NULL)
         obj.put(CROP, prefs.cropMargins ?: JSONObject.NULL)
+        obj.put(ZOOM, prefs.zoom?.toDouble() ?: JSONObject.NULL)
+        obj.put(ZOOM_X, prefs.zoomX?.toDouble() ?: JSONObject.NULL)
+        obj.put(REFLOW_SIZE, prefs.reflowSize ?: JSONObject.NULL)
         return obj.toString()
     }
+
+    private fun JSONObject.present(key: String) = has(key) && !isNull(key)
+
+    private fun JSONObject.floatOrNull(key: String): Float? =
+        if (present(key)) optDouble(key).takeIf { it.isFinite() }?.toFloat() else null
 }

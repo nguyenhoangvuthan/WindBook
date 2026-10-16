@@ -58,4 +58,14 @@ class DisplayPreferencesRepositoryTest {
         db.libraryDao().purge("b")
         assertNull(db.bookPreferencesDao().json("b"))
     }
+
+    @Test fun zoomAndReflowSizeRoundTrip() = runTest {
+        repo.set("b", BookDisplayPrefs(PdfLayout.VERTICAL, true, zoom = 2.5f, zoomX = 0.4f, reflowSize = 5))
+        assertEquals(BookDisplayPrefs(PdfLayout.VERTICAL, true, 2.5f, 0.4f, 5), repo.observe("b").first())
+    }
+
+    @Test fun preferencesSavedBeforeZoomExistedHaveNoZoom() = runTest {
+        db.bookPreferencesDao().upsert(BookPreferencesEntity("b", """{"pdfLayout":"PAGED","cropMargins":false}""", 1))
+        assertEquals(BookDisplayPrefs(PdfLayout.PAGED, false), repo.observe("b").first())
+    }
 }

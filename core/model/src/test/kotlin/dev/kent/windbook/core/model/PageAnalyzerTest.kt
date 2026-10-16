@@ -162,4 +162,53 @@ class PageAnalyzerTest {
         assertEquals(3, blocks.size)
         assertEquals(119 / 800f, (blocks[1] as LayoutBlock.TextLine).top, 1e-4f)
     }
+
+    private fun figures(blocks: List<LayoutBlock>) = blocks.filterIsInstance<LayoutBlock.Figure>()
+
+    /** Review #1: a ruled table under a caption stays one picture instead of rows of "words" and rule strips. */
+    @Test fun ruledTableWithCaptionIsOneFigure() {
+        val page = Page()
+        page.line(40, 40, listOf(5, 5, 5))
+        page.line(40, 60, listOf(5, 5))
+        for (y in 120..720 step 60) page.rect(40, y, 561, y + 1) // horizontal rules
+        for (x in listOf(40, 213, 386, 560)) page.rect(x, 120, x + 1, 721) // vertical rules
+        for (row in 0 until 10) for (x in listOf(50, 223, 396)) page.line(x, 144 + row * 60, listOf(3, 2))
+        val blocks = page.analyze().blocks
+        assertEquals("blocks: ${blocks.map { it::class.simpleName }}", 3, blocks.size)
+        val table = figures(blocks).single().box
+        assertEquals(120 / 800f, table.top, 1e-3f)
+        assertEquals(721 / 800f, table.bottom, 1e-3f)
+    }
+
+    /** Review #1: a line drawing (two labelled boxes joined by a line) is kept whole. */
+    @Test fun lineDiagramIsOneFigure() {
+        val page = Page()
+        page.line(40, 40, listOf(5, 5, 5))
+        page.line(40, 60, listOf(5, 5, 5))
+        for ((top, bottom) in listOf(200 to 300, 380 to 480)) {
+            page.rect(100, top, 300, top + 1)
+            page.rect(100, bottom - 1, 300, bottom)
+            page.rect(100, top, 101, bottom)
+            page.rect(299, top, 300, bottom)
+            page.line(150, top + 40, listOf(3))
+        }
+        page.rect(200, 300, 201, 380) // the connecting line
+        val blocks = page.analyze().blocks
+        assertEquals("blocks: ${blocks.map { it::class.simpleName }}", 3, blocks.size)
+        val diagram = figures(blocks).single().box
+        assertEquals(200 / 800f, diagram.top, 1e-3f)
+        assertEquals(480 / 800f, diagram.bottom, 1e-3f)
+    }
+
+    /** Review #2: light parts of a photo (sky, paper-white objects) don't cut it in two or drop the band. */
+    @Test fun photoWithALightBandIsOneFigure() {
+        val page = Page()
+        for (i in 0 until 5) page.line(40, 60 + i * 20, listOf(5, 5, 5))
+        page.rect(40, 200, 560, 300, ink = 40)
+        page.rect(40, 300, 560, 380, ink = 215) // light band, above the ink threshold
+        page.rect(40, 380, 560, 560, ink = 40)
+        val photo = figures(page.analyze().blocks).single().box
+        assertEquals(200 / 800f, photo.top, 1e-3f)
+        assertEquals(560 / 800f, photo.bottom, 1e-3f)
+    }
 }

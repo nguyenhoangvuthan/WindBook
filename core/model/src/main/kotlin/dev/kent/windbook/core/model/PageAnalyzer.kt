@@ -120,15 +120,17 @@ object PageAnalyzer {
             val h = robustMedian(runs.map { it.count() })
             val lines = mergeMarks(runs.flatMap { splitTall(it, h) }, h)
             val isFigure = lines.map { line -> figureLine(line, h) }
-            // Consecutive figure lines (gap ≤ h) form one figure; text lines are kept for words and paragraphs.
+            // Consecutive figure lines form one figure when close (gap ≤ h), or when they overlap sideways and the gap
+            // is no taller than either part (a photo's light band); text lines are kept for words and paragraphs.
             val groups = mutableListOf<Pair<Boolean, MutableList<IntRange>>>()
             lines.forEachIndexed { i, line ->
                 val last = groups.lastOrNull()
-                if (isFigure[i] && last != null && last.first && line.first - last.second.last().last - 1 <= h) {
-                    last.second += line
-                } else {
-                    groups += isFigure[i] to mutableListOf(line)
+                val joins = isFigure[i] && last != null && last.first && run {
+                    val previous = last.second.first().first..last.second.last().last
+                    val gap = line.first - previous.last - 1
+                    gap <= h || (gap <= minOf(previous.count(), line.count()) && overlapsSideways(previous, line))
                 }
+                if (joins) last!!.second += line else groups += isFigure[i] to mutableListOf(line)
             }
             val xHeights = groups.filter { !it.first }.flatMap { it.second }.map { xBand(it).let { (a, b) -> b - a + 1 } }
             val wordGap = max(1f, WORD_GAP * (if (xHeights.isEmpty()) h else median(xHeights)))
@@ -173,6 +175,8 @@ object PageAnalyzer {
         /** Touching lines are cut at their lightest inner row when it is nearly empty. */
         private fun splitTall(run: IntRange, h: Int): List<IntRange> {
             if (run.count() <= TALL_LINE * h || run.count() < 5) return listOf(run)
+            // Taller than any line pair: a table or drawing, whose rule-only rows must not cut it into "lines".
+            if (run.count() > FIGURE_HEIGHT * h) return listOf(run)
             val peak = run.maxOf { rowInk[it] }
             val lightest = ((run.first + 2)..(run.last - 2)).minByOrNull { rowInk[it] } ?: return listOf(run)
             if (rowInk[lightest] > SPLIT_INK * peak) return listOf(run)
@@ -228,6 +232,12 @@ object PageAnalyzer {
             val peak = line.maxOf { rowInk[it] }
             val strong = line.filter { rowInk[it] >= X_HEIGHT_INK * peak }
             return strong.first() to strong.last()
+        }
+
+        private fun overlapsSideways(a: IntRange, b: IntRange): Boolean {
+            val ea = extent(a) ?: return false
+            val eb = extent(b) ?: return false
+            return ea.first <= eb.second && eb.first <= ea.second
         }
 
         private fun extent(rows: IntRange): Pair<Int, Int>? {

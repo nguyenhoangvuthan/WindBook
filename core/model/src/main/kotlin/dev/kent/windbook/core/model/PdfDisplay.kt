@@ -1,6 +1,6 @@
 package dev.kent.windbook.core.model
 
-enum class PdfLayout { VERTICAL, PAGED }
+enum class PdfLayout { VERTICAL, PAGED, REFLOW }
 
 /** Page size in PDF points. */
 data class PageSize(val width: Float, val height: Float) {

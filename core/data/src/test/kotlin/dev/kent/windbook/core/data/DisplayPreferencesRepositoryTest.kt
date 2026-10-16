@@ -68,4 +68,9 @@ class DisplayPreferencesRepositoryTest {
         db.bookPreferencesDao().upsert(BookPreferencesEntity("b", """{"pdfLayout":"PAGED","cropMargins":false}""", 1))
         assertEquals(BookDisplayPrefs(PdfLayout.PAGED, false), repo.observe("b").first())
     }
+
+    @Test fun reflowLayoutRoundTrips() = runTest {
+        repo.set("b", BookDisplayPrefs(PdfLayout.REFLOW, null))
+        assertEquals(PdfLayout.REFLOW, repo.observe("b").first().pdfLayout)
+    }
 }

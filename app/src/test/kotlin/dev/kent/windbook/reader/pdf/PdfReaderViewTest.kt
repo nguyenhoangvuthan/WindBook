@@ -6,20 +6,27 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.pinch
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeUp
-import androidx.compose.ui.test.click
-import androidx.compose.ui.test.doubleClick
 import dev.kent.windbook.core.model.CropBox
 import dev.kent.windbook.core.model.CropPlan
+import dev.kent.windbook.core.model.LayoutBlock
+import dev.kent.windbook.core.model.PageLayout
+import dev.kent.windbook.core.model.PageRect
 import dev.kent.windbook.core.model.PageSize
 import dev.kent.windbook.core.model.PdfLayout
+import dev.kent.windbook.core.model.ReflowSizes
 import dev.kent.windbook.input.KeyEventDispatcher
 import dev.kent.windbook.input.LocalKeyEventDispatcher
 import dev.kent.windbook.reader.pdf.PDF_PAGED_TAG
+import dev.kent.windbook.reader.pdf.PDF_REFLOW_TAG
 import dev.kent.windbook.reader.pdf.PDF_VERTICAL_TAG
 import dev.kent.windbook.reader.pdf.PdfReaderView
 import java.lang.ref.WeakReference
@@ -58,6 +65,26 @@ class PdfReaderViewTest {
     private val pages = mutableListOf<Int>()
     private var taps = 0
     private val zooms = mutableListOf<Pair<Float, Float>>()
+    private val sizes = mutableListOf<Int>()
+
+    private val sampleLayout = PageLayout(
+        blocks = List(3) { i ->
+            val top = 0.1f + i * 0.05f
+            LayoutBlock.TextLine(
+                top = top,
+                bottom = top + 0.02f,
+                baseline = top + 0.016f,
+                words = List(4) { w -> PageRect(0.1f + w * 0.2f, top, 0.25f + w * 0.2f, top + 0.02f) },
+                startsParagraph = i == 0,
+            )
+        },
+        aspect = 1.5f,
+        medianLineHeight = 0.02f,
+    )
+
+    private val reflowable = object : PdfPageSource by FakeSource(List(20) { PageSize(400f, 600f) }) {
+        override suspend fun pageLayout(page: Int, crop: CropBox) = sampleLayout
+    }
 
     private fun show(
         source: PdfPageSource = book,
@@ -66,6 +93,7 @@ class PdfReaderViewTest {
         cropMargins: Boolean = false,
         initialZoom: Float = 1f,
         initialZoomX: Float = 0f,
+        reflowSize: Int = ReflowSizes.DEFAULT,
     ) {
         compose.setContent {
             CompositionLocalProvider(LocalKeyEventDispatcher provides dispatcher) {
@@ -74,6 +102,7 @@ class PdfReaderViewTest {
                     onPageChanged = { pages += it }, onCenterTap = { taps++ },
                     initialZoom = initialZoom, initialZoomX = initialZoomX,
                     onZoomChanged = { zoom, x -> zooms += zoom to x },
+                    reflowSize = reflowSize, onReflowSizeChange = { sizes += it },
                 )
             }
         }
@@ -256,5 +285,39 @@ class PdfReaderViewTest {
         assertEquals(0f, zooms.last().second, 0.02f) // back to the left edge, one screen down
         repeat(6) { press() }
         assertTrue("pages: $pages", pages.last() >= 1)
+    }
+
+    @Test fun reflowShowsLaidOutPagesAndScrollsWithTheVolumeKey() {
+        show(source = reflowable, layout = PdfLayout.REFLOW)
+        compose.onNodeWithTag(PDF_REFLOW_TAG).assertExists()
+        repeat(5) { pressVolumeDown() }
+        assertTrue("pages: $pages", pages.last() >= 1)
+    }
+
+    @Test fun reflowFallsBackToThePageWhenThereIsNoLayout() {
+        show(layout = PdfLayout.REFLOW) // FakeSource has no layouts
+        assertTrue("rendered: ${book.rendered}", 0 in book.rendered)
+    }
+
+    @Test fun pinchInReflowStepsTheTextSizeOnce() {
+        show(source = reflowable, layout = PdfLayout.REFLOW, reflowSize = 2)
+        compose.onNodeWithTag(PDF_REFLOW_TAG).performTouchInput {
+            pinch(center - Offset(40f, 0f), center - Offset(200f, 0f), center + Offset(40f, 0f), center + Offset(200f, 0f))
+        }
+        compose.waitForIdle()
+        assertEquals(listOf(3), sizes)
+    }
+
+    @Test fun switchingToReflowKeepsThePage() {
+        var layout by mutableStateOf(PdfLayout.VERTICAL)
+        compose.setContent {
+            CompositionLocalProvider(LocalKeyEventDispatcher provides dispatcher) {
+                PdfReaderView(reflowable, layout, cropMargins = false, initialPage = 5, onPageChanged = { pages += it }, onCenterTap = {})
+            }
+        }
+        compose.waitForIdle()
+        layout = PdfLayout.REFLOW
+        compose.waitForIdle()
+        assertEquals(5, pages.last())
     }
 }

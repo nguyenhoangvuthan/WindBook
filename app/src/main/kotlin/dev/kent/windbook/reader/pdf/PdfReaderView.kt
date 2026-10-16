@@ -1,5 +1,6 @@
 package dev.kent.windbook.reader.pdf
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
@@ -15,6 +16,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -46,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -56,12 +59,17 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.kent.windbook.R
 import dev.kent.windbook.core.model.CropBox
 import dev.kent.windbook.core.model.CropPlan
 import dev.kent.windbook.core.model.MAX_PDF_ZOOM
+import dev.kent.windbook.core.model.PageLayout
 import dev.kent.windbook.core.model.PdfLayout
+import dev.kent.windbook.core.model.ReflowLayouter
+import dev.kent.windbook.core.model.ReflowPage
+import dev.kent.windbook.core.model.ReflowSizes
 import dev.kent.windbook.input.KeyEventDispatcher
 import dev.kent.windbook.input.LocalKeyEventDispatcher
 import kotlin.coroutines.cancellation.CancellationException
@@ -75,9 +83,11 @@ import kotlinx.coroutines.launch
 
 const val PDF_VERTICAL_TAG = "pdf-vertical"
 const val PDF_PAGED_TAG = "pdf-paged"
+const val PDF_REFLOW_TAG = "pdf-reflow"
 
 private const val DOUBLE_TAP_ZOOM = 2.5f
 private val PagedSurround = Color(0xFF141210)
+private val ReflowPadding = 16.dp
 
 /**
  * WindBook's PDF view (spec §3.1). [initialPage] is read once; afterwards the view owns the current page
@@ -95,6 +105,8 @@ fun PdfReaderView(
     initialZoom: Float = 1f,
     initialZoomX: Float = 0f,
     onZoomChanged: (zoom: Float, zoomX: Float) -> Unit = { _, _ -> },
+    reflowSize: Int = ReflowSizes.DEFAULT,
+    onReflowSizeChange: (Int) -> Unit = {},
 ) {
     var currentPage by rememberSaveable(source) { mutableIntStateOf(initialPage.coerceIn(0, source.pageCount - 1)) }
     var plan by remember(source, cropMargins) { mutableStateOf<CropPlan?>(null) }
@@ -122,6 +134,9 @@ fun PdfReaderView(
             initialZoom, initialZoomX, onZoomChanged,
         )
         PdfLayout.PAGED -> PagedPages(source, currentPage, cropFor, resolveCrop, report, onCenterTap, modifier)
+        PdfLayout.REFLOW -> ReflowPages(
+            source, currentPage, cropFor, resolveCrop, report, onCenterTap, reflowSize, onReflowSizeChange, modifier,
+        )
     }
 }
 
@@ -152,13 +167,7 @@ private fun VerticalPages(
     }
     val density = LocalDensity.current
 
-    LaunchedEffect(listState) {
-        snapshotFlow {
-            // Pages are shorter than the screen, so at the end the last page is never the first visible one.
-            if (listState.canScrollForward) listState.firstVisibleItemIndex
-            else listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: listState.firstVisibleItemIndex
-        }.distinctUntilChanged().collect(onPageChanged)
-    }
+    ReportPage(listState, onPageChanged)
 
     // Back to the saved horizontal position once the zoomed width is known.
     LaunchedEffect(Unit) {
@@ -398,6 +407,174 @@ private fun PagedPages(
                 )
             }
         }
+    }
+}
+
+/** Reports the page being read: the first visible one, or the last when the list can't scroll further. */
+@Composable
+private fun ReportPage(listState: LazyListState, onPageChanged: (Int) -> Unit) {
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            // Pages are shorter than the screen, so at the end the last page is never the first visible one.
+            if (listState.canScrollForward) {
+                listState.firstVisibleItemIndex
+            } else {
+                listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: listState.firstVisibleItemIndex
+            }
+        }.distinctUntilChanged().collect(onPageChanged)
+    }
+}
+
+/** Reflow (spec §4.3): each page's words re-wrapped to the screen at the chosen text size. */
+@Composable
+private fun ReflowPages(
+    source: PdfPageSource,
+    startPage: Int,
+    cropFor: (Int) -> CropBox,
+    resolveCrop: suspend (Int) -> Unit,
+    onPageChanged: (Int) -> Unit,
+    onCenterTap: () -> Unit,
+    reflowSize: Int,
+    onReflowSizeChange: (Int) -> Unit,
+    modifier: Modifier,
+) {
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = startPage)
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val size by rememberUpdatedState(reflowSize)
+    val changeSize by rememberUpdatedState(onReflowSizeChange)
+    ReportPage(listState, onPageChanged)
+
+    BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+        val viewportW = constraints.maxWidth
+        val viewportH = constraints.maxHeight
+        val contentW = (viewportW - 2 * with(density) { ReflowPadding.roundToPx() }).coerceAtLeast(1)
+        val lineHeightPx = with(density) { ReflowSizes.lineHeightDp(reflowSize).dp.toPx() }
+
+        PageTurnKeys { forward ->
+            scope.launch { listState.animateScrollBy(viewportH * 0.9f * if (forward) 1 else -1) }
+            true
+        }
+
+        // The next page is analysed and rendered ahead so scrolling lands on a ready page (spec §4.3).
+        LaunchedEffect(listState, source, contentW, lineHeightPx) {
+            snapshotFlow { listState.firstVisibleItemIndex }.distinctUntilChanged().collectLatest { first ->
+                val next = first + 1
+                if (next >= source.pageCount) return@collectLatest
+                try {
+                    val crop = cropFor(next)
+                    val layout = source.pageLayout(next, crop) ?: return@collectLatest
+                    val scale = ReflowLayouter.layout(layout, contentW.toFloat(), lineHeightPx).scale
+                    source.render(next, crop, ReflowLayouter.sourceWidth(scale, viewportW))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // A broken page shows the page image when it scrolls in.
+                }
+            }
+        }
+
+        Box(
+            Modifier
+                .fillMaxSize()
+                .testTag(PDF_REFLOW_TAG)
+                .pinchStep { bigger ->
+                    val next = (size + if (bigger) 1 else -1).coerceIn(0, ReflowSizes.LAST)
+                    if (next != size) changeSize(next)
+                }
+                .pointerInput(Unit) { detectTapGestures(onTap = { onCenterTap() }) },
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(ReflowPadding),
+                verticalArrangement = Arrangement.spacedBy(ReflowPadding),
+            ) {
+                items(count = source.pageCount, key = { it }) { page ->
+                    LaunchedEffect(page, resolveCrop) {
+                        source.measure(page)
+                        resolveCrop(page)
+                    }
+                    val crop = cropFor(page)
+                    var layout by remember(page, crop) { mutableStateOf<PageLayout?>(null) }
+                    LaunchedEffect(page, crop) {
+                        layout = try {
+                            source.pageLayout(page, crop)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            null
+                        }
+                    }
+                    val reflow = remember(layout, contentW, lineHeightPx) {
+                        layout?.let { ReflowLayouter.layout(it, contentW.toFloat(), lineHeightPx) }
+                    }
+                    val width = with(density) { contentW.toDp() }
+                    if (reflow == null) {
+                        // Not analysed yet (or can't be): the page as in vertical mode.
+                        val heightPx = renderedHeight(source.pageSize(page), crop, contentW)
+                        PageBitmap(source, page, crop, renderWidthPx = contentW, modifier = Modifier.width(width).height(with(density) { heightPx.toDp() }))
+                    } else {
+                        ReflowedPage(
+                            source = source,
+                            page = page,
+                            crop = crop,
+                            reflow = reflow,
+                            renderWidthPx = ReflowLayouter.sourceWidth(reflow.scale, viewportW),
+                            modifier = Modifier.width(width).height(with(density) { reflow.height.toDp() }),
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Draws a page's reflowed pieces from one bitmap of its crop box. */
+@Composable
+private fun ReflowedPage(source: PdfPageSource, page: Int, crop: CropBox, reflow: ReflowPage, renderWidthPx: Int, modifier: Modifier) {
+    var image by remember(page, crop, renderWidthPx) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(page, crop, renderWidthPx) {
+        image = try {
+            source.render(page, crop, renderWidthPx).asImageBitmap()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+    Canvas(modifier.background(Color.White)) {
+        val img = image ?: return@Canvas
+        for (piece in reflow.pieces) {
+            val sx = (piece.src.left * img.width).roundToInt().coerceIn(0, img.width - 1)
+            val sy = (piece.src.top * img.height).roundToInt().coerceIn(0, img.height - 1)
+            val sw = ((piece.src.right * img.width).roundToInt() - sx).coerceIn(1, img.width - sx)
+            val sh = ((piece.src.bottom * img.height).roundToInt() - sy).coerceIn(1, img.height - sy)
+            drawImage(
+                image = img,
+                srcOffset = IntOffset(sx, sy),
+                srcSize = IntSize(sw, sh),
+                dstOffset = IntOffset(piece.x.roundToInt(), piece.y.roundToInt()),
+                dstSize = IntSize(piece.width.roundToInt().coerceAtLeast(1), piece.height.roundToInt().coerceAtLeast(1)),
+                filterQuality = FilterQuality.Medium,
+            )
+        }
+    }
+}
+
+/** One text-size step per two-finger gesture: spread to enlarge, pinch to shrink. */
+private fun Modifier.pinchStep(onStep: (bigger: Boolean) -> Unit): Modifier = pointerInput(Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        var total = 1f
+        do {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            if (event.changes.count { it.pressed } >= 2) {
+                total *= event.calculateZoom()
+                event.changes.forEach { it.consume() }
+            }
+        } while (event.changes.any { it.pressed })
+        if (total >= 1.25f) onStep(true) else if (total <= 0.8f) onStep(false)
     }
 }
 

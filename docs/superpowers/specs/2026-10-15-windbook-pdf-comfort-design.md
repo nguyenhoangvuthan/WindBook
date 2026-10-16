@@ -53,7 +53,7 @@ Input is the luminance of the page's crop box rendered about 1200 px wide.
 2. **Columns.** A vertical white gutter ≥ 3 % of the width that spans ≥ 80 % of the height splits the page. At most 3 columns, read left to right.
 3. **Lines per column.** Horizontal projection.
    - A run taller than 1.6× the median line height is split at its lightest row when that row has ≤ 15 % of the run's peak ink. This separates lines that touch at tight 1.2 leading.
-   - A run thinner than 0.5× the median line height that lies within 0.35× of that height from a neighbouring line is merged into that line. The line below wins when both are in reach, because marks above letters are far more common in Vietnamese than the dot below. This keeps detached diacritics (Ể, ỗ, ặ) with their letters.
+   - A run shorter than a body line (the median line height) and shorter than half the line it would join, within 0.35× of that line's height, is merged into it. Sizes are measured against the joined line so a large heading keeps its large marks (found on the scanned textbook's title page). The line below wins when both are in reach, because marks above letters are far more common in Vietnamese than the dot below. After a merge the run above is checked again, so stacked marks (Ẩ, Ễ, Ậ) both join. This keeps detached diacritics with their letters.
 4. **Figures.** A line is a figure line when any of these holds:
    - it is taller than 2.5× the median;
    - it is taller than 25 % of the page (a page that is one big picture);

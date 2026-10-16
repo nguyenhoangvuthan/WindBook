@@ -50,3 +50,16 @@ Waydroid could not be used: its Android gets no IP (firewalld blocks DHCP on `wa
 | P6 | View → Crop margins off | Whole page with margins; choice remembered | Pass 2026-10-15 | |
 | P7 | EPUB | First and last lines clear of the screen edges and camera | Pass 2026-10-15 | |
 | P8 | EPUB that links a file missing from the book | Opens and reads; `adb logcat -b crash` empty | Pass 2026-10-15 | |
+
+## PDF comfort (2026-10-16)
+
+| # | Step | Expected | Emulator | Neo 3 GT |
+|---|---|---|---|---|
+| C1 | Import the scanned textbook (2654×4329 pt pages) | ≤ 1.5 s, PSS +< 100 MB, title and cover shown | Pass 2026-10-16: ~0.75 s after the tap, PSS +15 MB peak, title, author and cover present | |
+| C2 | Zoom a portrait PDF, swipe sideways, reopen | Same zoom and position; never-zoomed books open at 1× | Pass 2026-10-16: 2.5× and x = 0.546 restored | |
+| C3 | Volume down ×3 while zoomed | Right, right edge, back to the left edge and down | Pass 2026-10-16 | |
+| C4 | View → Reflow on the scanned textbook | Words re-wrapped, no sideways panning, tone marks on their letters | Pass 2026-10-16 (body pages; title page after two analyzer fixes) | |
+| C5 | Reflow A+ / A− and pinch | Text size steps once per tap or pinch; remembered after reopening | Pass 2026-10-16 (A+ to the largest size, saved per book) | |
+| C6 | Reflow → Vertical → Reflow | Same page | Pass 2026-10-16 | |
+| C7 | Reflow, 30 pages at the largest size | TOTAL PSS < 400 MB | Pass 2026-10-16: 339 MB settled, 359 MB right after scrolling; one transient 406 MB peak during very fast flings | |
+

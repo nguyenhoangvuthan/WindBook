@@ -74,6 +74,16 @@ Language is measured from each record's `text_sample`: the share of letters that
 
 Why the scan was slow before: Readium's PDF parser renders a cover at the page's full device-pixel size when it opens a PDF (≈ 15 500 × 25 000 px for this scan). WindBook now opens PDFs with the framework `PdfRenderer` only. The importer still extracts PDF metadata through Readium, so importing a large scan still pays that cost.
 
+## PDF comfort (same emulator), 2026-10-16
+
+| Measure | Result |
+|---|---|
+| Import the scanned textbook | About 0.75 s after the tap (was ~36 s), PSS +15 MB at peak. Title, author and cover kept. |
+| Zoom memory | 2.5× and the horizontal position restored on reopen; volume keys read a zoomed page right, then back left and down. |
+| Reflow, scanned textbook | Body pages analysed in 153–236 ms (front matter up to 627 ms). Vietnamese marks stay on their letters, including stacked marks and large headings. |
+| Reflow, calibre Vietnamese PDF | Line pitch 82 px vs 32–33 px for the uncropped page: about 2.5× larger text. The few wrong marks there are in the PDF itself (calibre conversion). |
+| Reflow memory | 339 MB PSS settled after ~26 pages at the largest size; 359 MB right after scrolling; a 406 MB transient during very fast flings. |
+
 ## Consequences for the design
 
 1. **Vietnamese EPUB is now the largest single group (368 books).** Most are calibre conversions with a 1.2 line height, and almost none has a PDF twin. Four of them were checked on the emulator with publisher styles (1.2 without and with an embedded font, 1.5, unset): stacked diacritics never touch the line above. Line-height controls therefore stay in M2 (F2.4).

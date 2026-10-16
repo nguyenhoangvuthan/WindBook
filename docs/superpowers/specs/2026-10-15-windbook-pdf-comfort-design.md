@@ -51,9 +51,17 @@ Input is the luminance of the page's crop box rendered about 1200 px wide.
 
 1. **Binarise.** Otsu threshold from the page histogram (scans have grey paper).
 2. **Columns.** A vertical white gutter ≥ 3 % of the width that spans ≥ 80 % of the height splits the page. At most 3 columns, read left to right.
-3. **Lines per column.** Horizontal projection. A run thinner than 0.5× the median line height that lies within 0.35× of that height from a neighbouring line is merged into that line. This keeps detached diacritics (Ể, ỗ, ặ) with their letters.
-4. **Figures.** A line taller than 2.5× the median, or with ink density above 45 %, is a figure line. Consecutive figure lines form one figure block (tables and formulas included).
-5. **Words.** Vertical projection inside a line. A gap wider than 0.3× the line height separates words.
+3. **Lines per column.** Horizontal projection.
+   - A run taller than 1.6× the median line height is split at its lightest row when that row has ≤ 15 % of the run's peak ink. This separates lines that touch at tight 1.2 leading.
+   - A run thinner than 0.5× the median line height that lies within 0.35× of that height from a neighbouring line is merged into that line. The line below wins when both are in reach, because marks above letters are far more common in Vietnamese than the dot below. This keeps detached diacritics (Ể, ỗ, ặ) with their letters.
+4. **Figures.** A line is a figure line when any of these holds:
+   - it is taller than 2.5× the median;
+   - it is taller than 25 % of the page (a page that is one big picture);
+   - its ink density is above 45 %;
+   - it is a leftover thin run (a rule).
+
+   Consecutive figure lines form one figure block (tables and formulas included).
+5. **Words.** Vertical projection inside a line. A gap wider than 0.35× the column's median x-height separates words. (A space is about 0.25 em, so 0.3× the full line height, about 1.3 em, would glue words together.) A line's x-height runs from its first to its last row holding ≥ 40 % of its peak row ink; its baseline is that last row.
 6. **Paragraphs.** A line starts a paragraph when any of these holds:
    - the gap above it exceeds 1.5× the median line gap;
    - it is indented more than 4 % of the column width;

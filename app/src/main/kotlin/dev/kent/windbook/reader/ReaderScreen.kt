@@ -107,6 +107,9 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit) {
                         initialPage = initialPage,
                         onPageChanged = viewModel::onPdfPageChanged,
                         onCenterTap = viewModel::toggleOverlay,
+                        initialZoom = display.zoom,
+                        initialZoomX = display.zoomX,
+                        onZoomChanged = viewModel::setPdfZoom,
                     )
                 }
             } else {

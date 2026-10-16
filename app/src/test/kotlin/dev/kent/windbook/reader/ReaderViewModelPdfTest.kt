@@ -130,4 +130,15 @@ class ReaderViewModelPdfTest {
             }
             throw AssertionError("locator never saved: ${savedLocator(id)}")
         }
+
+    @Test fun zoomIsSavedForTheBookAndRestored() = runTest {
+        val first = vm(PageSize(400f, 600f))
+        first.pdfDisplay.filterNotNull().first()
+        first.setPdfZoom(2f, 0.4f)
+        prefs.observe("a").first { it.zoom == 2f }
+
+        val second = vm(PageSize(400f, 600f))
+        val display = second.pdfDisplay.filterNotNull().first { it.zoom == 2f }
+        assertEquals(0.4f, display.zoomX, 1e-6f)
+    }
 }

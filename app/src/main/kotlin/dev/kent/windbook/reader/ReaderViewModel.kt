@@ -148,6 +148,8 @@ class ReaderViewModel @AssistedInject constructor(
 
     fun setCropMargins(enabled: Boolean) = updatePrefs { it.copy(cropMargins = enabled) }
 
+    fun setPdfZoom(zoom: Float, zoomX: Float) = updatePrefs { it.copy(zoom = zoom, zoomX = zoomX) }
+
     private fun updatePrefs(change: (BookDisplayPrefs) -> BookDisplayPrefs) {
         val next = change(currentPrefs)
         viewModelScope.launch { displayPrefs.set(bookId, next) }

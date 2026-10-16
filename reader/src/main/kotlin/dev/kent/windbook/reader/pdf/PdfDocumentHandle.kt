@@ -58,8 +58,9 @@ class PdfDocumentHandle private constructor(
         }
     }
 
-    suspend fun luminance(page: Int, widthPx: Int = 300): Luma {
-        val bitmap = render(page, CropBox.FULL, widthPx)
+    /** Luminance of [crop] of [page] rendered [widthPx] wide (whole page by default). */
+    suspend fun luminance(page: Int, widthPx: Int = 300, crop: CropBox = CropBox.FULL): Luma {
+        val bitmap = render(page, crop, widthPx)
         val pixels = IntArray(bitmap.width * bitmap.height)
         bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
         bitmap.recycle()

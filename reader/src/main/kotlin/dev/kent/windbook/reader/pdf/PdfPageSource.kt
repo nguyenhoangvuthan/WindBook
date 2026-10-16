@@ -3,6 +3,7 @@ package dev.kent.windbook.reader.pdf
 import android.graphics.Bitmap
 import dev.kent.windbook.core.model.CropBox
 import dev.kent.windbook.core.model.CropPlan
+import dev.kent.windbook.core.model.PageLayout
 import dev.kent.windbook.core.model.PageSize
 import kotlin.math.roundToInt
 
@@ -25,6 +26,9 @@ interface PdfPageSource {
     suspend fun pageCrop(page: Int, plan: CropPlan): CropBox
 
     suspend fun render(page: Int, crop: CropBox, widthPx: Int, region: PixelRegion? = null): Bitmap
+
+    /** Lines, words and figures of [crop] of [page] for Reflow; null when this source can't analyse pages. */
+    suspend fun pageLayout(page: Int, crop: CropBox): PageLayout? = null
 }
 
 /** Height in pixels of [crop] of a page of [size] rendered [widthPx] wide. */

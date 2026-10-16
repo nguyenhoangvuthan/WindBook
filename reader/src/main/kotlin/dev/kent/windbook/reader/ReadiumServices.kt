@@ -27,7 +27,7 @@ class ReadiumServices(
             context,
             assetRetriever = assetRetriever,
             httpClient = httpClient,
-            pdfFactory = pdfFactory,
+            pdfFactory = pdfFactory?.let(::NoCoverPdfFactory),
         ),
     )
 

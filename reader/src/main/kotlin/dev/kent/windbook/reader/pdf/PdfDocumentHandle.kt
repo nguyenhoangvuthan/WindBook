@@ -10,6 +10,7 @@ import dev.kent.windbook.core.model.PageSize
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.runBlocking
@@ -58,17 +59,20 @@ class PdfDocumentHandle private constructor(
         }
     }
 
-    /** Luminance of [crop] of [page] rendered [widthPx] wide (whole page by default). */
+    /** Luminance of [crop] of [page] rendered [widthPx] wide (whole page by default). Never on the caller's thread. */
     suspend fun luminance(page: Int, widthPx: Int = 300, crop: CropBox = CropBox.FULL): Luma {
         val bitmap = render(page, crop, widthPx)
-        val pixels = IntArray(bitmap.width * bitmap.height)
-        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-        bitmap.recycle()
-        val luma = ByteArray(pixels.size) { i ->
-            val p = pixels[i]
-            ((299 * Color.red(p) + 587 * Color.green(p) + 114 * Color.blue(p)) / 1000).toByte()
+        // ~2.3 M pixels at the analysis width: keep the copy and loop off the UI thread (and off the PDF thread).
+        return withContext(Dispatchers.Default) {
+            val pixels = IntArray(bitmap.width * bitmap.height)
+            bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+            bitmap.recycle()
+            val luma = ByteArray(pixels.size) { i ->
+                val p = pixels[i]
+                ((299 * Color.red(p) + 587 * Color.green(p) + 114 * Color.blue(p)) / 1000).toByte()
+            }
+            Luma(widthPx, pixels.size / widthPx, luma)
         }
-        return Luma(widthPx, pixels.size / widthPx, luma)
     }
 
     override fun close() {

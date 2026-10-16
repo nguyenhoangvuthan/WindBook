@@ -145,6 +145,11 @@ Output is `ReflowPage(height, pieces)`. Each piece is a source rectangle in page
   - reflow text height vs the uncropped page (criterion 3);
   - PSS while scrolling Reflow.
 
+## 6a. Known limitations (after review, 2026-10-16)
+
+- **Two columns under a full-width block.** A gutter must span 80 % of the content height (§4.1 step 2), so a page whose full-width abstract, heading or figure covers more than about 20 % of it is read across both columns. Fix later with a band split (cut at wide horizontal white bands) before the column split. Most of the owner's library is single-column books.
+- **Gridless tables** reflow cell by cell (table reconstruction is out of scope); ruled tables stay one figure.
+
 ## 7. Out of scope
 
 Hyphenation, table reconstruction, OCR, text selection and search in Reflow, right-to-left scripts, reflow in page-by-page mode, zoom memory in page-by-page mode.

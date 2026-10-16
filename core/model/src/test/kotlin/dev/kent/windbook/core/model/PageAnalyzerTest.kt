@@ -30,6 +30,18 @@ class PageAnalyzerTest {
             return cx - 10
         }
 
+        /** A heading line of 16×24 hollow letters (2 px stroke) 6 px apart: twice the body size, still text. */
+        fun heading(x: Int, top: Int, letters: Int) {
+            var cx = x
+            repeat(letters) {
+                rect(cx, top, cx + 16, top + 2)
+                rect(cx, top + 22, cx + 16, top + 24)
+                rect(cx, top, cx + 2, top + 24)
+                rect(cx + 14, top, cx + 16, top + 24)
+                cx += 22
+            }
+        }
+
         fun analyze() = PageAnalyzer.analyze(px, w, h)
     }
 
@@ -124,5 +136,18 @@ class PageAnalyzerTest {
         page.line(40, 100, listOf(3))
         page.line(40, 120, listOf(3))
         assertEquals(112 / 800f, page.analyze().textLines[0].baseline, 1e-4f)
+    }
+
+    /** Found on the scanned textbook's title page: a heading's tone marks are taller than half a body line. */
+    @Test fun markOfALargeHeadingJoinsTheHeading() {
+        val page = Page()
+        for (i in 0 until 5) page.line(40, 100 + i * 20, listOf(5, 5, 5))
+        page.heading(40, 236, 6)
+        page.rect(50, 224, 52, 232) // two 8 px tone-mark strokes, 4 px above the heading
+        page.rect(130, 224, 132, 232)
+        for (i in 0 until 3) page.line(40, 300 + i * 20, listOf(5, 5, 5))
+        fun top(b: LayoutBlock) = if (b is LayoutBlock.Figure) b.box.top else (b as LayoutBlock.TextLine).top
+        val heading = page.analyze().blocks.single { top(it) in (200 / 800f)..(260 / 800f) }
+        assertEquals(224 / 800f, top(heading), 1e-3f)
     }
 }

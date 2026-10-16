@@ -179,25 +179,28 @@ object PageAnalyzer {
             return splitTall(run.first until lightest, h) + splitTall((lightest + 1)..run.last, h)
         }
 
-        /** Thin runs near a line (detached diacritics) join it; the line below wins ties. */
+        /**
+         * Thin runs near a line (detached diacritics) join it; the line below wins ties. Sizes are measured against the
+         * line the mark would join, so a large heading keeps its large marks; a mark is never as tall as a body line.
+         */
         private fun mergeMarks(lines: List<IntRange>, h: Int): List<IntRange> {
             val out = lines.toMutableList()
-            val reach = MARK_DISTANCE * h
             var i = 0
             while (i < out.size) {
                 val line = out[i]
-                if (line.count() >= MARK_HEIGHT * h) {
-                    i++
-                    continue
-                }
-                val below = out.getOrNull(i + 1)?.let { it.first - line.last - 1 }
-                val above = out.getOrNull(i - 1)?.let { line.first - it.last - 1 }
+                fun joins(neighbour: IntRange?, gap: Int?): Boolean =
+                    neighbour != null && gap != null &&
+                        line.count() < h &&
+                        line.count() < MARK_HEIGHT * neighbour.count() &&
+                        gap <= MARK_DISTANCE * neighbour.count()
+                val belowLine = out.getOrNull(i + 1)
+                val aboveLine = out.getOrNull(i - 1)
                 when {
-                    below != null && below <= reach -> {
+                    joins(belowLine, belowLine?.let { it.first - line.last - 1 }) -> {
                         out[i + 1] = line.first..out[i + 1].last
                         out.removeAt(i)
                     }
-                    above != null && above <= reach -> {
+                    joins(aboveLine, aboveLine?.let { line.first - it.last - 1 }) -> {
                         out[i - 1] = out[i - 1].first..line.last
                         out.removeAt(i)
                         i--

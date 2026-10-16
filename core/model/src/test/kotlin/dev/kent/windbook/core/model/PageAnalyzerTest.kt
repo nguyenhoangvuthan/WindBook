@@ -150,4 +150,16 @@ class PageAnalyzerTest {
         val heading = page.analyze().blocks.single { top(it) in (200 / 800f)..(260 / 800f) }
         assertEquals(224 / 800f, top(heading), 1e-3f)
     }
+
+    /** Stacked marks (Ẩ, Ễ, Ậ: a circumflex plus a tone mark) are two thin runs; both must join the line. */
+    @Test fun stackedMarksBothJoinTheLine() {
+        val page = Page()
+        for (top in listOf(100, 130, 160)) page.line(40, top, listOf(3, 4, 2))
+        page.rect(40, 124, 47, 127) // circumflex, 3 px above line 2
+        page.rect(42, 119, 45, 122) // tone mark, 2 px above the circumflex
+        val blocks = page.analyze().blocks
+        assertTrue("blocks: $blocks", blocks.all { it is LayoutBlock.TextLine })
+        assertEquals(3, blocks.size)
+        assertEquals(119 / 800f, (blocks[1] as LayoutBlock.TextLine).top, 1e-4f)
+    }
 }

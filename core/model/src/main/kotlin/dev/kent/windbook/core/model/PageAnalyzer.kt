@@ -199,6 +199,8 @@ object PageAnalyzer {
                     joins(belowLine, belowLine?.let { it.first - line.last - 1 }) -> {
                         out[i + 1] = line.first..out[i + 1].last
                         out.removeAt(i)
+                        // A run above (the tone mark over a circumflex) may now reach the grown line.
+                        i = maxOf(0, i - 1)
                     }
                     joins(aboveLine, aboveLine?.let { line.first - it.last - 1 }) -> {
                         out[i - 1] = out[i - 1].first..line.last

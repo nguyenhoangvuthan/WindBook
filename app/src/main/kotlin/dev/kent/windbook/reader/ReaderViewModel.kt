@@ -12,6 +12,7 @@ import dev.kent.windbook.core.model.BookDisplayPrefs
 import dev.kent.windbook.core.model.EffectiveDisplay
 import dev.kent.windbook.core.model.PdfLayout
 import dev.kent.windbook.core.model.ReadingStatus
+import dev.kent.windbook.core.model.ReflowSizes
 import dev.kent.windbook.core.model.resolve
 import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
@@ -149,6 +150,8 @@ class ReaderViewModel @AssistedInject constructor(
     fun setCropMargins(enabled: Boolean) = updatePrefs { it.copy(cropMargins = enabled) }
 
     fun setPdfZoom(zoom: Float, zoomX: Float) = updatePrefs { it.copy(zoom = zoom, zoomX = zoomX) }
+
+    fun setReflowSize(level: Int) = updatePrefs { it.copy(reflowSize = level.coerceIn(0, ReflowSizes.LAST)) }
 
     private fun updatePrefs(change: (BookDisplayPrefs) -> BookDisplayPrefs) {
         val next = change(currentPrefs)

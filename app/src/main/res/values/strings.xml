@@ -78,4 +78,9 @@
     <string name="layout_paged">Page by page</string>
     <string name="crop_margins">Crop margins</string>
     <string name="page_render_failed">This page can\'t be shown</string>
+    <string name="layout_reflow">Reflow</string>
+    <string name="text_smaller">A−</string>
+    <string name="text_larger">A+</string>
+    <string name="cd_text_smaller">Smaller text</string>
+    <string name="cd_text_larger">Larger text</string>
 </resources>

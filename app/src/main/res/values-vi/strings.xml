@@ -73,4 +73,9 @@
     <string name="layout_paged">Lật từng trang</string>
     <string name="crop_margins">Cắt lề trắng</string>
     <string name="page_render_failed">Không hiển thị được trang này</string>
+    <string name="layout_reflow">Dàn lại chữ</string>
+    <string name="text_smaller">A−</string>
+    <string name="text_larger">A+</string>
+    <string name="cd_text_smaller">Chữ nhỏ hơn</string>
+    <string name="cd_text_larger">Chữ lớn hơn</string>
 </resources>

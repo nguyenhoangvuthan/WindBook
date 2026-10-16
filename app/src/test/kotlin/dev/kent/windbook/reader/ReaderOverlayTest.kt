@@ -118,4 +118,47 @@ class ReaderOverlayTest {
         compose.onNodeWithText("Crop margins").assertIsOn().performClick()
         assertEquals(listOf(false), crops)
     }
+
+    @Test fun reflowIsAThirdViewChoice() {
+        val layouts = mutableListOf<PdfLayout>()
+        compose.setContent {
+            ReaderOverlay(
+                visible = true, title = "Doc", chapterTitle = null, progression = 0.1,
+                canMarkFinished = false, onMarkFinished = {}, onBack = {},
+                pdfDisplay = EffectiveDisplay(PdfLayout.VERTICAL, cropMargins = true),
+                onPdfLayoutChange = { layouts += it },
+            )
+        }
+        compose.onNodeWithContentDescription("View").performClick()
+        compose.onNodeWithText("Reflow").performClick()
+        assertEquals(listOf(PdfLayout.REFLOW), layouts)
+    }
+
+    @Test fun textSizeButtonsAreHiddenOutsideReflow() {
+        compose.setContent {
+            ReaderOverlay(
+                visible = true, title = "Doc", chapterTitle = null, progression = 0.1,
+                canMarkFinished = false, onMarkFinished = {}, onBack = {},
+                pdfDisplay = EffectiveDisplay(PdfLayout.VERTICAL, cropMargins = true),
+            )
+        }
+        compose.onNodeWithContentDescription("View").performClick()
+        compose.onNodeWithContentDescription("Larger text").assertDoesNotExist()
+    }
+
+    @Test fun largerTextStepsTheReflowSize() {
+        val sizes = mutableListOf<Int>()
+        compose.setContent {
+            ReaderOverlay(
+                visible = true, title = "Doc", chapterTitle = null, progression = 0.1,
+                canMarkFinished = false, onMarkFinished = {}, onBack = {},
+                pdfDisplay = EffectiveDisplay(PdfLayout.REFLOW, cropMargins = true, reflowSize = 2),
+                onReflowSizeChange = { sizes += it },
+            )
+        }
+        compose.onNodeWithContentDescription("View").performClick()
+        compose.onNodeWithContentDescription("Larger text").performClick()
+        compose.onNodeWithContentDescription("Smaller text").performClick()
+        assertEquals(listOf(3, 1), sizes)
+    }
 }

@@ -141,4 +141,12 @@ class ReaderViewModelPdfTest {
         val display = second.pdfDisplay.filterNotNull().first { it.zoom == 2f }
         assertEquals(0.4f, display.zoomX, 1e-6f)
     }
+
+    @Test fun reflowSizeIsSavedForTheBook() = runTest {
+        val model = vm(PageSize(400f, 600f))
+        model.pdfDisplay.filterNotNull().first()
+        model.setReflowSize(5)
+        assertEquals(5, prefs.observe("a").first { it.reflowSize != null }.reflowSize)
+        assertEquals(5, model.pdfDisplay.filterNotNull().first { it.reflowSize == 5 }.reflowSize)
+    }
 }

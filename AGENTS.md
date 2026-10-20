@@ -2,7 +2,7 @@
 
 Read this file first. It is shared by every AI agent working in this repo (Claude Code, Codex, …) and is the single place for project context, rules, current status and the task queue. **Keep it current:** when you finish or hand off work, update §8 "Current state" and §9 "Task queue" in the same commit as the work.
 
-Last updated: 2026-10-20 (after the PDF comfort milestone).
+Last updated: 2026-10-20 (owner feedback and next-scope brainstorming).
 
 ---
 
@@ -98,9 +98,10 @@ Four Gradle modules. Dependencies point downward only: `:app` → `:reader` → 
 
 ## 8. Current state (update on every hand-off)
 
-- **Branch:** `main`, in sync with `origin/main` (pushed 2026-10-20: the PDF comfort plan, the merged `pdf-comfort` branch and this file). Tag `v0.1.0` exists locally only.
+- **Branch:** `main`; the PDF comfort work was pushed on 2026-10-20. The owner-feedback documentation is local and has not been pushed. Tag `v0.1.0` exists locally only.
 - **Done milestones:** M1 core reading loop (v0.1.0; the roadmap row still says "Planned" and should read Done), Look & feel, PDF display, PDF comfort.
 - **Owner is testing** `~/Downloads/WindBook-0.1.0-pdf-comfort-debug.apk` (built from `32525b1`) on the Neo 3 GT. Expect feedback on import speed, zoom memory and Reflow. Record results in `docs/testing/m1-manual-checklist.md` (C1–C7, Neo 3 GT column).
+- **Owner feedback (2026-10-20):** missing notes, inadequate margins/layout, and missing folder loading/access to all files. Page-turning feedback is provisionally interpreted as positive. The affected format, note interaction and folder semantics still need clarification. See `docs/research/2026-10-20-daily-reading-feedback.md`; this is a discussion brief, not an approved scope change.
 - **Emulator results for PDF comfort:**
   - Scan import ~0.75 s (+15 MB PSS).
   - Zoom and horizontal position restored on reopen.
@@ -110,7 +111,7 @@ Four Gradle modules. Dependencies point downward only: `:app` → `:reader` → 
 ## 9. Task queue
 
 **Next (waiting on the owner):**
-1. Owner feedback from the phone build. Fix regressions first.
+1. Continue brainstorming from the owner's 2026-10-20 feedback: clarify notes, margins/layout and folder loading, then agree on a focused design. Consider bringing basic notes and folder import forward from M4/M6; no roadmap reorder is approved yet. Fix confirmed regressions first.
 2. Ask before pushing the `v0.1.0` tag.
 3. Start **M2 Reading comfort** (brainstorm → spec → plan): themes, fonts, typography (line height 1.2–2.0, a publisher-styles toggle), per-book EPUB prefs. The Vietnamese EPUB check (2026-10-15) found tone marks render fine at publisher line height 1.2, so line height is a preference, not a fix.
 

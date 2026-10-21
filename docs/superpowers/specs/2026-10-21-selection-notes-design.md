@@ -8,7 +8,7 @@ The Android 12–14 PDF region fallback remains an explicit proposed limit for
 owner approval. Gesture and text-extraction feasibility checks remain in planning.
 
 Local interactive mockup (throwaway, not app code):
-`.superpowers/brainstorm/407505-1792566249/content/selection-notes-v2.html`.
+`.superpowers/brainstorm/12573-1792568394/content/selection-notes-v3.html`.
 It demonstrates document modes, the compact EPUB selection menu, color-only
 highlights, composing/saving a note, searching the list,
 and returning to its source. Text selection and rectangle dragging are illustrated,
@@ -58,9 +58,13 @@ as a proposed portability measure; it is not a restorable database backup.
 
 Long-press a word and adjust the selection handles. Once selection settles,
 show a compact anchored popup directly above the selected passage. Its primary
-row contains exactly two labeled actions: Highlight color and Note. This is a
-small contextual menu, not a full-width sheet. Proposed width is approximately
-240 dp (clamped to the available viewport), with 48 dp touch targets. Center it
+menu contains exactly two text actions: Highlight color and Note. At the owner's
+request, v3 reduces the popup to roughly one-third of v2's area and increases
+label size from 14 to 18 in the mockup. Stack the two actions in a narrow popup
+(84 px wide in the prototype) and make the text itself clickable, without
+padded button boxes. Color swatches wrap compactly below. Preserve keyboard
+focus and TalkBack action labels. This replaces the previous 240 dp menu and
+48 dp padded-button proposal; final app dimensions follow the approved visual. Center it
 on the visible selection and respect safe insets. If there is insufficient room
 above, place it below. Do not cover the selected text or its handles. Reposition
 as the selection changes; dismiss on selection clear or navigation.

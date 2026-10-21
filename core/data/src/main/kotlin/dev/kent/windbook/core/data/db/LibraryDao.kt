@@ -27,6 +27,34 @@ interface LibraryDao {
     @Query("SELECT * FROM books WHERE sha256 = :sha256 LIMIT 1")
     suspend fun findBySha(sha256: String): BookEntity?
 
+    @Query("SELECT * FROM books WHERE id = :id")
+    suspend fun findIncludingHidden(id: String): BookEntity?
+
+    @Query("SELECT id FROM books")
+    suspend fun allIdsIncludingHidden(): List<String>
+
+    @Query("UPDATE books SET deleted_at = NULL, updated_at = :now WHERE id = :id AND file_path IS NULL")
+    suspend fun restoreExternal(id: String, now: Long)
+
+    @Query("UPDATE books SET deleted_at = :now, updated_at = :now WHERE id = :id AND file_path IS NULL")
+    suspend fun hideExternal(id: String, now: Long)
+
+    @Upsert
+    suspend fun upsertOwnedSource(source: BookSourceEntity)
+
+    /** Both records commit together; source failures must never leave a book without its source. */
+    @Transaction
+    suspend fun insertOwned(book: BookEntity) {
+        insert(book)
+        upsertOwnedSource(book.ownedSource())
+    }
+
+    @Transaction
+    suspend fun updateOwned(book: BookEntity) {
+        update(book)
+        upsertOwnedSource(book.ownedSource())
+    }
+
     @Insert
     suspend fun insert(book: BookEntity)
 
@@ -67,3 +95,13 @@ interface LibraryDao {
     @Query("SELECT * FROM reading_progress WHERE book_id = :bookId")
     suspend fun progress(bookId: String): ReadingProgressEntity?
 }
+
+private fun BookEntity.ownedSource() = BookSourceEntity(
+    id = "owned:$id",
+    bookId = id,
+    kind = "OWNED",
+    localPath = requireNotNull(filePath),
+    size = fileSize,
+    verifiedSha256 = requireNotNull(sha256),
+    availability = "AVAILABLE",
+)

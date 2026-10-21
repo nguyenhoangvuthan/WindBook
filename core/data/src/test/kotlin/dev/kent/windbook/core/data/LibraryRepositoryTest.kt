@@ -69,6 +69,17 @@ class LibraryRepositoryTest {
         assertEquals(ReadingStatus.FINISHED, repo.book("a")!!.status)
     }
 
+    @Test fun delete_externalBook_hidesWithoutDeletingProgressOrCover() = runTest {
+        val old = db.libraryDao().findById("a")!!
+        db.libraryDao().update(old.copy(filePath = null, sha256 = null))
+        repo.saveProgress("a", "old-locator", 0.5)
+        repo.delete("a")
+        assertNull(repo.book("a"))
+        assertEquals("old-locator", repo.savedLocator("a"))
+        org.junit.Assert.assertTrue(coverFile.exists())
+        org.junit.Assert.assertTrue(bookFile.exists())
+    }
+
     @Test fun delete_removesFilesAndHidesBook() = runTest {
         repo.saveProgress("a", "{}", 0.5)
         repo.delete("a")

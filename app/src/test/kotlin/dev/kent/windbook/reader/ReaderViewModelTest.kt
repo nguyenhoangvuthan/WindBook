@@ -1,5 +1,7 @@
 package dev.kent.windbook.reader
 
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.viewModelScope
 import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
 import dev.kent.windbook.core.data.DisplayPreferencesRepository
@@ -11,6 +13,7 @@ import dev.kent.windbook.core.model.BookFormat
 import dev.kent.windbook.core.model.ReadingStatus
 import dev.kent.windbook.testing.MainDispatcherRule
 import java.io.File
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -33,6 +36,8 @@ class ReaderViewModelTest {
     private lateinit var library: LibraryRepository
     private lateinit var prefs: DisplayPreferencesRepository
     private lateinit var bookFile: File
+    private val viewModels = mutableListOf<ReaderViewModel>()
+    private val viewModelStore = ViewModelStore()
 
     private class FakeSession(override val format: BookFormat) : ReaderSession {
         var closed = false
@@ -51,7 +56,18 @@ class ReaderViewModelTest {
         )
     }
 
-    @After fun tearDown() = db.close()
+    @After fun tearDown() = runTest {
+        val jobs = viewModels.mapNotNull { it.viewModelScope.coroutineContext[Job] }
+        viewModelStore.clear()
+        jobs.forEach { it.join() }
+        if (::db.isInitialized) db.close()
+    }
+
+    private fun viewModel(id: String, bookOpener: BookOpener = opener): ReaderViewModel =
+        ReaderViewModel(id, library, bookOpener, prefs).also {
+            viewModels.add(it)
+            viewModelStore.put(viewModels.size.toString(), it)
+        }
 
     private suspend fun ReaderViewModel.awaitSettled(): ReaderUiState =
         state.first { it !is ReaderUiState.Loading }
@@ -59,35 +75,35 @@ class ReaderViewModelTest {
     @Test fun ready_containsSavedLocator() = runTest {
         library.saveProgress("a", """{"href":"c3"}""", 0.6)
 
-        val state = ReaderViewModel("a", library, opener, prefs).awaitSettled() as ReaderUiState.Ready
+        val state = viewModel("a").awaitSettled() as ReaderUiState.Ready
 
         assertEquals("Dune", state.title)
         assertEquals("""{"href":"c3"}""", state.initialLocatorJson)
     }
 
     @Test fun opening_marksBookReading() = runTest {
-        ReaderViewModel("a", library, opener, prefs).awaitSettled()
+        viewModel("a").awaitSettled()
         assertEquals(ReadingStatus.READING, library.book("a")!!.status)
     }
 
     @Test fun unknownBook_isNotFound() = runTest {
-        assertEquals(ReaderUiState.Error(ReaderError.NOT_FOUND), ReaderViewModel("zzz", library, opener, prefs).awaitSettled())
+        assertEquals(ReaderUiState.Error(ReaderError.NOT_FOUND), viewModel("zzz").awaitSettled())
     }
 
     @Test fun missingFile_isFileMissing() = runTest {
         bookFile.delete()
-        assertEquals(ReaderUiState.Error(ReaderError.FILE_MISSING), ReaderViewModel("a", library, opener, prefs).awaitSettled())
+        assertEquals(ReaderUiState.Error(ReaderError.FILE_MISSING), viewModel("a").awaitSettled())
     }
 
     @Test fun openerFailure_isCannotOpenAndBookStaysToRead() = runTest {
         val failing = BookOpener { _, _ -> Result.failure(IllegalStateException("broken")) }
-        assertEquals(ReaderUiState.Error(ReaderError.CANNOT_OPEN), ReaderViewModel("a", library, failing, prefs).awaitSettled())
+        assertEquals(ReaderUiState.Error(ReaderError.CANNOT_OPEN), viewModel("a", failing).awaitSettled())
         assertEquals(ReadingStatus.TO_READ, library.book("a")!!.status)
     }
 
     @Test fun latestLocator_startsFromSavedAndFollowsChanges() = runTest {
         library.saveProgress("a", """{"href":"c3"}""", 0.6)
-        val vm = ReaderViewModel("a", library, opener, prefs)
+        val vm = viewModel("a")
         vm.awaitSettled()
         assertEquals("""{"href":"c3"}""", vm.latestLocatorJson)
 
@@ -98,7 +114,7 @@ class ReaderViewModelTest {
     }
 
     @Test fun nearTheEnd_offersMarkFinished() = runTest {
-        val vm = ReaderViewModel("a", library, opener, prefs)
+        val vm = viewModel("a")
         vm.awaitSettled()
         assertEquals(false, vm.canMarkFinished.value)
 
@@ -118,7 +134,7 @@ class ReaderViewModelTest {
 
     @Test fun removeBook_deletesThenCallsBack() = runTest {
         bookFile.delete()
-        val vm = ReaderViewModel("a", library, opener, prefs)
+        val vm = viewModel("a")
         vm.awaitSettled()
         val removed = kotlinx.coroutines.CompletableDeferred<Unit>()
 
@@ -129,7 +145,7 @@ class ReaderViewModelTest {
     }
 
     @Test fun rapidLocatorChanges_persistLastLocator() = runTest {
-        val vm = ReaderViewModel("a", library, opener, prefs)
+        val vm = viewModel("a")
         vm.awaitSettled()
 
         repeat(100) { i -> vm.onLocatorChanged("""{"href":"c","i":$i}""", i / 100.0, null) }
@@ -146,8 +162,20 @@ class ReaderViewModelTest {
         assertEquals(0.99, vm.progression.value, 1e-9)
     }
 
+    @Test fun externalCandidateWithoutOwnedPath_isCannotOpenBeforeCallingOpener() = runTest {
+        val old = db.libraryDao().findById("a")!!
+        db.libraryDao().update(old.copy(filePath = null, sha256 = null))
+        var calls = 0
+        val observing = BookOpener { _, format -> calls++; Result.success(FakeSession(format)) }
+        assertEquals(ReaderUiState.Error(ReaderError.CANNOT_OPEN),
+            viewModel("a", observing).awaitSettled())
+        assertEquals(0, calls)
+        assertEquals(ReadingStatus.TO_READ, library.book("a")!!.status)
+    }
+
     @Test fun toggleOverlay_flips() = runTest {
-        val vm = ReaderViewModel("a", library, opener, prefs)
+        val vm = viewModel("a")
+        vm.awaitSettled()
         val before = vm.overlayVisible.value
         vm.toggleOverlay()
         assertEquals(!before, vm.overlayVisible.value)

@@ -84,7 +84,7 @@ class BookImporter(
                 )
                 if (existing != null) {
                     // Re-import of a tombstoned book: revive the same row.
-                    dao.update(entity)
+                    dao.updateOwned(entity)
                     ImportResult.Imported(id)
                 } else {
                     insertOrDuplicate(entity, bookFile, coverPath)
@@ -107,10 +107,10 @@ class BookImporter(
     /** Two concurrent imports of the same file race on the unique sha256 index. */
     private suspend fun insertOrDuplicate(entity: BookEntity, bookFile: File, coverPath: String?): ImportResult =
         try {
-            dao.insert(entity)
+            dao.insertOwned(entity)
             ImportResult.Imported(entity.id)
         } catch (e: Exception) {
-            val winner = dao.findBySha(entity.sha256) ?: throw e
+            val winner = dao.findBySha(requireNotNull(entity.sha256)) ?: throw e
             bookFile.delete()
             files.delete(coverPath)
             ImportResult.Duplicate(winner.id)

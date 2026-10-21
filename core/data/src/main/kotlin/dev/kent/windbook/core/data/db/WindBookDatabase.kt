@@ -10,8 +10,11 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import kotlinx.coroutines.Dispatchers
 
 @Database(
-    entities = [BookEntity::class, ReadingProgressEntity::class, BookPreferencesEntity::class],
-    version = 2,
+    entities = [
+        BookEntity::class, ReadingProgressEntity::class, BookPreferencesEntity::class,
+        FolderEntity::class, BookSourceEntity::class, FolderMembershipEntity::class, ScanRunEntity::class,
+    ],
+    version = 3,
     exportSchema = true,
     autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
@@ -19,6 +22,10 @@ abstract class WindBookDatabase : RoomDatabase() {
     abstract fun libraryDao(): LibraryDao
 
     abstract fun bookPreferencesDao(): BookPreferencesDao
+
+    abstract fun sourceDao(): SourceDao
+
+    abstract fun folderDao(): FolderDao
 
     companion object {
         const val FILE_NAME = "windbook.db"
@@ -29,12 +36,14 @@ abstract class WindBookDatabase : RoomDatabase() {
         /** Opens (and migrates) the database file at [path]; tests pass the framework driver. */
         fun open(context: Context, path: String, driver: SQLiteDriver): WindBookDatabase =
             Room.databaseBuilder<WindBookDatabase>(context = context, name = path)
+                .addMigrations(FolderMigration)
                 .setDriver(driver)
                 .setQueryCoroutineContext(Dispatchers.IO)
                 .build()
 
         fun inMemory(context: Context, driver: SQLiteDriver): WindBookDatabase =
             Room.inMemoryDatabaseBuilder<WindBookDatabase>(context)
+                .addMigrations(FolderMigration)
                 .setDriver(driver)
                 .setQueryCoroutineContext(Dispatchers.IO)
                 .build()

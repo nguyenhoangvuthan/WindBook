@@ -1,5 +1,6 @@
 package dev.kent.windbook.core.data.importer
 
+import androidx.room3.useWriterConnection
 import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
 import dev.kent.windbook.core.data.db.WindBookDatabase
@@ -58,9 +59,24 @@ class BookImporterTest {
         assertEquals("Meta Author", book.author)
         assertEquals("EPUB", book.format)
         assertEquals("TO_READ", book.status)
-        assertTrue(File(book.filePath).exists())
+        assertTrue(File(book.filePath!!).exists())
+        val owned = db.sourceDao().forBook(book.id).single()
+        assertEquals("OWNED", owned.kind)
+        assertEquals(book.filePath, owned.localPath)
+        assertEquals(book.sha256, owned.verifiedSha256)
         assertTrue(File(book.coverPath!!).exists())
         assertTrue(store.tempDir.listFiles().orEmpty().isEmpty())
+    }
+
+    @Test fun import_sourceRegistrationFailure_rollsBackBookAndCleansFiles() = runTest {
+        db.useWriterConnection { connection ->
+            connection.usePrepared("CREATE TRIGGER fail_source BEFORE INSERT ON book_sources BEGIN SELECT RAISE(ABORT, 'source failed'); END") { it.step() }
+        }
+        assertEquals(ImportResult.Failed(ImportError.UNREADABLE), importer().import(source(TestBooks.epub(tmp.root))))
+        assertNull(db.libraryDao().findById("id1"))
+        assertEquals(0, db.sourceDao().countOwned())
+        assertTrue(store.booksDir.listFiles().orEmpty().isEmpty())
+        assertTrue(store.coversDir.listFiles().orEmpty().isEmpty())
     }
 
     @Test fun import_pdf_isDetectedByContentNotName() = runTest {
@@ -81,14 +97,16 @@ class BookImporterTest {
         importer().import(source(file))
         val old = db.libraryDao().findById("id1")!!
         db.libraryDao().softDelete("id1", now = 5)
-        File(old.filePath).delete()
+        File(old.filePath!!).delete()
 
         val result = importer().import(source(file))
 
         assertEquals(ImportResult.Imported("id1"), result)
         val revived = db.libraryDao().findById("id1")!!
         assertNull(revived.deletedAt)
-        assertTrue(File(revived.filePath).exists())
+        assertTrue(File(revived.filePath!!).exists())
+        assertEquals(1, db.sourceDao().countOwned())
+        assertEquals(revived.filePath, db.sourceDao().forBook("id1").single().localPath)
     }
 
     @Test fun import_blankMetadataTitle_fallsBackToFileName() = runTest {

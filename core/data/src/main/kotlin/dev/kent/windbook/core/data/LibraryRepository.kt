@@ -27,6 +27,10 @@ class LibraryRepository(
 
     suspend fun delete(id: String) {
         val book = dao.findById(id) ?: return
+        if (book.filePath == null) {
+            dao.hideExternal(id, clock())
+            return
+        }
         dao.softDelete(id, clock())
         files.delete(book.filePath)
         files.delete(book.coverPath)

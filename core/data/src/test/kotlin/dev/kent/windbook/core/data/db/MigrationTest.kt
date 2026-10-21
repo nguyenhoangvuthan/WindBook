@@ -52,6 +52,7 @@ class MigrationTest {
 
         val db = WindBookDatabase.open(ApplicationProvider.getApplicationContext(), path, AndroidSQLiteDriver())
         assertNotNull(db.libraryDao().findById("a"))
+        assertEquals("/f", db.sourceDao().forBook("a").single().localPath)
         assertEquals("""{"href":"x"}""", db.libraryDao().progress("a")!!.locatorJson)
         db.bookPreferencesDao().upsert(BookPreferencesEntity("a", "{}", 4))
         assertEquals("{}", db.bookPreferencesDao().json("a"))

@@ -95,5 +95,5 @@ EPUB/PDF/MOBI/AZW3/FB2/CBZ/CBR/TXT, and reading directly from the source folder
 to avoid a permanent second copy. This supersedes the batch-copy proposal above.
 The proposed design is `../superpowers/specs/2026-10-21-folder-library-design.md`;
 Android directory grants, temporary reader preparation and manual rescanning
-are proposed defaults awaiting design approval. New engine dependencies and
-the detailed implementation plan have not been approved.
+were accepted with the folder design on 2026-10-21. The two implementation
+plans and new engine dependencies still await separate approval.

@@ -1,7 +1,12 @@
 # Folder library and additional ebook formats
 
 Date: 2026-10-21
-Status: proposed design for owner review; not approved for implementation.
+Status: owner approved on 2026-10-21. Implementation plans and new dependencies
+require separate approval; no feature code has been implemented.
+
+Plans: `../plans/2026-10-21-folder-library.md` and
+`../plans/2026-10-21-ebook-format-readers.md`.
+Planning evidence: `../../research/2026-10-21-folder-reader-feasibility.md`.
 
 Independent builder review: no important unanswered planning questions. Engine
 feasibility, concrete cache limits and dependency proposals belong to planning.

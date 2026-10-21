@@ -20,15 +20,18 @@ class ReadiumMetadataExtractor(private val services: ReadiumServices) : Metadata
 
     override suspend fun extract(file: File, format: BookFormat): Result<ExtractedMetadata> =
         withContext(Dispatchers.IO) {
+            when (format) {
+                BookFormat.EPUB, BookFormat.PDF -> Unit
+                BookFormat.MOBI, BookFormat.AZW3, BookFormat.FB2,
+                BookFormat.CBZ, BookFormat.CBR, BookFormat.TXT ->
+                    return@withContext Result.failure(ReaderException("Unsupported format: $format"))
+            }
             services.openPublication(file).mapCatching { publication ->
                 try {
                     ExtractedMetadata(
                         title = publication.metadata.title,
                         author = publication.metadata.authors.firstOrNull()?.name,
-                        coverWebp = when (format) {
-                            BookFormat.PDF -> pdfCoverWebp(file)
-                            BookFormat.EPUB -> publication.cover()?.toWebp()
-                        },
+                        coverWebp = if (format == BookFormat.PDF) pdfCoverWebp(file) else publication.cover()?.toWebp(),
                     )
                 } finally {
                     publication.close()

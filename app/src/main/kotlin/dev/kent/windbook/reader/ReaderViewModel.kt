@@ -99,7 +99,11 @@ class ReaderViewModel @AssistedInject constructor(
             _state.value = ReaderUiState.Error(ReaderError.NOT_FOUND)
             return
         }
-        val file = File(book.filePath)
+        val filePath = book.filePath ?: run {
+            _state.value = ReaderUiState.Error(ReaderError.CANNOT_OPEN)
+            return
+        }
+        val file = File(filePath)
         if (!file.exists()) {
             _state.value = ReaderUiState.Error(ReaderError.FILE_MISSING)
             return

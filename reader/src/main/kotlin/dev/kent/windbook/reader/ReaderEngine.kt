@@ -13,14 +13,22 @@ class ReaderEngine(private val services: ReadiumServices) : BookOpener {
 
     override suspend fun open(file: File, format: BookFormat): Result<ReaderSession> =
         withContext(Dispatchers.IO) {
-            if (!file.exists()) return@withContext Result.failure(ReaderException("Missing file: $file"))
             when (format) {
-                BookFormat.EPUB -> services.openPublication(file).map { publication ->
-                    ReadiumReaderSession(format, publication, positionCount = publication.positions().size)
+                BookFormat.EPUB, BookFormat.PDF -> {
+                    if (!file.exists()) return@withContext Result.failure(ReaderException("Missing file: $file"))
+                    if (format == BookFormat.EPUB) {
+                        services.openPublication(file).map { publication ->
+                            ReadiumReaderSession(format, publication, positionCount = publication.positions().size)
+                        }
+                    } else {
+                        // Not through Readium: its PDF parser renders a full-size cover on open (see PdfReaderSession).
+                        runCatching { PdfReaderSession(PdfDocumentHandle.open(file)) }
+                            .recoverCatching { throw ReaderException("PDF can't be rendered: ${it.message}") }
+                    }
                 }
-                // Not through Readium: its PDF parser renders a full-size cover on open (see PdfReaderSession).
-                BookFormat.PDF -> runCatching { PdfReaderSession(PdfDocumentHandle.open(file)) }
-                    .recoverCatching { throw ReaderException("PDF can't be rendered: ${it.message}") }
+                BookFormat.MOBI, BookFormat.AZW3, BookFormat.FB2,
+                BookFormat.CBZ, BookFormat.CBR, BookFormat.TXT ->
+                    Result.failure(ReaderException("Unsupported format: $format"))
             }
         }
 }

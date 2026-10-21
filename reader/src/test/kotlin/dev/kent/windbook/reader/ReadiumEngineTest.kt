@@ -50,6 +50,50 @@ class ReadiumEngineTest {
         assertTrue(ReaderEngine(services).open(tmp.root.resolve("missing.epub"), BookFormat.EPUB).isFailure)
     }
 
+    @Test fun engineRejectsUnsupportedFormatsEvenForReadableEpubBytes() = runTest {
+        val epub = TestBooks.epub(tmp.root)
+
+        unsupportedFormats.forEach { format ->
+            val result = ReaderEngine(services).open(epub, format)
+            result.getOrNull()?.close()
+
+            assertUnsupported(format, result.exceptionOrNull())
+        }
+    }
+
+    @Test fun engineRejectsUnsupportedFormatsBeforeCheckingTheFile() = runTest {
+        unsupportedFormats.forEach { format ->
+            val result = ReaderEngine(services).open(tmp.root.resolve("missing.${format.extension}"), format)
+
+            assertUnsupported(format, result.exceptionOrNull())
+        }
+    }
+
+    @Test fun metadataRejectsUnsupportedFormatsEvenForReadableEpubBytes() = runTest {
+        val epub = TestBooks.epub(tmp.root)
+
+        unsupportedFormats.forEach { format ->
+            val result = ReadiumMetadataExtractor(services).extract(epub, format)
+
+            assertUnsupported(format, result.exceptionOrNull())
+        }
+    }
+
+    @Test fun metadataRejectsUnsupportedFormatsBeforeOpeningTheFile() = runTest {
+        unsupportedFormats.forEach { format ->
+            val result = ReadiumMetadataExtractor(services).extract(tmp.root.resolve("missing.${format.extension}"), format)
+
+            assertUnsupported(format, result.exceptionOrNull())
+        }
+    }
+
+    private fun assertUnsupported(format: BookFormat, error: Throwable?) {
+        assertTrue("$format must report unsupported format, got $error", error is ReaderException)
+        assertTrue("$format must report unsupported format, got $error", error?.message.orEmpty().contains("Unsupported format"))
+    }
+
+    private val unsupportedFormats = listOf(BookFormat.MOBI, BookFormat.AZW3, BookFormat.FB2, BookFormat.CBZ, BookFormat.CBR, BookFormat.TXT)
+
     @Test fun locatorCodecReadsTotalProgression() {
         val json = """{"href":"OEBPS/c1.xhtml","type":"application/xhtml+xml","locations":{"totalProgression":0.37}}"""
         assertEquals(0.37, LocatorCodec.progression(json)!!, 1e-9)

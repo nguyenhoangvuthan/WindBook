@@ -2,7 +2,7 @@
 
 Read this file first. It is shared by every AI agent working in this repo (Claude Code, Codex, …) and is the single place for project context, rules, current status and the task queue. **Keep it current:** when you finish or hand off work, update §8 "Current state" and §9 "Task queue" in the same commit as the work.
 
-Last updated: 2026-10-22 (folder plans approved; subagent implementation started).
+Last updated: 2026-10-22 (folder source/discovery types implemented; persistence next).
 
 ---
 
@@ -32,7 +32,7 @@ WindBook is a private, **offline** EPUB/PDF reader for Android 12+ (minSdk 31, t
 | Device tests (`:reader` androidTest) | `./gradlew :reader:connectedDebugAndroidTest` (17 tests) |
 | One device test class | `./gradlew :reader:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=<fqcn>` |
 
-Last green JVM counts (2026-10-21): 206 (model 36, data 46, reader 18, app 106); Reflow-only tests were removed. Device suite: 17 passed during Reflow removal verification. Lint: 0 errors, 9 pre-existing warnings (SDK/Gradle/Kotlin/serialization version notices, `PluralsCandidate` in strings.xml:17, `allowBackup`, monochrome icon). A fresh lint run against the pre-removal code also reports the same 9 warnings. A change must not add lint warnings.
+Last green JVM counts (2026-10-22): 219 (model 45, data 46, reader 22, app 106). Device suite: 17 passed during Reflow removal verification. Lint: 0 errors, 10 pre-existing warnings (SDK/Gradle/Kotlin/serialization/DataStore version notices, `PluralsCandidate` in strings.xml:17, `allowBackup`, monochrome icon). Refreshed unchanged baseline `5510307` also reports the identical 10 warnings; the increase from the historical 9 is an upstream DataStore version notice. A change must not add lint warnings.
 
 **Emulator** (AVD `Neo3GT_API_36`, matches the phone). Start it detached; `-gpu swiftshader_indirect` is required, otherwise it dies with a gfxstream "null ctx" error:
 
@@ -106,6 +106,7 @@ Four Gradle modules. Dependencies point downward only: `:app` → `:reader` → 
 - **Selection notes design:** `docs/superpowers/specs/2026-10-21-selection-notes-design.md` is drafted and independently reviewed, awaiting owner approval. It covers EPUB/PDF text selection and PDF scan region notes. The owner specified the same compact popup above EPUB text, PDF text and PDF scan regions with Highlight color and Note actions; standalone colored highlights are included for all three, with a translucent fill and outline for scan regions. The owner requested a popup about one-third of the previous area, larger labels, and clicks directly on text instead of padded button boxes. Both actions must stay on one horizontal row (owner correction). API 31–34 PDF region-only support and Markdown export are proposed defaults. Interactive mockup: `.superpowers/brainstorm/27897-1792599917/content/selection-notes-v5.html` (ignored, throwaway). Notes are not implemented in the APK.
 - **Folder library design:** `docs/superpowers/specs/2026-10-21-folder-library-design.md` was approved by the owner on 2026-10-21 after independent review. The owner requested folder location input, extension filters, recursive scans, discovery AND in-app reading for EPUB/PDF/MOBI/AZW3/FB2/CBZ/CBR/TXT, and direct source-folder reading without a permanent library copy. Proposed defaults: one-time Android tree grant, remembered folders and manual rescans; bounded per-book temporary preparation where engines require it. Raw typed paths do not grant access. New reader adapters require feasibility checks and concrete dependency proposals before approval; no dependencies added. Interactive mockup: `.superpowers/brainstorm/27897-1792599917/content/folder-library-v1.html` (ignored, synthetic). Design approval does not approve the implementation plans, new dependencies or branch merges.
 - **Folder implementation plans:** `docs/superpowers/plans/2026-10-21-folder-library.md` (8 tasks, no new dependencies) and `docs/superpowers/plans/2026-10-21-ebook-format-readers.md` (7 tasks, six additional readers) were approved on 2026-10-22 for subagent-driven execution. Full completion still requires all eight formats. Source/API inspection is recorded in `docs/research/2026-10-21-folder-reader-feasibility.md`; proposed additions are Junrar 8.1.2 (plus slf4j-api 2.0.17), native libmobi 0.12 and NDK 29.0.14206865 (not installed). The owner approved these additions and NDK installation on 2026-10-22. Runtime compatibility, APK delta and memory remain execution gates. Deliver a debug APK when the complete feature is verified.
+- **Folder Task 1:** source/discovery model seams are implemented: all eight formats, nullable owned path/hash, provider/document identity and locale-independent final-suffix filters. Reader and metadata opening explicitly reject the six pending adapters before accessing files; a null owned path temporarily produces the existing cannot-open state. Full CI passes 219 tests; lint matches the refreshed baseline (0 errors, 10 warnings). Persistence/source resolution and the six new readers remain later tasks.
 - **Historical emulator results for PDF comfort (before Reflow removal):**
   - Scan import ~0.75 s (+15 MB PSS).
   - Zoom and horizontal position restored on reopen.
@@ -114,8 +115,8 @@ Four Gradle modules. Dependencies point downward only: `:app` → `:reader` → 
 
 ## 9. Task queue
 
-**Next (waiting on the owner):**
-1. Execute both approved folder/format plans using subagents, independent task reviews and final verification; export the resulting APK for the owner. No further plan/dependency/NDK confirmation is needed. The separate selection-notes design still awaits approval; no notes implementation is implied. The owner separately decides merge/push; margins/layout remain a separate discussion.
+**Next (approved execution):**
+1. Review completed Folder Task 1, then continue Task 2 persistence and the remaining approved folder/format tasks using subagents, independent task reviews and final verification; export the resulting APK for the owner. No further plan/dependency/NDK confirmation is needed. The separate selection-notes design still awaits approval; no notes implementation is implied. The owner separately decides merge/push; margins/layout remain a separate discussion.
 2. Ask before pushing the `v0.1.0` tag.
 3. Start **M2 Reading comfort** (brainstorm → spec → plan): themes, fonts, typography (line height 1.2–2.0, a publisher-styles toggle), per-book EPUB prefs. The Vietnamese EPUB check (2026-10-15) found tone marks render fine at publisher line height 1.2, so line height is a preference, not a fix.
 
@@ -131,6 +132,7 @@ Four Gradle modules. Dependencies point downward only: `:app` → `:reader` → 
   - Paged-mode pan is unclamped.
   - Weak tests: mixed page heights, password PDF, cascade after migration.
 - Readium still parses PDFs at import (metadata only); OK now that it no longer renders the cover.
+- Existing test lifecycle race: `ReaderViewModelTest.toggleOverlay_flips` can leave asynchronous opening running past database teardown, surfacing as `UncaughtExceptionsBeforeTest` in the next test. The unchanged class and final full CI rerun passed; revisit lifecycle cleanup with Task 2 source fixtures.
 
 **Housekeeping:**
 - Roadmap: mark M1 Done.

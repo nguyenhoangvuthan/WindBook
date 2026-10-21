@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-folder-library-design.md` (owner approved 2026-10-21).
 
-**Status:** Proposed implementation plan. New dependencies, native build tooling and execution method are not approved.
+**Status:** Owner approved on 2026-10-22, including Junrar/slf4j, libmobi, NDK installation and subagent-driven execution.
 
 ## Global Constraints
 

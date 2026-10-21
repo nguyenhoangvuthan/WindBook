@@ -26,19 +26,20 @@ internal object BookPreferencesCodec {
     private const val CROP = "cropMargins"
     private const val ZOOM = "pdfZoom"
     private const val ZOOM_X = "pdfZoomX"
-    private const val REFLOW_SIZE = "pdfReflowSize"
 
     fun decode(json: String?): BookDisplayPrefs {
         val obj = json?.let { runCatching { JSONObject(it) }.getOrNull() } ?: return BookDisplayPrefs()
         val layout = obj.optString(LAYOUT).takeIf { it.isNotEmpty() && !obj.isNull(LAYOUT) }
-            ?.let { runCatching { PdfLayout.valueOf(it) }.getOrNull() }
+            ?.let {
+                // Reflow was removed; reopen old choices in vertical mode, including landscape books.
+                if (it == "REFLOW") PdfLayout.VERTICAL else runCatching { PdfLayout.valueOf(it) }.getOrNull()
+            }
         val crop = if (obj.present(CROP)) obj.optBoolean(CROP) else null
         return BookDisplayPrefs(
             pdfLayout = layout,
             cropMargins = crop,
             zoom = obj.floatOrNull(ZOOM),
             zoomX = obj.floatOrNull(ZOOM_X),
-            reflowSize = if (obj.present(REFLOW_SIZE)) obj.optInt(REFLOW_SIZE) else null,
         )
     }
 
@@ -48,7 +49,6 @@ internal object BookPreferencesCodec {
         obj.put(CROP, prefs.cropMargins ?: JSONObject.NULL)
         obj.put(ZOOM, prefs.zoom?.toDouble() ?: JSONObject.NULL)
         obj.put(ZOOM_X, prefs.zoomX?.toDouble() ?: JSONObject.NULL)
-        obj.put(REFLOW_SIZE, prefs.reflowSize ?: JSONObject.NULL)
         return obj.toString()
     }
 

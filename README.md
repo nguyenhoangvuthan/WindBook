@@ -3,6 +3,10 @@
 A private, offline EPUB/PDF reader for Android 12+ (minSdk 31, targetSdk 36), built with Kotlin, Jetpack Compose and Readium.
 Current version: **v0.1.0 (Milestone 1: core reading loop)**. It imports books, shows a library and opens EPUB/PDF. It always reopens at the exact page, even after rotation or the app being killed. UI in English and Vietnamese.
 
+PDF supports vertical scrolling and page-by-page reading, margin cropping and
+remembered zoom. Reflow was removed by owner decision on 2026-10-20; books
+with that saved mode reopen vertically at their saved page.
+
 - Design spec: [docs/superpowers/specs/2026-10-13-windbook-design.md](docs/superpowers/specs/2026-10-13-windbook-design.md)
 - Roadmap: [docs/superpowers/plans/2026-10-13-windbook-roadmap.md](docs/superpowers/plans/2026-10-13-windbook-roadmap.md)
 - Manual test results: [docs/testing/m1-manual-checklist.md](docs/testing/m1-manual-checklist.md)

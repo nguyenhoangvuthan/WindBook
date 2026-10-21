@@ -55,19 +55,4 @@ object PdfFixtures {
         return file
     }
 
-    /** One page of real text (drawn with the system font, Vietnamese included), one string per line. */
-    fun textLines(dir: File, name: String, lines: List<String>, pageW: Int = 400, pageH: Int = 600, textSize: Float = 14f, leading: Float = 24f): File {
-        val doc = PdfDocument()
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.BLACK
-            this.textSize = textSize
-        }
-        val page = doc.startPage(PdfDocument.PageInfo.Builder(pageW, pageH, 1).create())
-        lines.forEachIndexed { i, text -> page.canvas.drawText(text, 40f, 60f + i * leading, paint) }
-        doc.finishPage(page)
-        val file = File(dir, name)
-        file.outputStream().use { doc.writeTo(it) }
-        doc.close()
-        return file
-    }
 }

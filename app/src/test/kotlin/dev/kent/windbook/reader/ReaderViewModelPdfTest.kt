@@ -7,6 +7,7 @@ import app.cash.turbine.test
 import dev.kent.windbook.core.data.DisplayPreferencesRepository
 import dev.kent.windbook.core.data.LibraryRepository
 import dev.kent.windbook.core.data.db.BookEntity
+import dev.kent.windbook.core.data.db.BookPreferencesEntity
 import dev.kent.windbook.core.data.db.WindBookDatabase
 import dev.kent.windbook.core.data.files.BookFileStore
 import dev.kent.windbook.core.model.BookDisplayPrefs
@@ -142,11 +143,20 @@ class ReaderViewModelPdfTest {
         assertEquals(0.4f, display.zoomX, 1e-6f)
     }
 
-    @Test fun reflowSizeIsSavedForTheBook() = runTest {
-        val model = vm(PageSize(400f, 600f))
-        model.pdfDisplay.filterNotNull().first()
-        model.setReflowSize(5)
-        assertEquals(5, prefs.observe("a").first { it.reflowSize != null }.reflowSize)
-        assertEquals(5, model.pdfDisplay.filterNotNull().first { it.reflowSize == 5 }.reflowSize)
+    @Test fun legacyReflowBookReopensVerticallyAtTheSavedPageEvenForSlides() = runTest {
+        val first = vm(PageSize(720f, 540f))
+        first.pdfDisplay.filterNotNull().first()
+        first.onPdfPageChanged(7)
+        library.savedLocatorFlowFirst("a") { it?.contains("\"position\":8") == true }
+        db.bookPreferencesDao().upsert(BookPreferencesEntity(
+            "a", """{"pdfLayout":"REFLOW","pdfReflowSize":5,"pdfZoom":2.0,"pdfZoomX":0.4}""", 1,
+        ))
+
+        val reopened = vm(PageSize(720f, 540f))
+        val display = reopened.pdfDisplay.filterNotNull().first()
+        assertEquals(PdfLayout.VERTICAL, display.layout)
+        assertEquals(2f, display.zoom, 1e-6f)
+        assertEquals(0.4f, display.zoomX, 1e-6f)
+        assertEquals(7, reopened.initialPdfPage())
     }
 }

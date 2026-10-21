@@ -59,9 +59,9 @@ class DisplayPreferencesRepositoryTest {
         assertNull(db.bookPreferencesDao().json("b"))
     }
 
-    @Test fun zoomAndReflowSizeRoundTrip() = runTest {
-        repo.set("b", BookDisplayPrefs(PdfLayout.VERTICAL, true, zoom = 2.5f, zoomX = 0.4f, reflowSize = 5))
-        assertEquals(BookDisplayPrefs(PdfLayout.VERTICAL, true, 2.5f, 0.4f, 5), repo.observe("b").first())
+    @Test fun zoomAndHorizontalPositionRoundTrip() = runTest {
+        repo.set("b", BookDisplayPrefs(PdfLayout.VERTICAL, true, zoom = 2.5f, zoomX = 0.4f))
+        assertEquals(BookDisplayPrefs(PdfLayout.VERTICAL, true, 2.5f, 0.4f), repo.observe("b").first())
     }
 
     @Test fun preferencesSavedBeforeZoomExistedHaveNoZoom() = runTest {
@@ -69,8 +69,22 @@ class DisplayPreferencesRepositoryTest {
         assertEquals(BookDisplayPrefs(PdfLayout.PAGED, false), repo.observe("b").first())
     }
 
-    @Test fun reflowLayoutRoundTrips() = runTest {
-        repo.set("b", BookDisplayPrefs(PdfLayout.REFLOW, null))
-        assertEquals(PdfLayout.REFLOW, repo.observe("b").first().pdfLayout)
+    @Test fun legacyReflowOpensVerticallyAndPreservesOtherChoicesOnWrite() = runTest {
+        db.bookPreferencesDao().upsert(BookPreferencesEntity(
+            "b",
+            """{"pdfLayout":"REFLOW","pdfReflowSize":5,"cropMargins":false,"pdfZoom":2.5,"pdfZoomX":0.4,"fontScale":1.2}""",
+            1,
+        ))
+        val restored = repo.observe("b").first()
+        assertEquals(PdfLayout.VERTICAL, restored.pdfLayout)
+        assertEquals(false, restored.cropMargins)
+        assertEquals(2.5f, restored.zoom)
+        assertEquals(0.4f, restored.zoomX)
+
+        repo.set("b", restored.copy(cropMargins = true))
+        val json = JSONObject(db.bookPreferencesDao().json("b")!!)
+        assertEquals("VERTICAL", json.getString("pdfLayout"))
+        assertEquals(1.2, json.getDouble("fontScale"), 1e-9)
+        assertEquals(5, json.getInt("pdfReflowSize")) // inert legacy data follows the unknown-key policy
     }
 }

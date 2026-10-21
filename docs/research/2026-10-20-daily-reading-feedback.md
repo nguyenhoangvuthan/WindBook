@@ -10,9 +10,14 @@ missing folder loading with access to all files in the folder.
 The page-turning comment is provisionally interpreted as positive; confirm
 before treating page-turn performance as a reported defect.
 
-The feedback does not yet identify whether the margin problem occurs in EPUB,
-PDF, or both. The requested note interaction and the meaning of reading all
-files in a folder are also unresolved.
+The owner subsequently confirmed that notes should attach to selected text in
+both EPUB and PDF. For scans, the owner chose selecting an image region and
+attaching a note; OCR is not requested. The feedback does not yet identify
+whether the margin problem occurs in EPUB, PDF, or both, or define the meaning
+of reading all files in a folder.
+
+The owner explicitly requested removal of Reflow. That change is handled
+separately in `../superpowers/specs/2026-10-20-remove-pdf-reflow-design.md`.
 
 ## Evidence from the current implementation
 
@@ -43,7 +48,7 @@ margins, font size and line height, with an explicit publisher-style policy,
 live updates and per-book persistence. Verify that changes preserve the
 reading location and render Vietnamese diacritics correctly.
 
-For fixed-layout PDF, cropping, zoom and reflow are separate controls; an EPUB
+For fixed-layout PDF, cropping and zoom are separate controls; an EPUB
 margin setting cannot be assumed to solve a PDF layout problem.
 
 ### 2. Folder import
@@ -60,8 +65,7 @@ eventual design should make clear.
 
 ### 3. Notes
 
-Resolve the note interaction before choosing the data model: notes attached
-to selected text, notes attached to a reading position, or book-level notes.
+The confirmed interaction is to select a passage and attach a note to it.
 EPUB selection annotations and PDF page notes have different requirements;
 scanned PDFs do not provide selectable text through the current bitmap UI.
 
@@ -76,6 +80,6 @@ This proposal draws work forward from M4 (notes) and M6 (folders), alongside
 part of M2 (layout). It does not approve the complete M2 feature pack or
 silently reorder the accepted roadmap.
 
-Next: clarify the owner's note interaction, locate the margin problem, and
+Next: write the selection-notes design, locate the margin problem, and
 define folder behavior; then write a focused design for owner review under
 `AGENTS.md` section 6.

@@ -53,6 +53,9 @@ Waydroid could not be used: its Android gets no IP (firewalld blocks DHCP on `wa
 
 ## PDF comfort (2026-10-16)
 
+Rows C4–C7 below are historical only: Reflow was removed by owner decision on
+2026-10-20. C1–C3 remain applicable. Use R1–R3 for the removal build.
+
 | # | Step | Expected | Emulator | Neo 3 GT |
 |---|---|---|---|---|
 | C1 | Import the scanned textbook (2654×4329 pt pages) | ≤ 1.5 s, PSS +< 100 MB, title and cover shown | Pass 2026-10-16: ~0.75 s after the tap, PSS +15 MB peak, title, author and cover present | |
@@ -63,3 +66,17 @@ Waydroid could not be used: its Android gets no IP (firewalld blocks DHCP on `wa
 | C6 | Reflow → Vertical → Reflow | Same page | Pass 2026-10-16 | |
 | C7 | Reflow, 30 pages at the largest size | TOTAL PSS < 400 MB | Pass 2026-10-16: 339 MB settled, 359 MB right after scrolling; one transient 406 MB peak during very fast flings | |
 
+
+## Reflow removal (2026-10-20/21)
+
+Verified on branch `remove-pdf-reflow`. JVM: 206/206; reader device suite:
+17/17 on Neo3GT_API_36. Lint: 0 errors, 9 warnings, identical to a freshly
+rerun pre-removal baseline. Debug APK built. Independent code review found
+no correctness/regression issues. Screenshots stay in the ignored
+`.superpowers/checks/remove-reflow/` directory.
+
+| # | Step | Expected | Verification | Neo 3 GT |
+|---|---|---|---|---|
+| R1 | Open a PDF and its View menu | Vertical scroll, Page by page and Crop margins; no Reflow or text-size buttons | Emulator UI dump and screenshot inspected 2026-10-20; Compose regression passes | Pending |
+| R2 | Open a book with old REFLOW preferences | Vertical mode, saved page/crop/zoom retained, including landscape books | Repository and ViewModel regression tests pass 2026-10-21; phone upgrade check pending | Pending |
+| R3 | Switch layouts, reopen, use zoom and volume keys | Existing page layouts and saved state still work | Existing Compose/ViewModel tests and reader device suite pass 2026-10-21; full manual phone pass pending | Pending |

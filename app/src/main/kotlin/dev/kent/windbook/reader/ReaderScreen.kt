@@ -48,7 +48,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
@@ -66,7 +65,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.kent.windbook.R
 import dev.kent.windbook.core.model.EffectiveDisplay
 import dev.kent.windbook.core.model.PdfLayout
-import dev.kent.windbook.core.model.ReflowSizes
 import dev.kent.windbook.input.KeyEventDispatcher
 import dev.kent.windbook.input.LocalKeyEventDispatcher
 import dev.kent.windbook.reader.pdf.PdfReaderView
@@ -112,8 +110,6 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit) {
                         initialZoom = display.zoom,
                         initialZoomX = display.zoomX,
                         onZoomChanged = viewModel::setPdfZoom,
-                        reflowSize = display.reflowSize,
-                        onReflowSizeChange = viewModel::setReflowSize,
                     )
                 }
             } else {
@@ -130,7 +126,6 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit) {
                 pdfDisplay = if (pdf != null) pdfDisplay else null,
                 onPdfLayoutChange = viewModel::setPdfLayout,
                 onCropMarginsChange = viewModel::setCropMargins,
-                onReflowSizeChange = viewModel::setReflowSize,
             )
         }
     }
@@ -205,7 +200,6 @@ fun ReaderOverlay(
     pdfDisplay: EffectiveDisplay? = null,
     onPdfLayoutChange: (PdfLayout) -> Unit = {},
     onCropMarginsChange: (Boolean) -> Unit = {},
-    onReflowSizeChange: (Int) -> Unit = {},
 ) {
     val bar = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.97f)
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
@@ -228,7 +222,7 @@ fun ReaderOverlay(
                     modifier = Modifier.weight(1f),
                 )
                 if (pdfDisplay != null) {
-                    ViewMenu(pdfDisplay, onPdfLayoutChange, onCropMarginsChange, onReflowSizeChange)
+                    ViewMenu(pdfDisplay, onPdfLayoutChange, onCropMarginsChange)
                 } else {
                     // Balances the back button so the title is truly centred.
                     Spacer(Modifier.width(48.dp))
@@ -269,7 +263,6 @@ private fun ViewMenu(
     display: EffectiveDisplay,
     onLayoutChange: (PdfLayout) -> Unit,
     onCropChange: (Boolean) -> Unit,
-    onReflowSizeChange: (Int) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
@@ -280,7 +273,6 @@ private fun ViewMenu(
             listOf(
                 PdfLayout.VERTICAL to R.string.layout_vertical,
                 PdfLayout.PAGED to R.string.layout_paged,
-                PdfLayout.REFLOW to R.string.layout_reflow,
             ).forEach { (layout, label) ->
                 DropdownMenuItem(
                     text = { Text(stringResource(label)) },
@@ -290,23 +282,6 @@ private fun ViewMenu(
                         if (display.layout != layout) onLayoutChange(layout)
                     },
                 )
-            }
-            if (display.layout == PdfLayout.REFLOW) {
-                // The menu stays open so the size can be stepped several times.
-                val smaller = stringResource(R.string.cd_text_smaller)
-                val larger = stringResource(R.string.cd_text_larger)
-                Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(
-                        onClick = { onReflowSizeChange(display.reflowSize - 1) },
-                        enabled = display.reflowSize > 0,
-                        modifier = Modifier.semantics { contentDescription = smaller },
-                    ) { Text(stringResource(R.string.text_smaller)) }
-                    TextButton(
-                        onClick = { onReflowSizeChange(display.reflowSize + 1) },
-                        enabled = display.reflowSize < ReflowSizes.LAST,
-                        modifier = Modifier.semantics { contentDescription = larger },
-                    ) { Text(stringResource(R.string.text_larger)) }
-                }
             }
             HorizontalDivider()
             DropdownMenuItem(

@@ -1,5 +1,9 @@
 # WindBook – PDF comfort: light import, remembered zoom, reflow
 
+> Historical design. The owner removed Reflow on 2026-10-20; its requirements
+> are superseded by [Remove PDF Reflow](2026-10-20-remove-pdf-reflow-design.md).
+> Light import and remembered zoom remain supported.
+
 Date: 2026-10-15 · Status: draft for review
 Inputs: `docs/superpowers/specs/2026-10-15-windbook-pdf-display-design.md` (shipped, `43f8f98`), `docs/research/2026-10-15-library-analysis.md`
 

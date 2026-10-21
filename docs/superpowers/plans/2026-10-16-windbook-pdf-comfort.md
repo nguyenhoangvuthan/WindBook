@@ -1,5 +1,9 @@
 # WindBook PDF Comfort Implementation Plan
 
+> Historical implementation plan. Reflow was removed by owner decision on
+> 2026-10-20. Do not reimplement its tasks; see
+> [Remove PDF Reflow](../specs/2026-10-20-remove-pdf-reflow-design.md).
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Large scanned PDFs import in about a second instead of 36 s. A book zoomed once reopens at its zoom. A new Reflow mode re-wraps the words of any PDF page (scans included) at a readable size.

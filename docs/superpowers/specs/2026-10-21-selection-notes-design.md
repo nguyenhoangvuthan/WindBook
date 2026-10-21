@@ -8,8 +8,8 @@ The Android 12–14 PDF region fallback remains an explicit proposed limit for
 owner approval. Gesture and text-extraction feasibility checks remain in planning.
 
 Local interactive mockup (throwaway, not app code):
-`.superpowers/brainstorm/12573-1792568394/content/selection-notes-v4.html`.
-It demonstrates document modes, the compact EPUB selection menu, color-only
+`.superpowers/brainstorm/27897-1792599917/content/selection-notes-v5.html`.
+It demonstrates document modes, the shared compact selection menu, color-only
 highlights, composing/saving a note, searching the list,
 and returning to its source. Text selection and rectangle dragging are illustrated,
 not implemented. Mock data lasts only for the browser tab session.
@@ -20,8 +20,9 @@ The owner needs notes while reading, attached to a selected passage rather
 than only to a book or page. Both EPUB and PDF are required. For scanned PDFs,
 the owner explicitly chose selecting an image region and attaching a note.
 OCR is not requested. Reflow has been removed and must not return.
-The owner also specified a compact popup above an EPUB text selection with
-Highlight color and Note actions. EPUB highlights can exist without a note.
+The owner specified the same compact horizontal popup above selections in EPUB,
+text PDFs and scanned PDFs, with Highlight color and Note actions. All three
+support colored highlights without a note; scans highlight the selected region.
 
 The first usable release should let the owner select, write, save, find and
 revisit a note without leaving WindBook. This pulls a focused part of M4 and
@@ -36,31 +37,34 @@ claims of owner approval. Approving this design accepts those defaults.
 Include:
 
 - EPUB text selection with standalone colored highlights and optional notes.
-- Text selection notes for PDFs with an extractable text layer on Android 15+
-  (API 35+), including the owner's Android 16 phone.
-- Rectangular region notes for scanned PDFs, and a region fallback for any PDF
-  whose text cannot be selected or whose device lacks the text-selection API.
+- Text selection highlights and optional notes for PDFs with an extractable
+  text layer on Android 15+ (API 35+), including the owner's Android 16 phone.
+- Rectangular region highlights and optional notes for scanned PDFs, and a
+  region fallback for any PDF whose text cannot be selected or whose device
+  lacks the text-selection API.
 - Create, edit and delete a note; revisit its source; list notes for a book or
   across the library; search quote and note text.
-- Five EPUB highlight colors (proposed palette: gold, green, blue, pink, purple),
+- Five shared highlight colors (proposed palette: gold, green, blue, pink, purple),
   with gold as the initial default and a distinct mark when a note is attached.
-  PDF notes retain a single default mark; standalone PDF highlights are deferred.
+  PDF text marks follow the selected text rectangles; scan marks use a translucent
+  fill and visible outline over the selected region, preserving image legibility.
 - Explicit Markdown export of a book's notes through the system save picker.
 
-Defer standalone PDF highlights, underline-only annotations, tags, handwriting,
+Defer underline-only annotations, tags, handwriting,
 OCR, synchronization, embedding annotations into source PDFs, importing external
 PDF annotations, quote cards and a full backup/restore system. Export is included
 as a proposed portability measure; it is not a restorable database backup.
 
 ## 3. Reading interaction
 
-### EPUB
+### Shared selection menu
 
-Long-press a word and adjust the selection handles. Once selection settles,
+For EPUB and PDF text, long-press a word and adjust the selection handles.
+For scanned pages, draw and adjust a region first. Once selection settles,
 show a compact anchored popup directly above the selected passage. Its primary
 menu contains exactly two text actions: Highlight color and Note. At the owner's
 request, keep the popup around one-third of v2's area and increase label size
-from 14 to 18 in the mockup. The owner corrected v3's stacked layout: v4 places
+from 14 to 18 in the mockup. All three formats place
 both actions on one horizontal row, sized to their text with minimal padding
 (approximately 150 px wide). Make the text itself clickable, without padded
 button boxes. Color swatches appear on a compact horizontal row below. Preserve keyboard
@@ -90,6 +94,8 @@ overlap, first present a compact list to choose one. Updating through an
 existing annotation acts on its ID. Creating a new overlapping selection may
 create a separate annotation; it must never overwrite a different record.
 
+### EPUB anchors
+
 Selection is limited to the current EPUB resource/chapter. Changing fonts,
 size, theme or orientation must not invalidate the saved anchor. A future
 unresolvable anchor leaves the quote and note readable in Notes and reports
@@ -98,7 +104,9 @@ that the passage cannot be located; it must not silently jump to the wrong text.
 ### PDF with text
 
 Long-press a word to select it, then drag either handle across lines on the
-same page. Note opens the same editor. PDF selection and saved marks use page
+same page. Show the shared horizontal Highlight color / Note popup above it
+(or below when needed). Color saves a standalone text highlight; Note opens the
+same editor and can attach to the existing record. PDF selection and saved marks use page
 coordinates, independently of bitmap resolution, crop, zoom and scroll offsets.
 The mark must track the same content in both Vertical and Paged modes.
 
@@ -110,9 +118,13 @@ PDF text selection is limited to one page per note in this increment.
 ### PDF region / scanned page
 
 Select area enters a distinct mode on the current page. Drag to draw one
-rectangle, then adjust its corner handles. A preview of the selected region
-appears in the note editor. Save stores the note and its region; a subtle
-outline on the page lets the owner open it again.
+rectangle, then adjust its corner handles. Show the same horizontal Highlight
+color / Note popup above the region, falling below when space is insufficient.
+Choosing a color immediately saves the region highlight without requiring text.
+Note opens the editor with a preview of the selected region; saving attaches
+the note to that same record, preserving color and bounds. A translucent fill
+and visible outline mark the region; a distinct indicator identifies an attached
+note. Tapping the region reopens its actions, including changing the color.
 
 In selection mode, page-turn taps, page-turn keys and one-finger scrolling
 must not move the page while a region/handle is being dragged. The owner can
@@ -128,7 +140,8 @@ note and page reference with an unavailable-preview state.
 ### Editing and saving
 
 The editor has explicit Save and Cancel actions. Require nonblank text when
-saving a note; standalone EPUB highlights have no body and bypass the editor.
+saving a note; standalone highlights of all three anchor types have no body
+and bypass the editor.
 Disable duplicate Save/color submissions while their write is pending.
 Only show success after the database write succeeds. A failed save retains
 the draft and provides Retry. The draft survives rotation; deliberate Back or
@@ -141,10 +154,9 @@ Selecting a different passage creates another note.
 
 ## 4. Notes navigation and export
 
-The existing Notes tab contains both notes and standalone EPUB highlights,
-newest edited first. A highlight-only row shows its quote/color and a Highlight
-label rather than an empty note body. Each
-row shows the book, chapter or page, selected quote or region preview, and note
+The existing Notes tab contains notes and standalone highlights from all three
+formats, newest edited first. A highlight-only row shows its quote or region
+preview, color and a Highlight label rather than an empty note body. Each row shows the book, chapter or page, selected quote or region preview, and note
 body. Search matches note text and available quote text. A book filter narrows
 the list. The reader overlay opens this list scoped to its book, ordered by
 reading position. Return restores the reader state.
@@ -164,8 +176,9 @@ book or affect reading progress.
 
 Export is an explicit action for the current book. Save a UTF-8 Markdown file
 with book metadata, chapter/page references, quoted text where available and
-the note bodies. Standalone highlights include their quote and color name
-without an empty note section. Region notes include page number and normalized bounds;
+the note bodies. Standalone highlights include their quote when available and
+color name without an empty note section. Region annotations include color,
+page number and normalized bounds;
 embedded region images are deferred. Escape document content so quotes and
 notes remain readable Markdown. Cancellation leaves existing data unchanged.
 
@@ -174,9 +187,9 @@ notes remain readable Markdown. Cancellation leaves existing data unchanged.
 Keep the four-module dependency direction and existing dependencies.
 
 - `core:model`: annotation type, stable ID, book ID, anchor, optional quote,
-  annotation kind (highlight or note), EPUB color token, nullable note body and
-  timestamps. Highlight kind requires an EPUB text anchor and no body; note kind
-  requires a nonblank body. Pure validation and page-coordinate transforms.
+  annotation kind (highlight or note), shared color token, nullable note body and
+  timestamps. Highlight kind accepts EPUB text, PDF text or PDF region anchors
+  and no body; note kind requires a nonblank body. Pure validation and page-coordinate transforms.
 - `core:data`: Room annotations table and repository. Increment the schema
   from v2 to v3; preserve books, progress and JSON display preferences. Add
   foreign key/index for book ID. Treat insert/update/delete as atomic operations.
@@ -202,7 +215,7 @@ Reuse the installed Readium 3.4.0 EPUB navigator, its selection Locator and
 Decoration support; verify exact signatures against that pinned version during
 planning. Keep framework PdfRenderer for PDF. Android's `getTextContents` and
 `selectContent` are available from API 35; guard them at runtime. On API 31–34,
-use region notes for PDFs in this increment. This compatibility choice is
+use region highlights and notes for PDFs in this increment. This compatibility choice is
 proposed and must be visible in owner review. EPUB selection remains available
 across supported Android versions.
 
@@ -218,9 +231,11 @@ in both light and dark themes; label selection and editor controls for TalkBack.
 
 ## 6. Acceptance and verification
 
-- Verify the EPUB popup above/below selections near screen edges, no overlapping
+- Verify the same horizontal popup in EPUB, PDF text and PDF region modes,
+  above/below selections near screen edges, with no overlapping
   toolbar, accessible color choices, and preserved selection while tapping it.
-- Save a standalone highlight, restart, change color, attach a note to the same
+- For each of the three anchor types, save a standalone highlight, restart,
+  change color, attach a note to the same
   record, and cancel an edit without losing the existing highlight. Verify its
   list and export representation, including failed and duplicate writes.
 - Create/edit/delete an EPUB note, restart and reopen the exact passage; repeat

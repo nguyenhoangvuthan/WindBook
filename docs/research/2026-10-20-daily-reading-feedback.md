@@ -12,7 +12,9 @@ before treating page-turn performance as a reported defect.
 
 The owner subsequently confirmed that notes should attach to selected text in
 both EPUB and PDF. For scans, the owner chose selecting an image region and
-attaching a note; OCR is not requested. The feedback does not yet identify
+attaching a note; OCR is not requested. The owner also requested a compact popup above EPUB
+selections with color highlight and Note actions; highlights may be saved
+without a note. The feedback does not yet identify
 whether the margin problem occurs in EPUB, PDF, or both, or define the meaning
 of reading all files in a folder.
 

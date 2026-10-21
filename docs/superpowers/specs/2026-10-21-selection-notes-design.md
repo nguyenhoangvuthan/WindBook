@@ -8,8 +8,9 @@ The Android 12–14 PDF region fallback remains an explicit proposed limit for
 owner approval. Gesture and text-extraction feasibility checks remain in planning.
 
 Local interactive mockup (throwaway, not app code):
-`.superpowers/brainstorm/395381-1792565894/content/selection-notes-v1.html`.
-It demonstrates document modes, composing/saving a note, searching the list,
+`.superpowers/brainstorm/407505-1792566249/content/selection-notes-v2.html`.
+It demonstrates document modes, the compact EPUB selection menu, color-only
+highlights, composing/saving a note, searching the list,
 and returning to its source. Text selection and rectangle dragging are illustrated,
 not implemented. Mock data lasts only for the browser tab session.
 
@@ -19,6 +20,8 @@ The owner needs notes while reading, attached to a selected passage rather
 than only to a book or page. Both EPUB and PDF are required. For scanned PDFs,
 the owner explicitly chose selecting an image region and attaching a note.
 OCR is not requested. Reflow has been removed and must not return.
+The owner also specified a compact popup above an EPUB text selection with
+Highlight color and Note actions. EPUB highlights can exist without a note.
 
 The first usable release should let the owner select, write, save, find and
 revisit a note without leaving WindBook. This pulls a focused part of M4 and
@@ -32,17 +35,19 @@ claims of owner approval. Approving this design accepts those defaults.
 
 Include:
 
-- EPUB text selection with a note and a visible highlight.
+- EPUB text selection with standalone colored highlights and optional notes.
 - Text selection notes for PDFs with an extractable text layer on Android 15+
   (API 35+), including the owner's Android 16 phone.
 - Rectangular region notes for scanned PDFs, and a region fallback for any PDF
   whose text cannot be selected or whose device lacks the text-selection API.
 - Create, edit and delete a note; revisit its source; list notes for a book or
   across the library; search quote and note text.
-- A single default highlight color and a distinct mark for notes.
+- Five EPUB highlight colors (proposed palette: gold, green, blue, pink, purple),
+  with gold as the initial default and a distinct mark when a note is attached.
+  PDF notes retain a single default mark; standalone PDF highlights are deferred.
 - Explicit Markdown export of a book's notes through the system save picker.
 
-Defer multiple highlight colors, underline-only annotations, tags, handwriting,
+Defer standalone PDF highlights, underline-only annotations, tags, handwriting,
 OCR, synchronization, embedding annotations into source PDFs, importing external
 PDF annotations, quote cards and a full backup/restore system. Export is included
 as a proposed portability measure; it is not a restorable database backup.
@@ -51,15 +56,34 @@ as a proposed portability measure; it is not a restorable database backup.
 
 ### EPUB
 
-Long-press a word and adjust the selection handles. The selection menu offers
-Note alongside existing available actions such as Copy. Note opens an editor
-with the selected passage shown above a multiline input. Save creates the note
-and its highlight. Cancel closes the editor without creating an annotation.
+Long-press a word and adjust the selection handles. Once selection settles,
+show a compact anchored popup directly above the selected passage. Its primary
+row contains exactly two labeled actions: Highlight color and Note. This is a
+small contextual menu, not a full-width sheet. Proposed width is approximately
+240 dp (clamped to the available viewport), with 48 dp touch targets. Center it
+on the visible selection and respect safe insets. If there is insufficient room
+above, place it below. Do not cover the selected text or its handles. Reposition
+as the selection changes; dismiss on selection clear or navigation.
 
-Tap an existing note's highlight to view its quote and body, with Edit, Delete
-and Go to passage actions. If multiple saved notes overlap, present a compact
-list to choose one. Saving a second note at the same selection is permitted;
-it must not overwrite an existing note implicitly.
+Highlight color expands a short row of five labeled color swatches inside the
+same popup. Choosing a color saves the highlight immediately without opening
+the editor or requiring note text, then dismisses the popup. Failure keeps the
+selection and reports that saving failed; do not display a persisted mark until
+the write succeeds. Swatches expose their color name and selected state to
+TalkBack. Existing Copy behavior may remain in the system/secondary selection
+menu, but must not produce a second overlapping toolbar.
+
+Note opens an editor with the selected passage above a multiline input. Save
+creates the note with a gold highlight if the passage is new. Cancel does not
+create a new annotation. On an existing highlight, Note attaches text to that
+same record and preserves its color, anchor and ID. Cancel leaves the existing
+highlight untouched. A note-bearing highlight has a visible note indicator.
+
+Tap an existing highlight to reopen its contextual actions: change color,
+add/view its note, or delete the annotation. If multiple saved annotations
+overlap, first present a compact list to choose one. Updating through an
+existing annotation acts on its ID. Creating a new overlapping selection may
+create a separate annotation; it must never overwrite a different record.
 
 Selection is limited to the current EPUB resource/chapter. Changing fonts,
 size, theme or orientation must not invalidate the saved anchor. A future
@@ -98,8 +122,9 @@ note and page reference with an unavailable-preview state.
 
 ### Editing and saving
 
-The editor has explicit Save and Cancel actions. Require nonblank note text;
-a standalone highlight feature is deferred. Disable duplicate Save submissions.
+The editor has explicit Save and Cancel actions. Require nonblank text when
+saving a note; standalone EPUB highlights have no body and bypass the editor.
+Disable duplicate Save/color submissions while their write is pending.
 Only show success after the database write succeeds. A failed save retains
 the draft and provides Retry. The draft survives rotation; deliberate Back or
 Cancel with changes asks whether to discard. Saved notes survive process death
@@ -111,7 +136,9 @@ Selecting a different passage creates another note.
 
 ## 4. Notes navigation and export
 
-The existing Notes tab becomes a functional list, newest edited first. Each
+The existing Notes tab contains both notes and standalone EPUB highlights,
+newest edited first. A highlight-only row shows its quote/color and a Highlight
+label rather than an empty note body. Each
 row shows the book, chapter or page, selected quote or region preview, and note
 body. Search matches note text and available quote text. A book filter narrows
 the list. The reader overlay opens this list scoped to its book, ordered by
@@ -132,7 +159,8 @@ book or affect reading progress.
 
 Export is an explicit action for the current book. Save a UTF-8 Markdown file
 with book metadata, chapter/page references, quoted text where available and
-the note bodies. Region notes include page number and normalized bounds;
+the note bodies. Standalone highlights include their quote and color name
+without an empty note section. Region notes include page number and normalized bounds;
 embedded region images are deferred. Escape document content so quotes and
 notes remain readable Markdown. Cancellation leaves existing data unchanged.
 
@@ -141,7 +169,9 @@ notes remain readable Markdown. Cancellation leaves existing data unchanged.
 Keep the four-module dependency direction and existing dependencies.
 
 - `core:model`: annotation type, stable ID, book ID, anchor, optional quote,
-  note body and timestamps. Pure validation and page-coordinate transforms.
+  annotation kind (highlight or note), EPUB color token, nullable note body and
+  timestamps. Highlight kind requires an EPUB text anchor and no body; note kind
+  requires a nonblank body. Pure validation and page-coordinate transforms.
 - `core:data`: Room annotations table and repository. Increment the schema
   from v2 to v3; preserve books, progress and JSON display preferences. Add
   foreign key/index for book ID. Treat insert/update/delete as atomic operations.
@@ -183,6 +213,11 @@ in both light and dark themes; label selection and editor controls for TalkBack.
 
 ## 6. Acceptance and verification
 
+- Verify the EPUB popup above/below selections near screen edges, no overlapping
+  toolbar, accessible color choices, and preserved selection while tapping it.
+- Save a standalone highlight, restart, change color, attach a note to the same
+  record, and cancel an edit without losing the existing highlight. Verify its
+  list and export representation, including failed and duplicate writes.
 - Create/edit/delete an EPUB note, restart and reopen the exact passage; repeat
   after changing orientation and later typography settings.
 - Create a multiline text note on a PDF with selectable text on API 36; reopen

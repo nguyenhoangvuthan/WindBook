@@ -103,6 +103,7 @@ Four Gradle modules. Dependencies point downward only: `:app` → `:reader` → 
 - **Owner is testing** `~/Downloads/WindBook-0.1.0-pdf-comfort-debug.apk` (built from `32525b1`) on the Neo 3 GT. This older APK still includes Reflow; the removal build is `app/build/outputs/apk/debug/app-debug.apk`. Record phone results in `docs/testing/m1-manual-checklist.md` (C1–C3 and R1–R3, Neo 3 GT column).
 - **Owner feedback (2026-10-20/21):** missing notes, inadequate margins/layout, and missing folder loading/access to all files. Page-turning feedback is provisionally interpreted as positive. Notes must attach to selected text in **both EPUB and PDF** (confirmed). PDF scans use a selected image region with an attached note (confirmed). The format affected by the margin problem and folder semantics still need clarification. See `docs/research/2026-10-20-daily-reading-feedback.md`; this is a discussion brief, not an approved scope change.
 - **Reflow removal:** code, menu and exclusive analysis tests removed; legacy preferences reopen vertically without changing saved locators. Independent code review found no correctness/regression issues. Debug APK builds; JVM/lint checks pass. Local verification artifacts are under `.superpowers/checks/remove-reflow/`.
+- **Selection notes design:** `docs/superpowers/specs/2026-10-21-selection-notes-design.md` is drafted and independently reviewed, awaiting owner approval. It covers EPUB/PDF text selection and PDF scan region notes. API 31–34 PDF region-only support and Markdown export are proposed defaults. Interactive mockup: `.superpowers/brainstorm/395381-1792565894/content/selection-notes-v1.html` (ignored, throwaway). Notes are not implemented in the APK.
 - **Historical emulator results for PDF comfort (before Reflow removal):**
   - Scan import ~0.75 s (+15 MB PSS).
   - Zoom and horizontal position restored on reopen.
@@ -112,7 +113,7 @@ Four Gradle modules. Dependencies point downward only: `:app` → `:reader` → 
 ## 9. Task queue
 
 **Next (waiting on the owner):**
-1. Owner decides whether to merge `remove-pdf-reflow`; test its APK on the Neo 3 GT. Continue brainstorming selection notes for both EPUB/PDF: clarify margins/layout and folder loading, then agree on a focused design. Consider bringing basic notes and folder import forward from M4/M6; no roadmap reorder is approved yet. Fix confirmed regressions first.
+1. Owner reviews the selection-notes design/mockup, then approve a detailed implementation plan. Owner separately decides whether to merge `remove-pdf-reflow`; test its APK on the Neo 3 GT. Margins/layout and folder loading still need clarification. No broader roadmap reorder is approved yet. Fix confirmed regressions first.
 2. Ask before pushing the `v0.1.0` tag.
 3. Start **M2 Reading comfort** (brainstorm → spec → plan): themes, fonts, typography (line height 1.2–2.0, a publisher-styles toggle), per-book EPUB prefs. The Vietnamese EPUB check (2026-10-15) found tone marks render fine at publisher line height 1.2, so line height is a preference, not a fix.
 

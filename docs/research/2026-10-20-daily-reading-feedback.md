@@ -85,3 +85,15 @@ silently reorder the accepted roadmap.
 Next: write the selection-notes design, locate the margin problem, and
 define folder behavior; then write a focused design for owner review under
 `AGENTS.md` section 6.
+
+
+## Folder clarification — 2026-10-21
+
+The owner requested entering a folder location and choosing ebook extensions.
+They confirmed scanning subfolders, both discovery and in-app reading of
+EPUB/PDF/MOBI/AZW3/FB2/CBZ/CBR/TXT, and reading directly from the source folder
+to avoid a permanent second copy. This supersedes the batch-copy proposal above.
+The proposed design is `../superpowers/specs/2026-10-21-folder-library-design.md`;
+Android directory grants, temporary reader preparation and manual rescanning
+are proposed defaults awaiting design approval. New engine dependencies and
+the detailed implementation plan have not been approved.

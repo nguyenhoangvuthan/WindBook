@@ -6,11 +6,13 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import dev.kent.windbook.core.data.BookSourcesRepository
 import dev.kent.windbook.core.data.DisplayPreferencesRepository
 import dev.kent.windbook.core.data.LibraryPreferences
 import dev.kent.windbook.core.data.LibraryRepository
 import dev.kent.windbook.core.data.db.WindBookDatabase
 import dev.kent.windbook.core.data.files.BookFileStore
+import dev.kent.windbook.core.data.folders.FolderGrants
 import dev.kent.windbook.core.data.importer.BookImporter
 import dev.kent.windbook.core.data.libraryDataStore
 import dev.kent.windbook.input.KeyEventDispatcher
@@ -48,6 +50,13 @@ object AppModule {
     @Provides @Singleton
     fun libraryRepository(db: WindBookDatabase, files: BookFileStore): LibraryRepository =
         LibraryRepository(db.libraryDao(), files)
+
+    @Provides @Singleton
+    fun folderGrants(@ApplicationContext context: Context): FolderGrants = FolderGrants(context.contentResolver)
+
+    @Provides @Singleton
+    fun bookSources(db: WindBookDatabase, grants: FolderGrants): BookSourcesRepository =
+        BookSourcesRepository(db, releaseGrant = grants::releaseRead)
 
     @Provides @Singleton
     fun displayPreferences(db: WindBookDatabase): DisplayPreferencesRepository =

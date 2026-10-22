@@ -22,7 +22,7 @@ class FolderBindingsTest {
             val grants = AppModule.folderGrants(context)
             grants.persistRead(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             db.folderDao().upsert(FolderEntity("folder", tree, "Synthetic", "[]", true))
-            AppModule.bookSources(db, grants).disconnectFolder("folder")
+            AppModule.bookSources(db, AppModule.folders(db, grants)).disconnectFolder("folder")
             assertFalse(grants.hasRead(tree))
             assertNotNull(db.folderDao().find("folder")!!.disconnectedAt)
         } finally { db.close() }

@@ -3,11 +3,28 @@ package dev.kent.windbook.core.data.db
 import androidx.room3.Dao
 import androidx.room3.Insert
 import androidx.room3.Query
+import androidx.room3.Update
 
 @Dao
 interface SourceDao {
     @Insert
     suspend fun insert(source: BookSourceEntity)
+
+    @Update
+    suspend fun update(source: BookSourceEntity)
+
+    @Query("SELECT * FROM book_sources WHERE authority = :authority AND document_id = :documentId")
+    suspend fun findDocument(authority: String, documentId: String): BookSourceEntity?
+
+    @Query("""
+        UPDATE book_sources SET availability = 'MISSING'
+        WHERE id = :sourceId AND kind = 'EXTERNAL'
+          AND NOT EXISTS (
+            SELECT 1 FROM folder_memberships m JOIN folders f ON f.id = m.folder_id
+            WHERE m.source_id = :sourceId AND m.present = 1 AND f.disconnected_at IS NULL
+          )
+    """)
+    suspend fun markMissingIfAbsent(sourceId: String)
 
     @Query("SELECT * FROM book_sources WHERE book_id = :bookId ORDER BY CASE kind WHEN 'OWNED' THEN 0 ELSE 1 END, id")
     suspend fun forBook(bookId: String): List<BookSourceEntity>
@@ -27,7 +44,7 @@ interface SourceDao {
     """)
     suspend fun disconnectOrphans(folderId: String)
 
-    /** Membership overlap does not imply that a stored URI uses the other root's grant. */
+    /** Keep the canonical URI grant while any connected membership could use it again. */
     @Query("""
         SELECT EXISTS (
           SELECT 1 FROM book_sources s

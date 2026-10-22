@@ -3,6 +3,7 @@ package dev.kent.windbook.core.data.db
 import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
 import dev.kent.windbook.core.data.BookSourcesRepository
+import dev.kent.windbook.core.data.folders.FolderRepository
 import dev.kent.windbook.core.model.BookSource
 import dev.kent.windbook.core.model.DocumentKey
 import kotlinx.coroutines.flow.first
@@ -28,7 +29,9 @@ class SourceDaoTest {
 
     @Before fun setup() {
         db = WindBookDatabase.inMemory(ApplicationProvider.getApplicationContext(), AndroidSQLiteDriver())
-        repo = BookSourcesRepository(db, releaseGrant = { released.add(it) }, clock = { 77 })
+        val held = mutableSetOf(treeA, treeB)
+        val folders = FolderRepository(db, { held.toSet() }, { released.add(it); held.remove(it) }) { 77 }
+        repo = BookSourcesRepository(db, folders, clock = { 77 })
     }
     @After fun close() = db.close()
 

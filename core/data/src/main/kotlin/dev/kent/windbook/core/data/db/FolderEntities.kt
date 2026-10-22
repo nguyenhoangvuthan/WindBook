@@ -51,6 +51,7 @@ data class FolderMembershipEntity(
     @ColumnInfo(name = "relative_path") val relativePath: String,
     @ColumnInfo(name = "parent_document_id") val parentDocumentId: String,
     @ColumnInfo(name = "last_seen_run") val lastSeenRun: String,
+    @ColumnInfo(defaultValue = "1") val present: Boolean = true,
 )
 
 @Entity(
@@ -69,4 +70,6 @@ data class ScanRunEntity(
     val known: Long = 0,
     val unreadable: Long = 0,
     @ColumnInfo(name = "directory_errors") val directoryErrors: Long = 0,
+    @ColumnInfo(name = "started_at", defaultValue = "0") val startedAt: Long = 0,
+    @ColumnInfo(name = "current_path", defaultValue = "''") val currentPath: String = "",
 )

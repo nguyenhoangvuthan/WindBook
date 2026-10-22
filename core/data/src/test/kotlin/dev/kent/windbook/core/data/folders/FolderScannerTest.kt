@@ -123,7 +123,8 @@ class FolderScannerTest {
         assertEquals("content://scan.test/tree/root/document/p", found.document.uri)
         assertNull(found.document.size)
         assertNull(found.document.modifiedAt)
-        assertTrue(events.filterIsInstance<ScanEvent.Finished>().single().complete)
+        assertFalse(events.filterIsInstance<ScanEvent.Finished>().single().complete)
+        assertEquals(DocumentKey("scan.test", "n"), events.filterIsInstance<ScanEvent.Unreadable>().single().key)
     }
 
     @Test fun crossAuthorityRoot_isRejectedBeforeQuery() = runTest {

@@ -13,6 +13,13 @@ import dev.kent.windbook.core.data.LibraryRepository
 import dev.kent.windbook.core.data.db.WindBookDatabase
 import dev.kent.windbook.core.data.files.BookFileStore
 import dev.kent.windbook.core.data.folders.FolderGrants
+import dev.kent.windbook.core.data.folders.FolderRepository
+import dev.kent.windbook.core.data.folders.FolderScanCoordinator
+import dev.kent.windbook.core.data.folders.FolderScanner
+import dev.kent.windbook.core.data.folders.DocumentsTreeAccess
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import dev.kent.windbook.core.data.importer.BookImporter
 import dev.kent.windbook.core.data.libraryDataStore
 import dev.kent.windbook.input.KeyEventDispatcher
@@ -55,8 +62,17 @@ object AppModule {
     fun folderGrants(@ApplicationContext context: Context): FolderGrants = FolderGrants(context.contentResolver)
 
     @Provides @Singleton
-    fun bookSources(db: WindBookDatabase, grants: FolderGrants): BookSourcesRepository =
-        BookSourcesRepository(db, releaseGrant = grants::releaseRead)
+    fun folders(db: WindBookDatabase, grants: FolderGrants): FolderRepository =
+        FolderRepository(db, grants::persistedReadTrees, grants::releaseRead)
+
+    @Provides @Singleton
+    fun folderScans(folders: FolderRepository, @ApplicationContext context: Context): FolderScanCoordinator =
+        FolderScanCoordinator(folders, FolderScanner(DocumentsTreeAccess(context.contentResolver)),
+            CoroutineScope(SupervisorJob() + Dispatchers.IO))
+
+    @Provides @Singleton
+    fun bookSources(db: WindBookDatabase, folders: FolderRepository): BookSourcesRepository =
+        BookSourcesRepository(db, folders)
 
     @Provides @Singleton
     fun displayPreferences(db: WindBookDatabase): DisplayPreferencesRepository =

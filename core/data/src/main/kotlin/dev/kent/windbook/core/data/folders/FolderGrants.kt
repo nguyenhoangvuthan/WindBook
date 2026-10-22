@@ -12,6 +12,10 @@ class FolderGrants(private val resolver: ContentResolver) {
         resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 
+    fun persistedReadTrees(): Set<String> = resolver.persistedUriPermissions
+        .filter { it.isReadPermission && android.provider.DocumentsContract.isTreeUri(it.uri) }
+        .map { it.uri.toString() }.toSet()
+
     fun hasRead(treeUri: String): Boolean {
         val uri = requireTreeUri(treeUri)
         return resolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }

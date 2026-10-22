@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.map
 sealed interface ScanEvent {
     data class Found(val document: TreeDocument, val relativePath: String, val parentKey: DocumentKey) : ScanEvent
     data class Examined(val count: Long) : ScanEvent
+    data class Unreadable(val key: DocumentKey) : ScanEvent
     data class DirectoryFailed(val key: DocumentKey, val reason: String) : ScanEvent
     data class Finished(val complete: Boolean) : ScanEvent
 }
@@ -55,7 +56,10 @@ class FolderScanner(private val access: TreeAccess) {
             }.collect { document ->
                 currentCoroutineContext().ensureActive()
                 emit(ScanEvent.Examined(++examined))
-                if (document.name.isNotBlank()) {
+                if (document.name.isBlank()) {
+                    complete = false
+                    emit(ScanEvent.Unreadable(document.key))
+                } else {
                     val relativePath = if (path.isEmpty()) document.name else "$path/${document.name}"
                     if (document.isDirectory) {
                         if (options.recursive && visited.add(document.key)) pending.add(document.key to relativePath)

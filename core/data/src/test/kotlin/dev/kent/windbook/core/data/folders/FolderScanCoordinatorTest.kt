@@ -29,7 +29,7 @@ class FolderScanCoordinatorTest {
     private val access = TreeAccess { uri, key -> children(uri, key) }
     @Before fun setup() {
         db = WindBookDatabase.inMemory(ApplicationProvider.getApplicationContext(), AndroidSQLiteDriver())
-        repo = FolderRepository(db, { emptySet() }, {}) { 99 }
+        repo = FolderRepository(db, { emptySet() }, {}, { _, _ -> error("No picker acquisition expected") }) { 99 }
     }
     @After fun close() = db.close()
     private fun doc(id: String, name: String = "$id.pdf", directory: Boolean = false, uri: String = tree) =
@@ -228,7 +228,7 @@ class FolderScanCoordinatorTest {
     @Test fun successfulReconciliation_retainsCanonicalGrantUntilLastConnectedFolderDisconnects() = runTest {
         val otherTree = "content://scan.test/tree/other"
         val held = mutableSetOf(tree, otherTree)
-        repo = FolderRepository(db, { held.toSet() }, { held.remove(it) }) { 99 }
+        repo = FolderRepository(db, { held.toSet() }, { held.remove(it) }, { _, _ -> error("No picker acquisition expected") }) { 99 }
         val folder = repo.save(tree, "Root", ScanOptions())
         val other = repo.save(otherTree, "Other", ScanOptions())
         val c = FolderScanCoordinator(repo, FolderScanner(access), backgroundScope)
@@ -252,13 +252,13 @@ class FolderScanCoordinatorTest {
         val path = File(tmp.root, "restart.db").absolutePath
         val context = ApplicationProvider.getApplicationContext<Context>()
         db = WindBookDatabase.open(context, path, AndroidSQLiteDriver())
-        repo = FolderRepository(db, { emptySet() }, {}) { 99 }
+        repo = FolderRepository(db, { emptySet() }, {}, { _, _ -> error("No picker acquisition expected") }) { 99 }
         val folder = repo.save(tree, "Root", ScanOptions())
         db.folderDao().upsertRun(ScanRunEntity("zzz", folder, "{}", "COMPLETE", added = 3, startedAt = 99))
         db.folderDao().upsertRun(ScanRunEntity("aaa", folder, "{}", "RUNNING", examined = 7, currentPath = "child", startedAt = 99))
         db.close()
         db = WindBookDatabase.open(context, path, AndroidSQLiteDriver())
-        repo = FolderRepository(db, { emptySet() }, {}) { 100 }
+        repo = FolderRepository(db, { emptySet() }, {}, { _, _ -> error("No picker acquisition expected") }) { 100 }
         repo.initialize()
         val result = FolderScanCoordinator(repo, FolderScanner(access), backgroundScope).observe(folder).first()
         assertEquals("aaa", result.runId); assertEquals("INTERRUPTED", result.state)

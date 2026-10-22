@@ -30,7 +30,7 @@ class SourceDaoTest {
     @Before fun setup() {
         db = WindBookDatabase.inMemory(ApplicationProvider.getApplicationContext(), AndroidSQLiteDriver())
         val held = mutableSetOf(treeA, treeB)
-        val folders = FolderRepository(db, { held.toSet() }, { released.add(it); held.remove(it) }) { 77 }
+        val folders = FolderRepository(db, { held.toSet() }, { released.add(it); held.remove(it) }, { _, _ -> error("No picker acquisition expected") }) { 77 }
         repo = BookSourcesRepository(db, folders, clock = { 77 })
     }
     @After fun close() = db.close()

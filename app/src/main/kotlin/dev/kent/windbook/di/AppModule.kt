@@ -63,7 +63,7 @@ object AppModule {
 
     @Provides @Singleton
     fun folders(db: WindBookDatabase, grants: FolderGrants): FolderRepository =
-        FolderRepository(db, grants::persistedReadTrees, grants::releaseRead)
+        FolderRepository(db, grants::persistedReadTrees, grants::releaseRead, grants::persistRead)
 
     @Provides @Singleton
     fun folderScans(folders: FolderRepository, @ApplicationContext context: Context): FolderScanCoordinator =

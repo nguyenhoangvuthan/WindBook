@@ -100,7 +100,7 @@ class FolderMigrationTest {
         createV2(path)
         val db = WindBookDatabase.open(ApplicationProvider.getApplicationContext(), path, AndroidSQLiteDriver())
         try {
-            val sources = BookSourcesRepository(db, FolderRepository(db, { emptySet() }, {}))
+            val sources = BookSourcesRepository(db, FolderRepository(db, { emptySet() }, {}, { _, _ -> error("No picker acquisition expected") }))
             assertEquals(setOf("kept", "hidden"), db.libraryDao().allIdsIncludingHidden().toSet())
             assertNull(db.libraryDao().findById("hidden"))
             assertEquals(7L, db.libraryDao().findIncludingHidden("hidden")!!.deletedAt)

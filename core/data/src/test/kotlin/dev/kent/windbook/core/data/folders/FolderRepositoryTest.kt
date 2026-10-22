@@ -8,6 +8,9 @@ import dev.kent.windbook.core.data.db.*
 import dev.kent.windbook.core.data.BookSourcesRepository
 import dev.kent.windbook.core.model.*
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.*
@@ -28,7 +31,7 @@ class FolderRepositoryTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         db = WindBookDatabase.inMemory(context, AndroidSQLiteDriver())
         grants = FolderGrants(context.contentResolver)
-        repo = FolderRepository(db, grants::persistedReadTrees, grants::releaseRead, clock = { 77 })
+        repo = FolderRepository(db, grants::persistedReadTrees, grants::releaseRead, grants::persistRead, clock = { 77 })
     }
     @After fun close() = db.close()
     private fun grant(tree: String) = grants.persistRead(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -44,8 +47,7 @@ class FolderRepositoryTest {
         assertNull(folder.lastScanAt)
         repo.disconnectFolder(id)
         assertFalse(repo.observeFolders().first().single().connected)
-        grant(a)
-        assertEquals(id, repo.save(a, "Again", ScanOptions()))
+        assertEquals(id, repo.connect(a, "Again", ScanOptions(), Intent.FLAG_GRANT_READ_URI_PERMISSION))
         assertTrue(repo.observeFolders().first().single().connected)
     }
 
@@ -69,6 +71,65 @@ class FolderRepositoryTest {
         assertEquals(2, db.folderDao().memberships("source").size)
         assertEquals("locator", db.libraryDao().progress("book")!!.locatorJson)
         assertEquals("{\"unknown\":17}", db.bookPreferencesDao().json("book"))
+    }
+
+    @Test fun reconnectAsFirstOperation_keepsNewlyAcquiredReadPermission() = runTest {
+        db.folderDao().upsert(FolderEntity("a", a, "Old", "[]", true, disconnectedAt = 1, lastScanAt = 5))
+        grant(a)
+        assertEquals("a", repo.connect(a, "Reconnected", ScanOptions(), Intent.FLAG_GRANT_READ_URI_PERMISSION))
+        assertTrue(grants.hasRead(a))
+        assertNull(db.folderDao().find("a")!!.disconnectedAt)
+        assertEquals(5L, db.folderDao().find("a")!!.lastScanAt)
+    }
+
+    @Test fun reconnectAndScanFinalization_doNotSweepReacquiredReadPermission() = runTest {
+        val acquired = CompletableDeferred<Unit>()
+        val resumeConnection = CompletableDeferred<Unit>()
+        repo = FolderRepository(db, grants::persistedReadTrees, grants::releaseRead, { uri, flags ->
+            grants.persistRead(uri, flags)
+            acquired.complete(Unit)
+            resumeConnection.await()
+        }) { 77 }
+        repo.initialize()
+        db.folderDao().upsert(FolderEntity("a", a, "Old", "[]", true, disconnectedAt = 1))
+        val other = repo.save(b, "Other", ScanOptions())
+        val (_, run) = repo.beginScan(other)
+        val connecting = async {
+            repo.connect(a, "Reconnected", ScanOptions(), Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        acquired.await()
+        // An already initialized lifecycle call would return immediately without the shared lock.
+        val lifecycle = async(start = CoroutineStart.UNDISPATCHED) { repo.initialize() }
+        assertFalse(lifecycle.isCompleted)
+        val finishing = async(start = CoroutineStart.UNDISPATCHED) { repo.finishScan(run.id, "COMPLETE") }
+        assertFalse(finishing.isCompleted)
+        resumeConnection.complete(Unit)
+        assertEquals("a", connecting.await())
+        lifecycle.await()
+        assertEquals("COMPLETE", finishing.await()!!.state)
+        assertTrue(grants.hasRead(a))
+        assertNull(db.folderDao().find("a")!!.disconnectedAt)
+    }
+
+    @Test fun save_cannotReconnectThroughSplitGrantAcquisition() = runTest {
+        db.folderDao().upsert(FolderEntity("a", a, "Old", "[]", true, disconnectedAt = 1))
+        grant(a)
+        try {
+            repo.save(a, "Unsafe reconnect", ScanOptions())
+            fail("Reconnection must acquire its permission inside the shared lifecycle")
+        } catch (_: IllegalStateException) { }
+        assertEquals(1L, db.folderDao().find("a")!!.disconnectedAt)
+        assertEquals("Old", db.folderDao().find("a")!!.displayLocation)
+    }
+
+    @Test fun connect_withoutReturnedReadGrantDoesNotReconnectFolder() = runTest {
+        db.folderDao().upsert(FolderEntity("a", a, "Old", "[]", true, disconnectedAt = 1))
+        try {
+            repo.connect(a, "Invalid reconnect", ScanOptions(), Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            fail("A picker result without READ cannot connect a folder")
+        } catch (_: SecurityException) { }
+        assertFalse(grants.hasRead(a))
+        assertEquals(1L, db.folderDao().find("a")!!.disconnectedAt)
     }
 
     @Test fun initialize_sweepsOnlyHeldDisconnectedGrantsAndKeepsConnectedEmptyRoot() = runTest {

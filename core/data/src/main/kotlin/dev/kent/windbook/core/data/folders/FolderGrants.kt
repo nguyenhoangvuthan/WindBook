@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Intent
 
 class FolderGrants(private val resolver: ContentResolver) {
+    /** Picker connections call this through FolderRepository.connect, under its lifecycle lock. */
     fun persistRead(treeUri: String, returnedFlags: Int) {
         val uri = requireTreeUri(treeUri)
         if (returnedFlags and Intent.FLAG_GRANT_READ_URI_PERMISSION == 0) {

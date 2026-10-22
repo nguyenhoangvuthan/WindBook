@@ -43,6 +43,7 @@ class FolderRepository(
     private val db: WindBookDatabase,
     private val persistedReadTrees: () -> Set<String>,
     private val releaseGrant: suspend (String) -> Unit,
+    private val acquireRead: suspend (String, Int) -> Unit,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
     private val mutations = Mutex()
@@ -57,16 +58,39 @@ class FolderRepository(
         initialized = true
     }
 
+    /** Picker grant acquisition and connection are serialized with every cleanup sweep. */
+    suspend fun connect(
+        treeUri: String,
+        displayLocation: String,
+        options: ScanOptions,
+        returnedFlags: Int,
+    ): String = mutations.withLock {
+        requireTreeUri(treeUri)
+        // Clean up stale disconnected grants before acquiring the permission from this picker result.
+        initializeLocked()
+        acquireRead(treeUri, returnedFlags)
+        saveLocked(treeUri, displayLocation, options, reconnect = true)
+    }
+
+    /** Update remembered options; reconnecting a disconnected row requires [connect]. */
     suspend fun save(treeUri: String, displayLocation: String, options: ScanOptions): String = mutations.withLock {
         requireTreeUri(treeUri)
         initializeLocked()
-        db.withWriteTransaction {
-            val old = db.folderDao().findByTree(treeUri)
-            val folder = FolderEntity(old?.id ?: UUID.randomUUID().toString(), treeUri,
-                displayLocation, encodeExtensions(options), options.recursive, lastScanAt = old?.lastScanAt)
-            db.folderDao().upsert(folder)
-            folder.id
-        }
+        saveLocked(treeUri, displayLocation, options, reconnect = false)
+    }
+
+    private suspend fun saveLocked(
+        treeUri: String,
+        displayLocation: String,
+        options: ScanOptions,
+        reconnect: Boolean,
+    ): String = db.withWriteTransaction {
+        val old = db.folderDao().findByTree(treeUri)
+        check(old?.disconnectedAt == null || reconnect) { "Use connect to reacquire a disconnected folder grant" }
+        val folder = FolderEntity(old?.id ?: UUID.randomUUID().toString(), treeUri,
+            displayLocation, encodeExtensions(options), options.recursive, lastScanAt = old?.lastScanAt)
+        db.folderDao().upsert(folder)
+        folder.id
     }
 
     fun observeFolders(): Flow<List<FolderSummary>> = db.folderDao().observeFolders().onStart { initialize() }

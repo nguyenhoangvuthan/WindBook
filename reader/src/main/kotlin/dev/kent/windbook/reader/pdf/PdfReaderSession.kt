@@ -34,7 +34,10 @@ internal fun pdfLocator(page: Int, pageCount: Int): Locator {
  * A PDF read with WindBook's own renderer. It does not open the file through Readium: Readium's PDF parser
  * renders a full-size cover on open, which took 36 s and ~1.5 GB for the owner's 24 MB scanned textbook.
  */
-internal class PdfReaderSession(private val document: PdfDocumentHandle) : PdfSession {
+internal class PdfReaderSession(
+    private val document: PdfDocumentHandle,
+    private val source: dev.kent.windbook.reader.source.SourceLease? = null,
+) : PdfSession {
     override val format = BookFormat.PDF
     override val pageCount: Int get() = document.pageCount
     override val pages: PdfPageSource = PdfPages(document)
@@ -45,5 +48,10 @@ internal class PdfReaderSession(private val document: PdfDocumentHandle) : PdfSe
 
     override fun pageOf(locatorJson: String?): Int = pageIndexOf(locatorJson?.toLocatorOrNull(), pageCount)
 
-    override fun close() = document.close()
+    private val closed = java.util.concurrent.atomic.AtomicBoolean()
+    override fun close() {
+        if (closed.compareAndSet(false, true)) dev.kent.windbook.reader.closeReaderResources {
+            try { document.close() } finally { source?.close() }
+        }
+    }
 }

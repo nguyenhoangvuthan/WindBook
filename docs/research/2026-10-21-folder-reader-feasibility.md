@@ -1,8 +1,9 @@
 # Folder reader feasibility and dependency proposal
 
-Date: 2026-10-21. Evidence: repository and pinned upstream source/API inspection,
-not device validation. No application code, Gradle dependency or native library
-was installed or changed during this investigation.
+Original investigation: 2026-10-21, based on repository and pinned upstream
+source/API inspection. That investigation made no application or dependency
+changes. The 2026-10-22 source-session follow-up below records implementation
+and synthetic-device evidence; native reader gates remain pending.
 
 ## Findings affecting the plan
 
@@ -24,7 +25,47 @@ was installed or changed during this investigation.
   Its current synchronous `close()` and cancellation windows need coverage as
   the source lifetime changes. No Pdfium rendering or PDF Reflow is involved.
 
-## Proposed dependency choices (not approved or installed)
+## Source-session follow-up (2026-10-22)
+
+Task 5 implements bounded source leases without a permanent book copy. Readium
+3.4.0's pinned `ContentResource.stream(position)` closes and reopens the resolver
+URI when seeking backwards. Synthetic EPUB reading opened the provider twice on
+both API 31 and API 36. Thus raw URI acquisition, fingerprinting and later Readium
+reads cannot promise the same revision. `dup()` also shares a file offset, and a
+provider-owned seekable file can still change after acquisition.
+
+External sources therefore use one bounded snapshot under the active session
+lease, acquired through one read-only provider descriptor. Both PDF and EPUB read
+that snapshot; independent streams/descriptors have independent offsets. The
+same acquired lease must survive Task 6 fingerprinting, revision verification,
+metadata and reader opening. Imported owned sources remain direct.
+`SourceAccess.initialize()` provides an idempotent IO orphan sweep for Task 7
+app-startup wiring, including launches that never open a book; first acquisition
+also initializes the workspace lazily. The original
+500 MiB source, 1 GiB scratch, 64 MiB reserve and 64 KiB buffer defaults are
+implemented; no fallback retries a corrupt or denied source.
+
+The existing importer EPUB archive guard is shared through `core:model` and
+runs before Readium on acquired EPUBs too: 10,000 entries, 2 GiB declared expanded
+bytes, unsafe paths, container presence and corrupt-ZIP checks. This preserves
+the previous import boundary without adding a module dependency. Metadata work
+must consume the verified lease and keep this guard ahead of external EPUB parsing.
+
+Synthetic API 31/36 tests cover content, PDF rendering metadata, blocked pipes,
+cancellation, independent offsets, provider replacement, quotas, orphan cleanup,
+main-thread lifecycle and archive validation. Both platforms pass 10 cases;
+the synthetic external EPUB snapshot is 1,453 bytes and returns to zero tracked
+cache bytes on close. Final measured EPUB open/read times:
+
+| Emulator API | Session snapshot | Direct URI API seam | Provider opens (snapshot / URI) |
+|---|---:|---:|---:|
+| 31 | 46 ms | 17 ms | 1 / 2 |
+| 36 | 57 ms | 19 ms | 1 / 2 |
+
+These tiny-fixture results do not establish large-library scan performance or
+physical-phone performance.
+
+## Dependency proposal (approved 2026-10-22; adapter gates pending)
 
 | Purpose | Proposed pin | Why this candidate | Remaining execution proof |
 |---|---|---|---|
@@ -44,8 +85,8 @@ libmobi's selected native surface is `mobi_init`, `mobi_load_file`,
 Build a shared JNI library with bundled miniz and the internal writer; do not
 add libxml2 or a system-installed converter. Preserve upstream notices and
 COPYING in the approved vendor directory. Upstream identifies its license as
-LGPL-3.0-or-later; verify the distribution packaging before a release. The local SDK has CMake 4.1.2 but no installed NDK. The native plan proposes
-NDK 29.0.14206865, with installation explicitly requiring owner approval. No
+LGPL-3.0-or-later; verify the distribution packaging before a release. The local SDK has CMake 4.1.2. The owner approved NDK 29.0.14206865
+on 2026-10-22 and it is installed for the native plan. No
 claim of measured APK size or successful Android integration is made here.
 
 libarchive v3.8.10 was also inspected: its header exposes both RAR and RAR5

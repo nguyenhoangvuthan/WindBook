@@ -10,6 +10,8 @@ import dev.kent.windbook.core.model.PageSize
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -76,11 +78,20 @@ class PdfDocumentHandle private constructor(
     }
 
     private val closed = java.util.concurrent.atomic.AtomicBoolean()
+    private val closeCompleted = CompletableDeferred<Unit>()
     override fun close() {
         if (closed.compareAndSet(false, true)) dev.kent.windbook.reader.closeReaderResources {
-            try { runBlocking(thread) { renderer.close() } }
-            finally { try { fd.close() } finally { thread.close() } }
+            try {
+                try { runBlocking(thread) { renderer.close() } }
+                finally { try { fd.close() } finally { thread.close() } }
+            } finally { closeCompleted.complete(Unit) }
         }
+    }
+
+    /** Failure/session cleanup must retain its source until a concurrent public close finishes too. */
+    internal suspend fun closeAndJoin() = withContext(NonCancellable + Dispatchers.IO) {
+        close()
+        closeCompleted.await()
     }
 
     companion object {
@@ -90,6 +101,11 @@ class PdfDocumentHandle private constructor(
         /** Consumes fd, including construction failure and cancellation before dispatcher delivery. */
         suspend fun open(fd: ParcelFileDescriptor): PdfDocumentHandle {
             val thread = Executors.newSingleThreadExecutor { Thread(it, "windbook-pdf") }.asCoroutineDispatcher()
+            return open(fd, thread)
+        }
+
+        /** Consumes the supplied descriptor and dedicated worker on every outcome. */
+        internal suspend fun open(fd: ParcelFileDescriptor, thread: ExecutorCoroutineDispatcher): PdfDocumentHandle {
             var opened: PdfDocumentHandle? = null
             try {
                 return withContext(thread) {
@@ -101,8 +117,11 @@ class PdfDocumentHandle private constructor(
                     } catch (e: Throwable) { renderer.close(); throw e }
                 }
             } catch (e: Throwable) {
-                if (opened != null) opened.close()
-                else { try { fd.close() } finally { thread.close() } }
+                withContext(NonCancellable + Dispatchers.IO) {
+                    val handle = opened
+                    if (handle != null) handle.closeAndJoin()
+                    else { try { fd.close() } finally { thread.close() } }
+                }
                 throw e
             }
         }

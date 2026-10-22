@@ -54,8 +54,9 @@ class SessionWorkspaceTest {
     @Test fun independentManagersPreserveBothActiveLeasesAndRemoveOrphans() = runBlocking<Unit> {
         val first = workspace()
         val a = first.create()
-        a.stage(ByteArrayInputStream(byteArrayOf(1)), null)
-        val second = workspace()
+        val aFile = a.stage(ByteArrayInputStream(byteArrayOf(1)), null)
+        val second = SessionWorkspace(File(tmp.root, "."), SourceLimits(20, 30, 10, 4)) { 100 }
+        assertArrayEquals(byteArrayOf(1), aFile.readBytes())
         val b = second.create()
         b.stage(ByteArrayInputStream(byteArrayOf(2)), null)
         val orphan = File(tmp.root, "orphan").apply { mkdir(); resolve("partial").writeText("old") }
@@ -63,6 +64,8 @@ class SessionWorkspaceTest {
         assertFalse(orphan.exists())
         assertTrue(a.directory.exists()); assertTrue(b.directory.exists())
         assertEquals(2, first.activeLeaseCount)
+        assertEquals(2L, second.usedBytes)
+        assertArrayEquals(byteArrayOf(1), aFile.readBytes())
         a.close(); b.close()
     }
 

@@ -27,15 +27,16 @@ class SourceSpaceException : IOException("Insufficient session workspace space")
 
 /** Process-wide ownership per root: another manager must never clean a live session. */
 class SessionWorkspace(
-    private val root: File,
+    root: File,
     internal val limits: SourceLimits = SourceLimits(),
     private val usableSpace: () -> Long = { root.usableSpace },
 ) {
+    private val root = root.canonicalFile
     private class State {
         val active = mutableMapOf<File, Long>()
         val preparation = Mutex()
     }
-    private val state = states.computeIfAbsent(root.canonicalPath) { State() }
+    private val state = states.computeIfAbsent(this.root.path) { State() }
     val activeLeaseCount: Int get() = synchronized(state) { state.active.size }
     val usedBytes: Long get() = synchronized(state) { state.active.values.sum() }
 

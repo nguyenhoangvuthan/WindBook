@@ -51,7 +51,7 @@ internal class PdfReaderSession(
     private val closed = java.util.concurrent.atomic.AtomicBoolean()
     override fun close() {
         if (closed.compareAndSet(false, true)) dev.kent.windbook.reader.closeReaderResources {
-            try { document.close() } finally { source?.close() }
+            try { kotlinx.coroutines.runBlocking { document.closeAndJoin() } } finally { source?.close() }
         }
     }
 }

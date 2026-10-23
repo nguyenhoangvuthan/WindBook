@@ -6,6 +6,7 @@ import dev.kent.windbook.core.model.CropBox
 import dev.kent.windbook.core.model.ExtractedMetadata
 import dev.kent.windbook.core.model.MetadataExtractor
 import dev.kent.windbook.reader.pdf.PdfDocumentHandle
+import dev.kent.windbook.reader.pdf.renderedHeight
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
@@ -39,18 +40,28 @@ class ReadiumMetadataExtractor(private val services: ReadiumServices) : Metadata
         }
 }
 
-/** Page 1 at cover height through the framework renderer; null when the page can't be rendered. */
+/** Page 1 through the framework renderer; optional when no safe cover can be rendered. */
 internal suspend fun pdfCoverWebp(file: File): ByteArray? =
     try {
-        PdfDocumentHandle.open(file).use { doc ->
-            val size = doc.pageSize(0)
-            val width = (COVER_HEIGHT * size.width / maxOf(size.width, size.height)).toInt().coerceIn(1, COVER_HEIGHT)
-            doc.render(0, CropBox.FULL, width).toWebp()
+        pdfCoverBitmap(file)?.let { bitmap ->
+            try { bitmap.toWebp() } finally { bitmap.recycle() }
         }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
         null
+    }
+
+/** Bounds the actual render target, before allocation; extreme portraits may have no safe width. */
+internal suspend fun pdfCoverBitmap(file: File): Bitmap? =
+    PdfDocumentHandle.open(file).use { doc ->
+        val size = doc.pageSize(0)
+        val width = (COVER_HEIGHT * size.width / maxOf(size.width, size.height)).toInt()
+        if (width !in 1..COVER_HEIGHT || renderedHeight(size, CropBox.FULL, width) !in 1..COVER_HEIGHT) {
+            null // At least one pixel wide would exceed the height bound; omit the optional cover.
+        } else {
+            doc.render(0, CropBox.FULL, width)
+        }
     }
 
 private fun Bitmap.toWebp(maxHeight: Int = COVER_HEIGHT): ByteArray {

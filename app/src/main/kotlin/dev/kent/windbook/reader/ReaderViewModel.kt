@@ -20,6 +20,8 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.NonCancellable
 import dev.kent.windbook.core.model.BookDisplayPrefs
 import dev.kent.windbook.core.model.EffectiveDisplay
 import dev.kent.windbook.core.model.PdfLayout
@@ -106,6 +108,7 @@ class ReaderViewModel @AssistedInject constructor(
     private var session: ReaderSession? = null
 
     private var openJob: Job? = null
+    private var pendingReplacement: BookSource? = null
 
     init {
         openJob = viewModelScope.launch { open() }
@@ -117,6 +120,7 @@ class ReaderViewModel @AssistedInject constructor(
     }
 
     private suspend fun open(replacement: BookSource? = null) {
+        pendingReplacement = replacement
         _state.value = ReaderUiState.Loading
         val book = library.book(bookId) ?: run {
             _state.value = ReaderUiState.Error(ReaderError.NOT_FOUND)
@@ -204,16 +208,27 @@ class ReaderViewModel @AssistedInject constructor(
         }
     }
 
-    fun reconnect(source: BookSource) {
-        openJob?.cancel()
-        openJob = viewModelScope.launch { open(source) }
-    }
+    fun reconnect(source: BookSource) = startOpen(source)
 
     fun restoreHiddenMatch() {
         val hidden = _state.value as? ReaderUiState.HiddenMatch ?: return
+        startOpen(pendingReplacement, restoreBookId = hidden.bookId)
+    }
+
+    private fun startOpen(replacement: BookSource?, restoreBookId: String? = null) {
+        val previous = openJob
+        // Guard the action before Room can suspend, so repeated Restore taps cannot launch peers.
+        _state.value = ReaderUiState.Loading
         openJob = viewModelScope.launch {
-            sources.restoreExternalBook(hidden.bookId)
-            open()
+            // Keep cancellation chains joined too: a newer attempt must wait for all prior cleanup.
+            withContext(NonCancellable) { previous?.cancelAndJoin() }
+            currentCoroutineContext().ensureActive()
+            val previousSession = session
+            session = null
+            previousSession?.close()
+            latestLocatorJson = null
+            if (restoreBookId != null) sources.restoreExternalBook(restoreBookId)
+            open(replacement)
         }
     }
 

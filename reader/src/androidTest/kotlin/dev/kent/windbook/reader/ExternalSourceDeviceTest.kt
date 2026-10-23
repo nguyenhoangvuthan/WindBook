@@ -78,13 +78,24 @@ class ExternalSourceDeviceTest {
     }
 
     @Test fun pdfMetadataCoverBoundsLongestEdgeBeforeRendering() = runBlocking {
-        for ((width, height) in listOf(4000 to 100, 100 to 4000)) {
+        for ((width, height) in listOf(4000 to 100, 100 to 4000, 4000 to 1, 1 to 600)) {
             val file = PdfFixtures.boxed(context.cacheDir, "cover.pdf", pages = 1, pageW = width, pageH = height)
+            val target = pdfCoverBitmap(file)!!
+            try {
+                assertTrue("Actual render target is ${target.width}x${target.height}",
+                    target.width in 1..600 && target.height in 1..600)
+            } finally { target.recycle() }
             val bytes = pdfCoverWebp(file)!!
             val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
             android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
             assertTrue("Cover is ${options.outWidth}x${options.outHeight}", options.outWidth in 1..600 && options.outHeight in 1..600)
         }
+    }
+
+    @Test fun extremePortraitCoverIsOmittedBeforeRendering() = runBlocking {
+        val file = PdfFixtures.boxed(context.cacheDir, "extreme-cover.pdf", pages = 1, pageW = 1, pageH = 4000)
+        assertNull("No bitmap target may be allocated for an unsafe minimum width", pdfCoverBitmap(file))
+        assertNull("A cover requiring more than 600 px at minimum width must be omitted", pdfCoverWebp(file))
     }
 
     @Test fun defaultWorkspaceCleanupWaitsForIOAcquisition() = runBlocking {

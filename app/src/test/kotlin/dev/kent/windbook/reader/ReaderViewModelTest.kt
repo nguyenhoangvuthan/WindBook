@@ -1,6 +1,9 @@
 package dev.kent.windbook.reader
 
 import androidx.lifecycle.ViewModelStore
+import androidx.room3.withWriteTransaction
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.joinAll
 import androidx.lifecycle.viewModelScope
 import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
@@ -279,6 +282,67 @@ class ReaderViewModelTest {
         vm.restoreHiddenMatch()
         assertEquals(ReaderUiState.Redirect("hidden"), withContext(kotlinx.coroutines.Dispatchers.IO) { kotlinx.coroutines.withTimeout(2_000) { vm.state.first { it is ReaderUiState.Redirect } } })
         assertEquals(null, db.libraryDao().findIncludingHidden("hidden")!!.deletedAt)
+    }
+
+    @Test fun reconnectHiddenReplacement_restoresAndOpensWithoutPickingAgain() = runTest {
+        external()
+        library.saveProgress("a", "original-anchor", .4) // A read conflict keeps its own identity.
+        val sha = java.security.MessageDigest.getInstance("SHA-256").digest(bookFile.readBytes()).joinToString("") { "%02x".format(it) }
+        db.libraryDao().insert(BookEntity("hidden", "Hidden", null, "EPUB", null, 0, sha, null, null,
+            "READING", 0, 1, 1, 2))
+        deniedUris = setOf("content://test/document/a")
+        var opens = 0
+        val vm = viewModel("a", verifiedOpener { opens++; FakeSession(BookFormat.EPUB) })
+        assertEquals(ReaderUiState.Reconnect, vm.awaitSettled())
+        val replacement = BookSource.External("content://test/document/replacement", DocumentKey("test", "replacement"))
+        vm.reconnect(replacement)
+        assertEquals(ReaderUiState.HiddenMatch("hidden"), vm.awaitSettled())
+        vm.restoreHiddenMatch()
+        val settled = withContext(kotlinx.coroutines.Dispatchers.IO) {
+            kotlinx.coroutines.withTimeout(2_000) { vm.state.first { it is ReaderUiState.Ready || it is ReaderUiState.Reconnect } }
+        }
+        assertTrue("Restore must continue with the selected replacement", settled is ReaderUiState.Ready)
+        assertEquals("original-anchor", (settled as ReaderUiState.Ready).initialLocatorJson)
+        assertTrue(replacement in sources.sources("a"))
+        assertEquals(1, opens)
+    }
+
+    @Test fun doubleRestoreWhileRoomWriteIsBlocked_publishesOneSessionAndClosesItExactlyOnce() = runTest {
+        external()
+        library.saveProgress("a", "original-anchor", .4)
+        val sha = java.security.MessageDigest.getInstance("SHA-256").digest(bookFile.readBytes()).joinToString("") { "%02x".format(it) }
+        db.libraryDao().insert(BookEntity("hidden", "Hidden", null, "EPUB", null, 0, sha, null, null,
+            "READING", 0, 1, 1, 2))
+        class CountedSession : ReaderSession {
+            override val format = BookFormat.EPUB
+            var closeCalls = 0
+            override fun close() { closeCalls++ }
+        }
+        val opened = java.util.concurrent.CopyOnWriteArrayList<CountedSession>()
+        val vm = viewModel("a", verifiedOpener { CountedSession().also { opened.add(it) } })
+        assertEquals(ReaderUiState.HiddenMatch("hidden"), vm.awaitSettled())
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val writer = launch(kotlinx.coroutines.Dispatchers.IO) {
+            db.withWriteTransaction { entered.complete(Unit); release.await() }
+        }
+        entered.await()
+        val existingJobs = vm.viewModelScope.coroutineContext[Job]!!.children.toSet()
+        try {
+            vm.restoreHiddenMatch()
+            val stateDuringWrite = vm.state.value
+            vm.restoreHiddenMatch()
+            val restoreJobs = vm.viewModelScope.coroutineContext[Job]!!.children.filter { it !in existingJobs }.toList()
+            release.complete(Unit)
+            writer.join()
+            restoreJobs.joinAll()
+            assertTrue(vm.state.value is ReaderUiState.Ready)
+            assertEquals("Repeated Restore must not construct a second live session", 1, opened.size)
+            assertEquals(ReaderUiState.Loading, stateDuringWrite)
+            assertEquals(0, opened.single().closeCalls)
+            viewModelStore.clear()
+            assertEquals(1, opened.single().closeCalls)
+        } finally { release.complete(Unit); writer.join() }
     }
 
     @Test fun metadataUsesTheSameLeaseAndStorageFailureDoesNotBlockReading() = runTest {

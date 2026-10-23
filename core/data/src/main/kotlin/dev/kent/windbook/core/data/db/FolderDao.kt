@@ -42,13 +42,13 @@ interface FolderDao {
 
     @Query("""
         SELECT b.id AS bookId, s.id AS sourceId, m.relative_path AS relativePath,
-          b.format, s.availability
+          b.format, s.availability, b.title, b.deleted_at AS deletedAt
         FROM folder_memberships m JOIN book_sources s ON s.id = m.source_id
         JOIN books b ON b.id = s.book_id
-        WHERE m.folder_id = :folderId AND b.deleted_at IS NULL
+        WHERE m.folder_id = :folderId AND (:includeHidden OR b.deleted_at IS NULL)
         ORDER BY m.relative_path COLLATE NOCASE, s.id
     """)
-    fun observeEntries(folderId: String): Flow<List<FolderEntryRow>>
+    fun observeEntries(folderId: String, includeHidden: Boolean = false): Flow<List<FolderEntryRow>>
 
     @Upsert
     suspend fun upsertRun(run: ScanRunEntity)
@@ -73,4 +73,6 @@ data class FolderEntryRow(
     val relativePath: String,
     val format: String,
     val availability: String,
+    val title: String,
+    val deletedAt: Long?,
 )

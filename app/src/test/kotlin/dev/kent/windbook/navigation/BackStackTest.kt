@@ -5,6 +5,14 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class BackStackTest {
+    @Test fun folderResultsOpenReaderByStableIdAndReturnToFolder() {
+        val stack = mutableListOf<NavKey>(LibraryKey, FolderKey("root"))
+        stack.openReader("book")
+        assertEquals(ReaderKey("book"), stack.last())
+        stack.removeAt(stack.lastIndex)
+        assertEquals(FolderKey("root"), stack.last())
+    }
+
     @Test fun doubleTapOpensTheReaderOnce() {
         val stack = mutableListOf<NavKey>(LibraryKey)
         stack.openReader("a")

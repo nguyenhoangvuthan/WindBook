@@ -58,12 +58,13 @@ data class LibraryActions(
     val onLayoutChange: (LibraryLayout) -> Unit,
     val onSetStatus: (String, ReadingStatus) -> Unit,
     val onDelete: (String) -> Unit,
+    val onFoldersClick: () -> Unit = {},
 )
 
 private val IMPORT_MIME_TYPES = arrayOf("application/epub+zip", "application/pdf", "application/octet-stream")
 
 @Composable
-fun LibraryRoute(onOpenBook: (String) -> Unit, viewModel: LibraryViewModel = hiltViewModel()) {
+fun LibraryRoute(onOpenBook: (String) -> Unit, onFoldersClick: () -> Unit = {}, viewModel: LibraryViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -99,6 +100,7 @@ fun LibraryRoute(onOpenBook: (String) -> Unit, viewModel: LibraryViewModel = hil
         snackbarHostState = snackbar,
         actions = LibraryActions(
             onOpenBook = onOpenBook,
+            onFoldersClick = onFoldersClick,
             onImportClick = { picker.launch(IMPORT_MIME_TYPES) },
             onQueryChange = viewModel::onQueryChange,
             onFilterChange = viewModel::onFilterChange,
@@ -132,6 +134,10 @@ fun LibraryScreen(
 ) {
     Scaffold(
         topBar = {
+            androidx.compose.foundation.layout.Column(Modifier.windowInsetsPadding(TabScreenInsets)) {
+            androidx.compose.material3.TextButton(onClick = actions.onFoldersClick) {
+                androidx.compose.material3.Text(stringResource(R.string.folder_title))
+            }
             if (!state.isLibraryEmpty) {
                 LibraryHeader(
                     bookCount = state.bookCount,
@@ -141,8 +147,8 @@ fun LibraryScreen(
                     onQueryChange = actions.onQueryChange,
                     onSortChange = actions.onSortChange,
                     onLayoutChange = actions.onLayoutChange,
-                    modifier = Modifier.windowInsetsPadding(TabScreenInsets),
                 )
+            }
             }
         },
         floatingActionButton = {

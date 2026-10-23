@@ -75,9 +75,12 @@ object AppModule {
         FolderRepository(db, grants::persistedReadTrees, grants::releaseRead, grants::persistRead)
 
     @Provides @Singleton
-    fun folderScans(folders: FolderRepository, @ApplicationContext context: Context): FolderScanCoordinator =
+    fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @Provides @Singleton
+    fun folderScans(folders: FolderRepository, @ApplicationContext context: Context, scope: CoroutineScope): FolderScanCoordinator =
         FolderScanCoordinator(folders, FolderScanner(DocumentsTreeAccess(context.contentResolver)),
-            CoroutineScope(SupervisorJob() + Dispatchers.IO))
+            scope)
 
     @Provides @Singleton
     fun bookSources(db: WindBookDatabase, folders: FolderRepository): BookSourcesRepository =

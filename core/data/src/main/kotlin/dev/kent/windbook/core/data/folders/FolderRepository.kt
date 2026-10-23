@@ -36,6 +36,8 @@ data class FolderEntry(
     val relativePath: String,
     val format: BookFormat,
     val availability: SourceAvailability,
+    val title: String = name,
+    val hidden: Boolean = false,
 )
 
 /** All scan writes and connection/grant changes share one lifecycle lock. */
@@ -97,12 +99,12 @@ class FolderRepository(
         .map { folders -> folders.map { FolderSummary(it.id, it.displayLocation, options(it),
             it.disconnectedAt == null, it.lastScanAt) } }
 
-    fun observeEntries(folderId: String, query: String, formats: Set<BookFormat>): Flow<List<FolderEntry>> =
-        db.folderDao().observeEntries(folderId).onStart { initialize() }.map { rows ->
+    fun observeEntries(folderId: String, query: String, formats: Set<BookFormat>, includeHidden: Boolean = false): Flow<List<FolderEntry>> =
+        db.folderDao().observeEntries(folderId, includeHidden).onStart { initialize() }.map { rows ->
             rows.map { row -> FolderEntry(row.bookId, row.sourceId, row.relativePath.substringAfterLast('/'),
-                row.relativePath, BookFormat.valueOf(row.format), SourceAvailability.valueOf(row.availability)) }
+                row.relativePath, BookFormat.valueOf(row.format), SourceAvailability.valueOf(row.availability), row.title, row.deletedAt != null) }
                 .filter { (formats.isEmpty() || it.format in formats) &&
-                    (query.isBlank() || it.relativePath.contains(query.trim(), ignoreCase = true)) }
+                    (query.isBlank() || (it.relativePath.contains(query.trim(), ignoreCase = true) || it.title.contains(query.trim(), ignoreCase = true))) }
         }
 
     suspend fun disconnectFolder(folderId: String) = mutations.withLock {

@@ -17,3 +17,6 @@ data object NotesKey : NavKey
 
 @Serializable
 data object SettingsKey : NavKey
+
+@Serializable
+data class FolderKey(val folderId: String? = null) : NavKey

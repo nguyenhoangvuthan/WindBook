@@ -47,12 +47,13 @@ fun FolderRoute(folderId: String?, onOpenBook: (String) -> Unit, onBack: () -> U
         restore = { viewModel.restore(it, renderedFolderId) }, back = onBack, showHidden = viewModel::showHidden,
         setRecursive = { viewModel.setRecursive(it, renderedFolderId) }, toggleExtension = { viewModel.toggleExtension(it, renderedFolderId) },
         setExtensions = { viewModel.setExtensions(it, renderedFolderId) },
-    ))
+    ), canRead = viewModel::canRead)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun FolderScreen(state: FolderUiState, actions: FolderActions) {
+fun FolderScreen(state: FolderUiState, actions: FolderActions,
+    canRead: (BookFormat) -> Boolean = dev.kent.windbook.reader.formats.FormatCapabilities.BUILT_IN::canRead) {
     var confirmDisconnect by remember(state.resolvedFolderId) { mutableStateOf(false) }
     val results = remember(state.entries, state.query, state.options.extensions, state.showHidden) {
         state.entries.filter { (state.query.isBlank() || (it.relativePath.contains(state.query.trim(), true) || it.title.contains(state.query.trim(), true))) &&
@@ -142,13 +143,13 @@ fun FolderScreen(state: FolderUiState, actions: FolderActions) {
         }
         if (results.isEmpty()) item { Text(stringResource(R.string.folder_empty)) }
         items(results, key = { "entry-${it.sourceId}" }) { entry ->
-            Column(Modifier.fillMaxWidth().clickable(enabled = !entry.hidden && entry.format in setOf(BookFormat.EPUB, BookFormat.PDF)) { actions.openBook(entry.bookId) }.padding(vertical = 8.dp)) {
+            Column(Modifier.fillMaxWidth().clickable(enabled = !entry.hidden && canRead(entry.format)) { actions.openBook(entry.bookId) }.padding(vertical = 8.dp)) {
                 Text(entry.title, style = MaterialTheme.typography.titleMedium)
                 Text(entry.relativePath, style = MaterialTheme.typography.bodySmall)
                 if (entry.hidden) TextButton(onClick = { actions.restore(entry.bookId) }) {
                     Text(stringResource(R.string.folder_restore))
                 }
-                Text(if (entry.format !in setOf(BookFormat.EPUB, BookFormat.PDF))
+                Text(if (!canRead(entry.format))
                     stringResource(R.string.folder_unavailable) else stringResource(R.string.folder_open),
                     color = MaterialTheme.colorScheme.primary)
                 if (entry.availability.name !in setOf("AVAILABLE", "UNVERIFIED"))

@@ -24,6 +24,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class FolderViewModelTest {
     @get:Rule val main = MainDispatcherRule()
+    private val unusedOpener = dev.kent.windbook.reader.BookOpener { _, _ -> error("Folder actions do not open sessions") }
     private val uri = Uri.parse("content://folders.test/tree/root")
 
     @Test fun returnedReadFlagRequiredAndTypedPathInvalidatesSelection() = runTest {
@@ -32,7 +33,7 @@ class FolderViewModelTest {
         val grants = FolderGrants(context.contentResolver)
         val repo = FolderRepository(db, grants::persistedReadTrees, grants::releaseRead, grants::persistRead)
         val coordinator = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow {} }), backgroundScope)
-        val vm = FolderViewModel(repo, coordinator, db, context, RepositoryFolderObservations(repo, coordinator))
+        val vm = FolderViewModel(repo, coordinator, db, context, RepositoryFolderObservations(repo, coordinator), unusedOpener)
         val store = ViewModelStore().also { it.put("folder", vm) }
         try {
             vm.onTreeGranted(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION).join()
@@ -64,7 +65,7 @@ class FolderViewModelTest {
         val coordinator = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ ->
             flow { awaitCancellation() }
         }), backgroundScope)
-        val vm = FolderViewModel(repo, coordinator, db, context, RepositoryFolderObservations(repo, coordinator))
+        val vm = FolderViewModel(repo, coordinator, db, context, RepositoryFolderObservations(repo, coordinator), unusedOpener)
         val store = ViewModelStore().also { it.put("folder", vm) }
         try {
             vm.onTreeGranted(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION).join()
@@ -115,7 +116,7 @@ class FolderViewModelTest {
                 kotlinx.coroutines.flow.flowOf(ScanProgress("old-run", "RUNNING")) else kotlinx.coroutines.flow.flow<ScanProgress> { awaitCancellation() }
         }
         val scans = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow {} }), backgroundScope)
-        val vm = FolderViewModel(repo, scans, db, context, inputs)
+        val vm = FolderViewModel(repo, scans, db, context, inputs, unusedOpener)
         val store = ViewModelStore().also { it.put("folder", vm) }
         try {
             vm.selectFolder(a).join()
@@ -148,7 +149,7 @@ class FolderViewModelTest {
         val a = repo.save(uri.toString(), "A", ScanOptions())
         val b = repo.save("content://folders.test/tree/b", "B", ScanOptions())
         val scans = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow {} }), backgroundScope)
-        val vm = FolderViewModel(repo, scans, db, context, RepositoryFolderObservations(repo, scans))
+        val vm = FolderViewModel(repo, scans, db, context, RepositoryFolderObservations(repo, scans), unusedOpener)
         val store = ViewModelStore().also { it.put("folder", vm) }
         try {
             vm.selectFolder(a).join()

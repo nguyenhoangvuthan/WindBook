@@ -63,4 +63,16 @@ class FolderScreenTest {
         compose.onNodeWithText("Quét cả thư mục con").performScrollTo().assertIsDisplayed()
     }
 
+    @Test fun registeredFormatUsesRuntimeCapabilityForClickAndLabel() {
+        var opened = ""
+        val entry = dev.kent.windbook.core.data.folders.FolderEntry("text-book", "source", "story.txt", "story.txt",
+            BookFormat.TXT, dev.kent.windbook.core.model.SourceAvailability.AVAILABLE, title = "Synthetic text")
+        compose.setContent { FolderScreen(FolderUiState(entries = listOf(entry), options = ScanOptions(extensions = setOf(BookFormat.TXT))),
+            FolderActions(openBook = { opened = it }), canRead = { it == BookFormat.TXT }) }
+        compose.onNodeWithTag("folder-list").performScrollToNode(hasText("Synthetic text"))
+        compose.onNodeWithText("Synthetic text").performClick()
+        compose.waitForIdle()
+        assertEquals("text-book", opened)
+    }
+
 }

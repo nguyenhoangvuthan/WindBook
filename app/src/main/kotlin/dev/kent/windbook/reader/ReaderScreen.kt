@@ -139,7 +139,8 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit, onReplaceReader: (String) ->
         is ReaderUiState.Ready -> Box(Modifier.fillMaxSize()) {
             val pdf = current.session as? PdfSession
             val pdfDisplay by viewModel.pdfDisplay.collectAsStateWithLifecycle()
-            if (pdf != null) {
+            if (current.session.surface == NavigationSurface.PDF) {
+                requireNotNull(pdf)
                 pdfDisplay?.let { display ->
                     val initialPage = remember(pdf) { viewModel.initialPdfPage() }
                     PdfReaderView(
@@ -154,7 +155,7 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit, onReplaceReader: (String) ->
                         onZoomChanged = viewModel::setPdfZoom,
                     )
                 }
-            } else {
+            } else if (current.session.surface == NavigationSurface.PUBLICATION) {
                 ReaderSurface(current, viewModel)
             }
             ReaderOverlay(
@@ -194,7 +195,7 @@ private fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewModel
             .windowInsetsPadding(
                 WindowInsets.displayCutout.only(WindowInsetsSides.Vertical).union(WindowInsets(top = 16.dp, bottom = 16.dp)),
             ),
-        arguments = ReaderHostFragment.arguments(state.session.format),
+        arguments = ReaderHostFragment.arguments(state.session.surface),
     ) { fragment ->
         hostRef.value = fragment
         // A re-created fragment (rotation) must open where the reader is now, not where the book was opened.

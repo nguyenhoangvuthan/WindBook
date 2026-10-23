@@ -32,7 +32,10 @@ class FolderViewModel @Inject constructor(
     private val db: WindBookDatabase,
     @ApplicationContext private val context: Context,
     private val observations: FolderObservations,
+    private val opener: dev.kent.windbook.reader.BookOpener,
 ) : ViewModel() {
+    fun canRead(format: dev.kent.windbook.core.model.BookFormat): Boolean = opener.capabilities.canRead(format)
+
     private val mutable = MutableStateFlow(FolderUiState())
     val state = mutable.asStateFlow()
     private val commands = Mutex()

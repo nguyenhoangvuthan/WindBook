@@ -11,7 +11,6 @@ import androidx.fragment.app.commitNow
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import dev.kent.windbook.core.model.BookFormat
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.readium.r2.navigator.Navigator
@@ -46,8 +45,8 @@ class ReaderHostFragment : Fragment() {
         get() = childFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as? Navigator
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        val format = BookFormat.valueOf(requireArguments().getString(ARG_FORMAT, BookFormat.EPUB.name))
-        require(format == BookFormat.EPUB) { "ReaderHostFragment hosts EPUB only; PDFs use PdfReaderView" }
+        val surface = NavigationSurface.valueOf(requireArguments().getString(ARG_SURFACE, NavigationSurface.PUBLICATION.name))
+        require(surface == NavigationSurface.PUBLICATION) { "ReaderHostFragment requires a publication surface" }
         childFragmentManager.fragmentFactory = EpubNavigatorFragment.createDummyFactory()
         super.onCreate(savedInstanceState)
         // A restored (dummy) navigator throws if it reaches onResume, so drop it now;
@@ -67,6 +66,7 @@ class ReaderHostFragment : Fragment() {
     }
 
     fun bind(session: ReaderSession, initialLocatorJson: String?, callbacks: Callbacks, darkTheme: Boolean) {
+        require(session.surface == NavigationSurface.PUBLICATION) { "ReaderHostFragment requires a publication session" }
         this.callbacks = callbacks
         val readium = session as ReadiumReaderSession
         if (readium === boundSession) return
@@ -137,9 +137,9 @@ class ReaderHostFragment : Fragment() {
     }
 
     companion object {
-        private const val ARG_FORMAT = "format"
+        private const val ARG_SURFACE = "surface"
         private const val NAVIGATOR_TAG = "readium-navigator"
 
-        fun arguments(format: BookFormat): Bundle = bundleOf(ARG_FORMAT to format.name)
+        fun arguments(surface: NavigationSurface): Bundle = bundleOf(ARG_SURFACE to surface.name)
     }
 }

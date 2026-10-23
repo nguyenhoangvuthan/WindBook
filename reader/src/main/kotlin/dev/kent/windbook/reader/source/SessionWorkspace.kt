@@ -95,6 +95,43 @@ class SessionWorkspace(
             }
         }
 
+    internal suspend fun writeArtifact(lease: SessionLease, write: (java.io.OutputStream) -> Unit): File =
+        withContext(Dispatchers.IO) {
+            state.preparation.withLock {
+                check(!lease.closed.get()) { "Session lease is closed" }
+                val target = File(lease.directory, UUID.randomUUID().toString())
+                var reserved = 0L
+                val context = currentCoroutineContext()
+                try {
+                    target.outputStream().use { output ->
+                        val bounded = object : java.io.OutputStream() {
+                            override fun write(value: Int) = write(byteArrayOf(value.toByte()), 0, 1)
+                            override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                                context.ensureActive()
+                                synchronized(state) {
+                                    check(!lease.closed.get()) { "Session lease is closed" }
+                                    if (state.active.values.sum() + length > limits.scratchBytes ||
+                                        usableSpace() - length < limits.freeReserveBytes) throw SourceSpaceException()
+                                    state.active[lease.directory] = state.active.getValue(lease.directory) + length
+                                    reserved += length
+                                }
+                                output.write(bytes, offset, length)
+                            }
+                        }
+                        write(bounded)
+                    }
+                    context.ensureActive()
+                    target
+                } catch (e: Throwable) {
+                    target.delete()
+                    synchronized(state) {
+                        state.active[lease.directory]?.let { state.active[lease.directory] = it - reserved }
+                    }
+                    throw e
+                }
+            }
+        }
+
     internal fun release(lease: SessionLease) = synchronized(state) {
         lease.directory.deleteRecursively()
         state.active.remove(lease.directory)
@@ -106,7 +143,11 @@ class SessionWorkspace(
 
 class SessionLease internal constructor(val directory: File, private val workspace: SessionWorkspace) : AutoCloseable {
     internal val closed = AtomicBoolean()
+    private val artifacts = ConcurrentHashMap.newKeySet<File>()
+    internal fun ownsArtifact(file: File): Boolean = !closed.get() && file.canonicalFile in artifacts
     /** Consumes input ownership, including rejection, cancellation and copy failures. */
-    suspend fun stage(input: InputStream, declaredSize: Long? = null): File = workspace.stage(this, input, declaredSize)
+    suspend fun stage(input: InputStream, declaredSize: Long? = null): File = workspace.stage(this, input, declaredSize).also { artifacts.add(it.canonicalFile) }
+    /** Generated output shares the source snapshot's global scratch quota and preparation lock. */
+    suspend fun writeArtifact(write: (java.io.OutputStream) -> Unit): File = workspace.writeArtifact(this, write).also { artifacts.add(it.canonicalFile) }
     override fun close() { if (closed.compareAndSet(false, true)) workspace.release(this) }
 }

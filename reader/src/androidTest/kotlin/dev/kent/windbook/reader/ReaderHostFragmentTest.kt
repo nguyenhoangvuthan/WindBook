@@ -29,7 +29,7 @@ class ReaderHostFragmentTest {
         var reportedJson = ""
 
         val scenario = launchFragmentInContainer<ReaderHostFragment>(
-            fragmentArgs = ReaderHostFragment.arguments(BookFormat.EPUB),
+            fragmentArgs = ReaderHostFragment.arguments(NavigationSurface.PUBLICATION),
             themeResId = androidx.appcompat.R.style.Theme_AppCompat_DayNight_NoActionBar,
         )
         scenario.onFragment { fragment ->
@@ -59,7 +59,7 @@ class ReaderHostFragmentTest {
         var firstJson = ""
         val first = CountDownLatch(1)
         val scenario = launchFragmentInContainer<ReaderHostFragment>(
-            fragmentArgs = ReaderHostFragment.arguments(BookFormat.EPUB),
+            fragmentArgs = ReaderHostFragment.arguments(NavigationSurface.PUBLICATION),
             themeResId = androidx.appcompat.R.style.Theme_AppCompat_DayNight_NoActionBar,
         )
         scenario.onFragment { fragment ->
@@ -99,7 +99,7 @@ class ReaderHostFragmentTest {
         }
         val seen = CountDownLatch(1)
         val scenario = launchFragmentInContainer<ReaderHostFragment>(
-            fragmentArgs = ReaderHostFragment.arguments(BookFormat.EPUB),
+            fragmentArgs = ReaderHostFragment.arguments(NavigationSurface.PUBLICATION),
             themeResId = androidx.appcompat.R.style.Theme_AppCompat_DayNight_NoActionBar,
         )
         scenario.onFragment { fragment ->

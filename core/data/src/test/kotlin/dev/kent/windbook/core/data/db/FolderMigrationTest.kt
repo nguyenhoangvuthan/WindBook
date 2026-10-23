@@ -90,7 +90,7 @@ class FolderMigrationTest {
             assertEquals(0L, run.startedAt); assertEquals("", run.currentPath)
         } finally { db.close() }
         AndroidSQLiteDriver().open(path).use { connection ->
-            connection.prepare("PRAGMA user_version").use { assertTrue(it.step()); assertEquals(4L, it.getLong(0)) }
+            connection.prepare("PRAGMA user_version").use { assertTrue(it.step()); assertEquals(5L, it.getLong(0)) }
             connection.prepare("PRAGMA foreign_key_check").use { assertFalse(it.step()) }
         }
     }
@@ -119,7 +119,7 @@ class FolderMigrationTest {
             connection.prepare("PRAGMA index_list('books')").use { stmt ->
                 while (stmt.step()) indices[stmt.getText(1)] = stmt.getLong(2)
             }
-            assertEquals(1L, indices["index_books_sha256"])
+            assertEquals(0L, indices["index_books_sha256"])
             assertEquals(0L, indices["index_books_last_opened_at"])
             connection.execSQL("PRAGMA foreign_keys = ON")
             connection.execSQL("DELETE FROM books WHERE id = 'kept'")

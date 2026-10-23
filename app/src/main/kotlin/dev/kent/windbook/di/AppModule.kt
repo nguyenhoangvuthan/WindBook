@@ -25,6 +25,9 @@ import dev.kent.windbook.core.data.libraryDataStore
 import dev.kent.windbook.input.KeyEventDispatcher
 import dev.kent.windbook.library.ContentResolverImportSourceFactory
 import dev.kent.windbook.library.ImportSourceFactory
+import dev.kent.windbook.reader.source.SourceAccess
+import dev.kent.windbook.reader.source.SourceMetadata
+import dev.kent.windbook.reader.source.ReadiumSourceMetadata
 import dev.kent.windbook.reader.BookOpener
 import dev.kent.windbook.reader.ReaderEngine
 import dev.kent.windbook.reader.ReadiumMetadataExtractor
@@ -49,6 +52,12 @@ object AppModule {
 
     @Provides @Singleton
     fun bookOpener(readium: ReadiumServices): BookOpener = ReaderEngine(readium)
+
+    @Provides @Singleton
+    fun sourceAccess(readium: ReadiumServices): SourceAccess = readium.sourceAccess
+
+    @Provides @Singleton
+    fun sourceMetadata(readium: ReadiumServices): SourceMetadata = ReadiumSourceMetadata(readium)
 
     @Provides @Singleton
     fun importer(db: WindBookDatabase, files: BookFileStore, readium: ReadiumServices): BookImporter =

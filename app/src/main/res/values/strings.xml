@@ -78,4 +78,10 @@
     <string name="layout_paged">Page by page</string>
     <string name="crop_margins">Crop margins</string>
     <string name="page_render_failed">This page can\'t be shown</string>
+    <string name="reader_source_unavailable">This source is missing or access is unavailable. Choose the file again to reconnect it.</string>
+    <string name="reader_reconnect">Reconnect file</string>
+    <string name="reader_source_changed">The file has changed. Your previous reading position is saved with the original revision.</string>
+    <string name="reader_open_revision">Open new revision</string>
+    <string name="reader_hidden_match">This file matches a book hidden from your library. Restore it to continue.</string>
+    <string name="reader_restore">Restore book</string>
 </resources>

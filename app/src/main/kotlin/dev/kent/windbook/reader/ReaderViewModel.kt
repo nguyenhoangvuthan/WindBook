@@ -8,6 +8,18 @@ import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.kent.windbook.core.data.DisplayPreferencesRepository
 import dev.kent.windbook.core.data.LibraryRepository
+import dev.kent.windbook.core.data.BookSourcesRepository
+import dev.kent.windbook.core.data.Verification
+import dev.kent.windbook.core.data.files.BookFileStore
+import dev.kent.windbook.core.model.BookSource
+import dev.kent.windbook.reader.source.SourceAccess
+import dev.kent.windbook.reader.source.SourceMetadata
+import dev.kent.windbook.reader.source.SourceLease
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import dev.kent.windbook.core.model.BookDisplayPrefs
 import dev.kent.windbook.core.model.EffectiveDisplay
 import dev.kent.windbook.core.model.PdfLayout
@@ -36,6 +48,10 @@ sealed interface ReaderUiState {
         val initialLocatorJson: String?,
     ) : ReaderUiState
     data class Error(val error: ReaderError) : ReaderUiState
+    data object Reconnect : ReaderUiState
+    data class Changed(val newBookId: String) : ReaderUiState
+    data class Redirect(val bookId: String) : ReaderUiState
+    data class HiddenMatch(val bookId: String) : ReaderUiState
 }
 
 @HiltViewModel(assistedFactory = ReaderViewModel.Factory::class)
@@ -44,6 +60,10 @@ class ReaderViewModel @AssistedInject constructor(
     private val library: LibraryRepository,
     private val opener: BookOpener,
     private val displayPrefs: DisplayPreferencesRepository,
+    private val sources: BookSourcesRepository,
+    private val sourceAccess: SourceAccess,
+    private val metadata: SourceMetadata,
+    private val files: BookFileStore,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<ReaderUiState>(ReaderUiState.Loading)
@@ -85,8 +105,10 @@ class ReaderViewModel @AssistedInject constructor(
 
     private var session: ReaderSession? = null
 
+    private var openJob: Job? = null
+
     init {
-        viewModelScope.launch { open() }
+        openJob = viewModelScope.launch { open() }
         viewModelScope.launch {
             locatorUpdates.collect { (json, progression) ->
                 library.saveProgress(bookId, json, progression)
@@ -94,52 +116,109 @@ class ReaderViewModel @AssistedInject constructor(
         }
     }
 
-    private suspend fun open() {
+    private suspend fun open(replacement: BookSource? = null) {
+        _state.value = ReaderUiState.Loading
         val book = library.book(bookId) ?: run {
             _state.value = ReaderUiState.Error(ReaderError.NOT_FOUND)
             return
         }
-        val filePath = book.filePath ?: run {
-            _state.value = ReaderUiState.Error(ReaderError.CANNOT_OPEN)
-            return
-        }
-        val file = File(filePath)
-        if (!file.exists()) {
-            _state.value = ReaderUiState.Error(ReaderError.FILE_MISSING)
-            return
-        }
-        val savedLocator = library.savedLocator(bookId)
-        finished.value = book.status == ReadingStatus.FINISHED
-        opener.open(file, book.format)
-            .onSuccess { opened ->
-                session = opened
-                latestLocatorJson = savedLocator
-                library.markOpened(bookId)
-                if (opened is PdfSession) {
-                    // A broken page while sizing the first pages means the book can't be shown, not a crash.
-                    val firstPages = try {
-                        opened.firstPageSizes()
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        opened.close()
-                        session = null
-                        _state.value = ReaderUiState.Error(ReaderError.CANNOT_OPEN)
-                        return@onSuccess
+        val candidates = if (replacement != null) listOf(replacement) else
+            sources.sources(bookId).ifEmpty { book.filePath?.let { listOf(BookSource.Owned(it)) } ?: emptyList() }
+        var pending: ReaderUiState? = null
+        var acquiredAny = false
+        for (source in candidates) {
+            var lease: SourceLease? = null
+            var opened: ReaderSession? = null
+            try {
+                val before = if (source is BookSource.External) sourceAccess.metadata(source) else null
+                var enrichment: dev.kent.windbook.core.model.ExtractedMetadata? = null
+                val result = if (source is BookSource.External) {
+                    lease = sourceAccess.acquire(source)
+                    val sha = lease.fingerprint()
+                    if (before!!.changed(sourceAccess.metadata(source))) continue
+                    val verification = if (replacement == null) sources.verify(bookId, source, sha)
+                        else sources.reconnect(bookId, source, sha)
+                    when (verification) {
+                        is Verification.Changed -> { pending = ReaderUiState.Changed(verification.newBookId); continue }
+                        is Verification.Redirect -> { pending = ReaderUiState.Redirect(verification.bookId); continue }
+                        is Verification.HiddenMatch -> { pending = ReaderUiState.HiddenMatch(verification.bookId); continue }
+                        is Verification.Ready -> Unit
                     }
-                    viewModelScope.launch {
-                        displayPrefs.observe(bookId).collect { prefs ->
-                            currentPrefs = prefs
-                            _pdfDisplay.value = prefs.resolve(firstPages)
-                        }
+                    acquiredAny = true
+                    enrichment = try { metadata.read(lease, book.format).getOrNull() }
+                        catch (e: CancellationException) { throw e }
+                        catch (_: Exception) { null }
+                    val transferred = lease
+                    lease = null // BookOpener consumes the lease on success, failure and cancellation.
+                    opener.open(transferred, book.format)
+                } else {
+                    val owned = source as BookSource.Owned
+                    if (!File(owned.path).isFile) continue
+                    acquiredAny = true
+                    opener.open(File(owned.path), book.format)
+                }
+                opened = result.getOrThrow()
+                currentCoroutineContext().ensureActive()
+                // The engine reads the pinned snapshot. A changed/unavailable provider must not
+                // receive saved anchors or mark this old revision opened.
+                if (before != null && before.changed(sourceAccess.metadata(source))) continue
+                val firstPages = if (opened is PdfSession) opened.firstPageSizes() else null
+                currentCoroutineContext().ensureActive()
+                enrichment?.let { info ->
+                    try {
+                        val cover = withContext(Dispatchers.IO) { info.coverWebp?.let { files.writeCover(bookId, it).path } }
+                        sources.enrich(bookId, info, cover)
+                    } catch (e: CancellationException) { throw e }
+                    catch (_: Exception) { /* Metadata is optional; a valid reader keeps its filename fallback. */ }
+                }
+                val savedLocator = library.savedLocator(bookId)
+                library.markOpened(bookId)
+                currentCoroutineContext().ensureActive()
+                val title = library.book(bookId)?.title ?: book.title
+                currentCoroutineContext().ensureActive()
+                finished.value = book.status == ReadingStatus.FINISHED
+                latestLocatorJson = savedLocator
+                session = opened
+                _state.value = ReaderUiState.Ready(opened, title, savedLocator)
+                if (firstPages != null) viewModelScope.launch {
+                    displayPrefs.observe(bookId).collect { prefs ->
+                        currentPrefs = prefs
+                        _pdfDisplay.value = prefs.resolve(firstPages)
                     }
                 }
-                _state.value = ReaderUiState.Ready(opened, book.title, savedLocator)
+                opened = null // The ViewModel now owns the session.
+                return
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // A denied/missing source can coexist with a healthy owned or external source.
+            } finally {
+                opened?.close()
+                lease?.close()
             }
-            .onFailure { _state.value = ReaderUiState.Error(ReaderError.CANNOT_OPEN) }
+        }
+        _state.value = pending ?: when {
+            candidates.any { it is BookSource.External } || book.filePath == null -> ReaderUiState.Reconnect
+            acquiredAny -> ReaderUiState.Error(ReaderError.CANNOT_OPEN)
+            else -> ReaderUiState.Error(ReaderError.FILE_MISSING)
+        }
+    }
+
+    fun reconnect(source: BookSource) {
+        openJob?.cancel()
+        openJob = viewModelScope.launch { open(source) }
+    }
+
+    fun restoreHiddenMatch() {
+        val hidden = _state.value as? ReaderUiState.HiddenMatch ?: return
+        openJob = viewModelScope.launch {
+            sources.restoreExternalBook(hidden.bookId)
+            open()
+        }
     }
 
     fun onLocatorChanged(locatorJson: String, progression: Double, chapterTitle: String?) {
+        if (_state.value !is ReaderUiState.Ready) return
         latestLocatorJson = locatorJson
         _progression.value = progression
         _chapterTitle.value = chapterTitle

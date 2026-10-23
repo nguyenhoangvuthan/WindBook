@@ -6,6 +6,10 @@ import androidx.test.core.app.ApplicationProvider
 import app.cash.turbine.test
 import dev.kent.windbook.core.data.DisplayPreferencesRepository
 import dev.kent.windbook.core.data.LibraryRepository
+import dev.kent.windbook.core.data.BookSourcesRepository
+import dev.kent.windbook.core.data.folders.FolderRepository
+import dev.kent.windbook.reader.source.SourceAccess
+import dev.kent.windbook.reader.source.SourceMetadata
 import dev.kent.windbook.core.data.db.BookEntity
 import dev.kent.windbook.core.data.db.BookPreferencesEntity
 import dev.kent.windbook.core.data.db.WindBookDatabase
@@ -69,7 +73,11 @@ class ReaderViewModelPdfTest {
 
     @After fun tearDown() = db.close()
 
-    private fun vm(size: PageSize) = ReaderViewModel("a", library, BookOpener { _, _ -> Result.success(FakePdf(size)) }, prefs)
+    private fun model(opener: BookOpener) = ReaderViewModel("a", library, opener, prefs,
+        BookSourcesRepository(db, FolderRepository(db, { emptySet() }, {}, { _, _ -> })),
+        SourceAccess(ApplicationProvider.getApplicationContext()), SourceMetadata { _, _ -> error("Owned metadata") },
+        BookFileStore(tmp.root))
+    private fun vm(size: PageSize) = model(BookOpener { _, _ -> Result.success(FakePdf(size)) })
 
     @Test fun portraitPdfDefaultsToVerticalWithCrop() = runTest {
         val display = vm(PageSize(400f, 600f)).pdfDisplay.filterNotNull().first()
@@ -118,7 +126,7 @@ class ReaderViewModelPdfTest {
         val broken = object : PdfSession by FakePdf(PageSize(400f, 600f)) {
             override suspend fun firstPageSizes(): List<PageSize> = throw IllegalStateException("bad page")
         }
-        val model = ReaderViewModel("a", library, BookOpener { _, _ -> Result.success(broken) }, prefs)
+        val model = model(BookOpener { _, _ -> Result.success(broken) })
         assertEquals(ReaderUiState.Error(ReaderError.CANNOT_OPEN), model.state.first { it !is ReaderUiState.Loading })
     }
 

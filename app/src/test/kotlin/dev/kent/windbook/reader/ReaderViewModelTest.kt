@@ -6,6 +6,17 @@ import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
 import dev.kent.windbook.core.data.DisplayPreferencesRepository
 import dev.kent.windbook.core.data.LibraryRepository
+import dev.kent.windbook.core.data.BookSourcesRepository
+import dev.kent.windbook.core.data.folders.FolderRepository
+import dev.kent.windbook.core.data.db.BookSourceEntity
+import dev.kent.windbook.core.model.BookSource
+import dev.kent.windbook.core.model.DocumentKey
+import dev.kent.windbook.core.model.ExtractedMetadata
+import dev.kent.windbook.reader.source.*
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.cancel
 import dev.kent.windbook.core.data.db.BookEntity
 import dev.kent.windbook.core.data.db.WindBookDatabase
 import dev.kent.windbook.core.data.files.BookFileStore
@@ -36,6 +47,13 @@ class ReaderViewModelTest {
     private lateinit var library: LibraryRepository
     private lateinit var prefs: DisplayPreferencesRepository
     private lateinit var bookFile: File
+    private lateinit var sources: BookSourcesRepository
+    private lateinit var access: SourceAccess
+    private lateinit var files: BookFileStore
+    private var stamp = SourceStamp(null, null)
+    private var duringAcquire: (() -> Unit)? = null
+    private var deniedUris = emptySet<String>()
+    private var metadata = SourceMetadata { _, _ -> Result.failure(Exception("No metadata")) }
     private val viewModels = mutableListOf<ReaderViewModel>()
     private val viewModelStore = ViewModelStore()
 
@@ -48,7 +66,19 @@ class ReaderViewModelTest {
 
     @Before fun setUp() = runTest {
         db = WindBookDatabase.inMemory(ApplicationProvider.getApplicationContext(), AndroidSQLiteDriver())
-        library = LibraryRepository(db.libraryDao(), BookFileStore(tmp.newFolder("app")))
+        files = BookFileStore(tmp.newFolder("app"))
+        library = LibraryRepository(db.libraryDao(), files)
+        sources = BookSourcesRepository(db, FolderRepository(db, { emptySet() }, {}, { _, _ -> }))
+        access = object : SourceAccess(ApplicationProvider.getApplicationContext()) {
+            override suspend fun acquire(source: BookSource): SourceLease {
+                duringAcquire?.invoke()
+                return super.acquire(BookSource.Owned(bookFile.path))
+            }
+            override suspend fun metadata(source: BookSource): SourceStamp {
+                if (source is BookSource.External && source.uri in deniedUris) throw SecurityException("Denied")
+                return stamp
+            }
+        }
         prefs = DisplayPreferencesRepository(db.bookPreferencesDao())
         bookFile = tmp.newFile("a.epub")
         db.libraryDao().insert(
@@ -64,7 +94,7 @@ class ReaderViewModelTest {
     }
 
     private fun viewModel(id: String, bookOpener: BookOpener = opener): ReaderViewModel =
-        ReaderViewModel(id, library, bookOpener, prefs).also {
+        ReaderViewModel(id, library, bookOpener, prefs, sources, access, metadata, files).also {
             viewModels.add(it)
             viewModelStore.put(viewModels.size.toString(), it)
         }
@@ -167,10 +197,123 @@ class ReaderViewModelTest {
         db.libraryDao().update(old.copy(filePath = null, sha256 = null))
         var calls = 0
         val observing = BookOpener { _, format -> calls++; Result.success(FakeSession(format)) }
-        assertEquals(ReaderUiState.Error(ReaderError.CANNOT_OPEN),
+        assertEquals(ReaderUiState.Reconnect,
             viewModel("a", observing).awaitSettled())
         assertEquals(0, calls)
         assertEquals(ReadingStatus.TO_READ, library.book("a")!!.status)
+    }
+
+    private suspend fun external(sha: String? = null) {
+        db.libraryDao().update(db.libraryDao().findById("a")!!.copy(filePath = null, sha256 = sha))
+        db.sourceDao().insert(BookSourceEntity("external", "a", "EXTERNAL", uri = "content://test/document/a",
+            authority = "test", documentId = "a", verifiedSha256 = sha))
+    }
+    private fun verifiedOpener(block: suspend (SourceLease) -> ReaderSession) = object : BookOpener {
+        override suspend fun open(source: BookSource, format: BookFormat): Result<ReaderSession> = error("Must use acquired lease")
+        override suspend fun open(source: SourceLease, format: BookFormat): Result<ReaderSession> =
+            try { Result.success(block(source)) } finally { source.close() }
+    }
+    @Test fun changedBytes_neverOpenOrApplySavedLocatorAndRetainOriginalProgress() = runTest {
+        external("old"); library.saveProgress("a", "old-locator", .4)
+        var callsBeforeVerification = 0
+        val vm = viewModel("a", verifiedOpener { callsBeforeVerification++; FakeSession(BookFormat.EPUB) })
+        val changed = vm.awaitSettled() as ReaderUiState.Changed
+        assertTrue(changed.newBookId != "a")
+        assertEquals("old-locator", library.savedLocator("a"))
+        assertEquals(null, library.savedLocator(changed.newBookId))
+        assertEquals(null, vm.latestLocatorJson)
+        assertEquals(0, callsBeforeVerification)
+    }
+    @Test fun verifiedSnapshot_isPassedToOpenerBeforeSavedLocatorApplied() = runTest {
+        external(); library.saveProgress("a", "old-locator", .4)
+        val vm = viewModel("a", verifiedOpener { lease ->
+            assertEquals(lease.fingerprint(), library.book("a")!!.sha256)
+            assertEquals(null, viewModels.last().latestLocatorJson)
+            FakeSession(BookFormat.EPUB)
+        })
+        val ready = vm.awaitSettled() as ReaderUiState.Ready
+        assertEquals("old-locator", ready.initialLocatorJson)
+        assertEquals("Dune", ready.title) // Metadata failures retain filename/title fallback.
+    }
+    @Test fun changedProviderDuringOpen_closesSessionWithoutApplyingLocator() = runTest {
+        external(); stamp = SourceStamp(0, 1)
+        library.saveProgress("a", "old-locator", .4)
+        val opened = FakeSession(BookFormat.EPUB)
+        val vm = viewModel("a", verifiedOpener { stamp = SourceStamp(0, 2); opened })
+        assertEquals(ReaderUiState.Reconnect, vm.awaitSettled())
+        assertTrue(opened.closed)
+        assertEquals(null, vm.latestLocatorJson)
+        assertEquals("old-locator", library.savedLocator("a"))
+    }
+    @Test fun changedDuringFingerprint_doesNotVerifyOrUseOldLocator() = runTest {
+        external(); stamp = SourceStamp(0, 1)
+        duringAcquire = { stamp = SourceStamp(0, 2) }
+        var opens = 0
+        val vm = viewModel("a", verifiedOpener { opens++; FakeSession(BookFormat.EPUB) })
+        assertEquals(ReaderUiState.Reconnect, vm.awaitSettled())
+        assertEquals(null, library.book("a")!!.sha256)
+        assertEquals(0, opens)
+    }
+    @Test fun deniedSource_fallsBackToHealthyVerifiedSource() = runTest {
+        external(); deniedUris = setOf("content://test/document/a")
+        db.sourceDao().insert(BookSourceEntity("z", "a", "EXTERNAL", uri = "content://test/document/z",
+            authority = "test", documentId = "z"))
+        assertTrue(viewModel("a", verifiedOpener { FakeSession(BookFormat.EPUB) }).awaitSettled() is ReaderUiState.Ready)
+    }
+    @Test fun reconnectSameBytes_usesSavedLocatorAfterVerification() = runTest {
+        external(java.security.MessageDigest.getInstance("SHA-256").digest(bookFile.readBytes()).joinToString("") { "%02x".format(it) })
+        library.saveProgress("a", "old-locator", .4)
+        deniedUris = setOf("content://test/document/a")
+        val vm = viewModel("a", verifiedOpener { FakeSession(BookFormat.EPUB) })
+        assertEquals(ReaderUiState.Reconnect, vm.awaitSettled())
+        vm.reconnect(BookSource.External("content://test/document/z", DocumentKey("test", "z")))
+        assertEquals("old-locator", (vm.awaitSettled() as ReaderUiState.Ready).initialLocatorJson)
+    }
+    @Test fun hiddenOwnedMatch_requiresRestoreBeforeRedirect() = runTest {
+        external()
+        val sha = java.security.MessageDigest.getInstance("SHA-256").digest(bookFile.readBytes()).joinToString("") { "%02x".format(it) }
+        db.libraryDao().insert(BookEntity("hidden", "Hidden", null, "EPUB", "/old-missing", 0, sha, null, null,
+            "READING", 0, 1, 1, 2))
+        val vm = viewModel("a", verifiedOpener { error("Hidden content cannot open") })
+        assertEquals(ReaderUiState.HiddenMatch("hidden"), vm.awaitSettled())
+        vm.restoreHiddenMatch()
+        assertEquals(ReaderUiState.Redirect("hidden"), withContext(kotlinx.coroutines.Dispatchers.IO) { kotlinx.coroutines.withTimeout(2_000) { vm.state.first { it is ReaderUiState.Redirect } } })
+        assertEquals(null, db.libraryDao().findIncludingHidden("hidden")!!.deletedAt)
+    }
+
+    @Test fun metadataUsesTheSameLeaseAndStorageFailureDoesNotBlockReading() = runTest {
+        external()
+        var borrowed: SourceLease? = null
+        metadata = SourceMetadata { lease, _ -> borrowed = lease; Result.success(ExtractedMetadata("Enriched", "Author", byteArrayOf(1))) }
+        files.coversDir.parentFile!!.mkdirs()
+        files.coversDir.writeText("Prevent directory creation")
+        val vm = viewModel("a", verifiedOpener { lease ->
+            assertTrue(borrowed === lease)
+            FakeSession(BookFormat.EPUB)
+        })
+        assertTrue(vm.awaitSettled() is ReaderUiState.Ready)
+    }
+
+    @Test fun cancelledOpenReturningSession_closesExactlyOnce() = runTest {
+        external()
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var closeCalls = 0
+        val opened = object : ReaderSession {
+            override val format = BookFormat.EPUB
+            override fun close() { closeCalls++ }
+        }
+        val vm = viewModel("a", verifiedOpener {
+            entered.complete(Unit)
+            withContext(NonCancellable) { release.await() }
+            opened
+        })
+        entered.await()
+        vm.viewModelScope.cancel()
+        release.complete(Unit)
+        vm.viewModelScope.coroutineContext[Job]!!.join()
+        assertEquals(1, closeCalls)
+        assertEquals(null, vm.latestLocatorJson)
     }
 
     @Test fun toggleOverlay_flips() = runTest {

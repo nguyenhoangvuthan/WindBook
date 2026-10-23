@@ -24,7 +24,7 @@ interface LibraryDao {
     suspend fun findById(id: String): BookEntity?
 
     /** Includes tombstoned rows so a re-import can revive them. */
-    @Query("SELECT * FROM books WHERE sha256 = :sha256 LIMIT 1")
+    @Query("SELECT * FROM books WHERE sha256 = :sha256 ORDER BY CASE WHEN deleted_at IS NULL THEN 0 ELSE 1 END, CASE WHEN file_path IS NOT NULL THEN 0 ELSE 1 END, added_at, id LIMIT 1")
     suspend fun findBySha(sha256: String): BookEntity?
 
     @Query("SELECT * FROM books WHERE id = :id")
@@ -32,6 +32,10 @@ interface LibraryDao {
 
     @Query("SELECT id FROM books")
     suspend fun allIdsIncludingHidden(): List<String>
+
+    /** Explicit Restore after matching verified bytes also revives an imported tombstone. */
+    @Query("UPDATE books SET deleted_at = NULL, updated_at = :now WHERE id = :id")
+    suspend fun restoreVerified(id: String, now: Long)
 
     @Query("UPDATE books SET deleted_at = NULL, updated_at = :now WHERE id = :id AND file_path IS NULL")
     suspend fun restoreExternal(id: String, now: Long)
@@ -47,6 +51,15 @@ interface LibraryDao {
     suspend fun insertOwned(book: BookEntity) {
         insert(book)
         upsertOwnedSource(book.ownedSource())
+    }
+
+    /** Nonunique revision hashes still require atomic canonical selection for owned imports. */
+    @Transaction
+    suspend fun insertOwnedUnlessDuplicate(book: BookEntity): String? {
+        val winner = findBySha(requireNotNull(book.sha256))
+        if (winner != null) return winner.id
+        insertOwned(book)
+        return null
     }
 
     @Transaction

@@ -14,7 +14,7 @@ import kotlinx.coroutines.Dispatchers
         BookEntity::class, ReadingProgressEntity::class, BookPreferencesEntity::class,
         FolderEntity::class, BookSourceEntity::class, FolderMembershipEntity::class, ScanRunEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
     autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
@@ -36,14 +36,14 @@ abstract class WindBookDatabase : RoomDatabase() {
         /** Opens (and migrates) the database file at [path]; tests pass the framework driver. */
         fun open(context: Context, path: String, driver: SQLiteDriver): WindBookDatabase =
             Room.databaseBuilder<WindBookDatabase>(context = context, name = path)
-                .addMigrations(FolderMigration, ScanReconciliationMigration)
+                .addMigrations(FolderMigration, ScanReconciliationMigration, RevisionIdentityMigration)
                 .setDriver(driver)
                 .setQueryCoroutineContext(Dispatchers.IO)
                 .build()
 
         fun inMemory(context: Context, driver: SQLiteDriver): WindBookDatabase =
             Room.inMemoryDatabaseBuilder<WindBookDatabase>(context)
-                .addMigrations(FolderMigration, ScanReconciliationMigration)
+                .addMigrations(FolderMigration, ScanReconciliationMigration, RevisionIdentityMigration)
                 .setDriver(driver)
                 .setQueryCoroutineContext(Dispatchers.IO)
                 .build()

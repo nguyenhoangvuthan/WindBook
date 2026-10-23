@@ -9,7 +9,6 @@ import dev.kent.windbook.reader.pdf.PdfDocumentHandle
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.readium.r2.shared.publication.services.cover
@@ -45,7 +44,7 @@ internal suspend fun pdfCoverWebp(file: File): ByteArray? =
     try {
         PdfDocumentHandle.open(file).use { doc ->
             val size = doc.pageSize(0)
-            val width = (COVER_HEIGHT * size.width / size.height).roundToInt().coerceAtLeast(1)
+            val width = (COVER_HEIGHT * size.width / maxOf(size.width, size.height)).toInt().coerceIn(1, COVER_HEIGHT)
             doc.render(0, CropBox.FULL, width).toWebp()
         }
     } catch (e: CancellationException) {
@@ -55,9 +54,10 @@ internal suspend fun pdfCoverWebp(file: File): ByteArray? =
     }
 
 private fun Bitmap.toWebp(maxHeight: Int = COVER_HEIGHT): ByteArray {
-    val scaled = if (height > maxHeight) {
-        val width = (width * maxHeight.toFloat() / height).toInt().coerceAtLeast(1)
-        Bitmap.createScaledBitmap(this, width, maxHeight, true)
+    val scaled = if (maxOf(width, height) > maxHeight) {
+        val scale = maxHeight.toFloat() / maxOf(width, height)
+        Bitmap.createScaledBitmap(this, (width * scale).toInt().coerceAtLeast(1),
+            (height * scale).toInt().coerceAtLeast(1), true)
     } else {
         this
     }

@@ -11,6 +11,7 @@ import dev.kent.windbook.testing.TestBooks
 import java.io.File
 import java.io.InputStream
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.async
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -90,6 +91,31 @@ class BookImporterTest {
         importer().import(source(file))
         assertEquals(ImportResult.Duplicate("id1"), importer().import(source(file)))
         assertEquals(1, store.booksDir.listFiles()!!.size)
+    }
+
+    @Test fun concurrentImportsOfSameBytes_keepOneCanonicalBookAndCleanLosingFiles() = runTest {
+        val ready = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val release = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val entered = java.util.concurrent.atomic.AtomicInteger()
+        val nextId = java.util.concurrent.atomic.AtomicInteger()
+        val file = TestBooks.epub(tmp.root)
+        val parallel = BookImporter(db.libraryDao(), store, MetadataExtractor { _, _ ->
+            if (entered.incrementAndGet() == 2) ready.complete(Unit)
+            release.await()
+            Result.success(ExtractedMetadata("Synthetic", null, byteArrayOf(1)))
+        }, newId = { "parallel-${nextId.incrementAndGet()}" })
+        val first = async(kotlinx.coroutines.Dispatchers.IO) { parallel.import(source(file)) }
+        val second = async(kotlinx.coroutines.Dispatchers.IO) { parallel.import(source(file)) }
+        ready.await() // Both imports passed the initial canonical lookup before either commits.
+        release.complete(Unit)
+        val results = listOf(first.await(), second.await())
+        assertEquals(1, results.count { it is ImportResult.Imported })
+        assertEquals(1, results.count { it is ImportResult.Duplicate })
+        assertEquals(1, db.libraryDao().allIdsIncludingHidden().size)
+        assertEquals(1, db.sourceDao().countOwned())
+        assertEquals(1, store.booksDir.listFiles()!!.size)
+        assertEquals(1, store.coversDir.listFiles()!!.size)
+        assertTrue(store.tempDir.listFiles().orEmpty().isEmpty())
     }
 
     @Test fun import_afterDelete_revivesTombstonedBook() = runTest {

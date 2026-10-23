@@ -61,6 +61,32 @@ class ExternalSourceDeviceTest {
         assertProviderClosed()
     }
 
+    @Test fun verifiedMetadataUsesOneAcquisitionAndKeepsLeaseOpen() = runBlocking {
+        TestBooks.epub(context.cacheDir)
+        val access = SourceAccess(context, workspace())
+        val uri = source("book.epub")
+        val before = stats("book.epub").getInt("attempts")
+        access.acquire(uri).use { lease ->
+            val hash = lease.fingerprint()
+            val metadata = ReadiumSourceMetadata(ReadiumServices(context, null)).read(lease, BookFormat.EPUB).getOrThrow()
+            assertEquals("Test Book", metadata.title)
+            assertEquals(hash, lease.fingerprint())
+            ReaderEngine(ReadiumServices(context, null), access).open(lease, BookFormat.EPUB).getOrThrow().close()
+        }
+        assertEquals(1, stats("book.epub").getInt("attempts") - before)
+        assertProviderClosed()
+    }
+
+    @Test fun pdfMetadataCoverBoundsLongestEdgeBeforeRendering() = runBlocking {
+        for ((width, height) in listOf(4000 to 100, 100 to 4000)) {
+            val file = PdfFixtures.boxed(context.cacheDir, "cover.pdf", pages = 1, pageW = width, pageH = height)
+            val bytes = pdfCoverWebp(file)!!
+            val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+            assertTrue("Cover is ${options.outWidth}x${options.outHeight}", options.outWidth in 1..600 && options.outHeight in 1..600)
+        }
+    }
+
     @Test fun defaultWorkspaceCleanupWaitsForIOAcquisition() = runBlocking {
         val orphan = File(context.cacheDir, "reader-sessions/orphan-init").apply { mkdirs() }
         val access = withContext(Dispatchers.Main) { SourceAccess(context) }

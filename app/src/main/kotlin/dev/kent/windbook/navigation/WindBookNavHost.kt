@@ -49,7 +49,11 @@ fun WindBookNavHost() {
                 entry<NotesKey> { NotesScreen() }
                 entry<SettingsKey> { SettingsRoute() }
                 entry<ReaderKey> { key ->
-                    ReaderRoute(bookId = key.bookId, onBack = { backStack.removeLastOrNull() })
+                    ReaderRoute(bookId = key.bookId, onBack = { backStack.removeLastOrNull() },
+                        onReplaceReader = { id ->
+                            backStack.removeLastOrNull()
+                            backStack.openReader(id)
+                        })
                 }
             },
         )

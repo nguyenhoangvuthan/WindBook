@@ -10,7 +10,7 @@ import androidx.room3.PrimaryKey
 @Entity(
     tableName = "books",
     indices = [
-        Index(value = ["sha256"], unique = true),
+        Index(value = ["sha256"]),
         Index(value = ["last_opened_at"]),
     ],
 )

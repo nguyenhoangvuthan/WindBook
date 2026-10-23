@@ -21,7 +21,7 @@ class ReadiumServices(
     context: Context,
     pdfFactory: PdfDocumentFactory<*>? = PdfiumDocumentFactory(context),
 ) {
-    internal val sourceAccess by lazy { SourceAccess(context) }
+    val sourceAccess by lazy { SourceAccess(context) }
     private val resolver = context.contentResolver
 
     // Never DefaultHttpClient: see OfflineHttpClient.

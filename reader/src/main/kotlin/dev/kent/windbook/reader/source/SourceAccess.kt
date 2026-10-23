@@ -21,7 +21,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /** Acquires external bytes once. Provider URI reopening cannot preserve a verified revision. */
-class SourceAccess(
+open class SourceAccess(
     context: Context,
     workspace: SessionWorkspace? = null,
 ) {
@@ -35,7 +35,28 @@ class SourceAccess(
     /** Call from app startup even if no book opens. Repeated calls retain every active lease. */
     suspend fun initialize() = withContext(Dispatchers.IO) { workspace.cleanupOrphans() }
 
-    suspend fun acquire(source: BookSource): SourceLease {
+    /** Null fields are legitimate provider answers; query failure means access is unavailable. */
+    open suspend fun metadata(source: BookSource): SourceStamp = withContext(Dispatchers.IO) {
+        when (source) {
+            is BookSource.Owned -> File(source.path).let {
+                if (!it.isFile) throw java.io.FileNotFoundException()
+                SourceStamp(it.length(), it.lastModified())
+            }
+            is BookSource.External -> {
+                val columns = arrayOf(android.provider.DocumentsContract.Document.COLUMN_SIZE,
+                    android.provider.DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                resolver.query(Uri.parse(source.uri), columns, null, null, null)?.use { cursor ->
+                    if (!cursor.moveToFirst()) throw java.io.FileNotFoundException()
+                    fun value(name: String): Long? = cursor.getColumnIndex(name).let { index ->
+                        if (index < 0 || cursor.isNull(index)) null else cursor.getLong(index).takeIf { it >= 0 }
+                    }
+                    SourceStamp(value(columns[0]), value(columns[1]))
+                } ?: throw java.io.FileNotFoundException()
+            }
+        }
+    }
+
+    open suspend fun acquire(source: BookSource): SourceLease {
         var acquired: SourceLease? = null
         try {
             return withContext(Dispatchers.IO) {
@@ -115,4 +136,11 @@ class SourceLease internal constructor(
     override fun close() {
         if (closed.compareAndSet(false, true)) dev.kent.windbook.reader.closeReaderResources { workspace?.close() }
     }
+}
+
+/** Only comparable, known fields detect a provider change; unknown metadata never proves identity. */
+data class SourceStamp(val size: Long?, val modifiedAt: Long?) {
+    fun changed(other: SourceStamp): Boolean =
+        (size != null && other.size != null && size != other.size) ||
+            (modifiedAt != null && other.modifiedAt != null && modifiedAt != other.modifiedAt)
 }

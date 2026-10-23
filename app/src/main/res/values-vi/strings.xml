@@ -73,4 +73,10 @@
     <string name="layout_paged">Lật từng trang</string>
     <string name="crop_margins">Cắt lề trắng</string>
     <string name="page_render_failed">Không hiển thị được trang này</string>
+    <string name="reader_source_unavailable">Không tìm thấy nguồn sách hoặc không còn quyền truy cập. Chọn lại tệp để kết nối.</string>
+    <string name="reader_reconnect">Kết nối lại tệp</string>
+    <string name="reader_source_changed">Tệp đã thay đổi. Vị trí đọc trước vẫn được lưu cùng phiên bản cũ.</string>
+    <string name="reader_open_revision">Mở phiên bản mới</string>
+    <string name="reader_hidden_match">Tệp này trùng với sách đã ẩn khỏi thư viện. Khôi phục sách để tiếp tục.</string>
+    <string name="reader_restore">Khôi phục sách</string>
 </resources>

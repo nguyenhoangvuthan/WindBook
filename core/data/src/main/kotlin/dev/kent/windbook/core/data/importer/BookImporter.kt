@@ -104,17 +104,13 @@ class BookImporter(
         }
     }
 
-    /** Two concurrent imports of the same file race on the unique sha256 index. */
-    private suspend fun insertOrDuplicate(entity: BookEntity, bookFile: File, coverPath: String?): ImportResult =
-        try {
-            dao.insertOwned(entity)
-            ImportResult.Imported(entity.id)
-        } catch (e: Exception) {
-            val winner = dao.findBySha(requireNotNull(entity.sha256)) ?: throw e
-            bookFile.delete()
-            files.delete(coverPath)
-            ImportResult.Duplicate(winner.id)
-        }
+    /** Canonical lookup and source registration are atomic even with shared revision hashes. */
+    private suspend fun insertOrDuplicate(entity: BookEntity, bookFile: File, coverPath: String?): ImportResult {
+        val winner = dao.insertOwnedUnlessDuplicate(entity) ?: return ImportResult.Imported(entity.id)
+        bookFile.delete()
+        files.delete(coverPath)
+        return ImportResult.Duplicate(winner)
+    }
 
     private fun ioError(): ImportError =
         if (files.usableBytes() < LOW_SPACE_BYTES) ImportError.NO_SPACE else ImportError.READ_FAILED

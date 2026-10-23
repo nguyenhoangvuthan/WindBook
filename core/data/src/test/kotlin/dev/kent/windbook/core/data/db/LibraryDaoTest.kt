@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -82,10 +81,13 @@ class LibraryDaoTest {
         assertNull(dao.progress("a"))
     }
 
-    @Test fun shaIsUnique() = runTest {
+    @Test fun sharedRevisionHashKeepsSeparateRowsAndDeterministicCanonicalLookup() = runTest {
+        dao.insert(book("b", sha = "dup"))
         dao.insert(book("a", sha = "dup"))
-        val failure = runCatching { dao.insert(book("b", sha = "dup")) }.exceptionOrNull()
-        assertNotNull(failure)
+        assertEquals(setOf("a", "b"), dao.allIdsIncludingHidden().toSet())
+        assertEquals("a", dao.findBySha("dup")!!.id)
+        dao.tombstone("a", 10)
+        assertEquals("b", dao.findBySha("dup")!!.id)
     }
 
     @Test fun upsertProgress_overwrites() = runTest {

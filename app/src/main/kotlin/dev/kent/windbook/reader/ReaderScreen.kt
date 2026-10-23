@@ -1,6 +1,15 @@
 package dev.kent.windbook.reader
 
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.app.Activity
+import android.content.Intent
+import android.provider.DocumentsContract
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.LaunchedEffect
+import dev.kent.windbook.core.model.BookSource
+import dev.kent.windbook.core.model.DocumentKey
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -74,7 +83,7 @@ import dev.kent.windbook.ui.components.uppercaseForUi
 import dev.kent.windbook.ui.icons.WindBookIcons
 
 @Composable
-fun ReaderRoute(bookId: String, onBack: () -> Unit) {
+fun ReaderRoute(bookId: String, onBack: () -> Unit, onReplaceReader: (String) -> Unit) {
     val viewModel = hiltViewModel<ReaderViewModel, ReaderViewModel.Factory>(
         key = bookId,
         creationCallback = { factory -> factory.create(bookId) },
@@ -85,6 +94,26 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit) {
     val chapterTitle by viewModel.chapterTitle.collectAsStateWithLifecycle()
     val canMarkFinished by viewModel.canMarkFinished.collectAsStateWithLifecycle()
 
+    val context = LocalContext.current
+    val reconnectPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val uri = result.data?.data
+        if (result.resultCode == Activity.RESULT_OK && uri != null) {
+            try {
+                require(result.data!!.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                viewModel.reconnect(BookSource.External(uri.toString(),
+                    DocumentKey(requireNotNull(uri.authority), DocumentsContract.getDocumentId(uri))))
+            } catch (_: Exception) { /* Retain the reconnect screen when the provider denies the grant. */ }
+        }
+    }
+    val onReconnect = {
+        reconnectPicker.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        })
+    }
+
     ImmersiveReadingWindow()
 
     when (val current = state) {
@@ -94,6 +123,19 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit) {
             onBack = onBack,
             onRemove = { viewModel.removeBook(onRemoved = onBack) },
         )
+        ReaderUiState.Reconnect -> ReaderSourceMessage(
+            R.string.reader_source_unavailable, R.string.reader_reconnect, onReconnect, onBack,
+        )
+        is ReaderUiState.Changed -> ReaderSourceMessage(
+            R.string.reader_source_changed, R.string.reader_open_revision,
+            { onReplaceReader(current.newBookId) }, onBack,
+        )
+        is ReaderUiState.HiddenMatch -> ReaderSourceMessage(
+            R.string.reader_hidden_match, R.string.reader_restore, viewModel::restoreHiddenMatch, onBack,
+        )
+        is ReaderUiState.Redirect -> {
+            LaunchedEffect(current.bookId) { onReplaceReader(current.bookId) }
+        }
         is ReaderUiState.Ready -> Box(Modifier.fillMaxSize()) {
             val pdf = current.session as? PdfSession
             val pdfDisplay by viewModel.pdfDisplay.collectAsStateWithLifecycle()
@@ -319,5 +361,19 @@ private fun ReaderErrorScreen(error: ReaderError, onBack: () -> Unit, onRemove: 
         if (error == ReaderError.FILE_MISSING) {
             TextButton(onClick = onRemove) { Text(stringResource(R.string.remove_from_library)) }
         }
+    }
+}
+
+@Composable
+internal fun ReaderSourceMessage(message: Int, action: Int, onAction: () -> Unit, onBack: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(stringResource(message), style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = onAction) { Text(stringResource(action)) }
+        TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
     }
 }

@@ -6,7 +6,7 @@ The spec covers eight milestones. Each milestone is shippable on its own (signed
 
 | Milestone | Plan file | Depends on | Delivers | Status |
 |---|---|---|---|---|
-| M1 Core reading loop | `2026-10-13-windbook-m1-core-reading-loop.md` | — | Import → library → read EPUB/PDF → never lose place; CI; signed APK | **Planned** |
+| M1 Core reading loop | `2026-10-13-windbook-m1-core-reading-loop.md` | — | Import → library → read EPUB/PDF → never lose place; CI; signed APK | Done (v0.1.0; phone checklist remains) |
 | Look & feel | `2026-10-14-windbook-look-and-feel.md` | M1 | Cream & bronze palette (light + warm dark), Literata, restyled Library/Reader, 4-tab shell, Settings (language, storage, about). Later milestones build their screens to `2026-10-14-windbook-look-and-feel-design.md` §5.6 | Done (branch `look-and-feel`) |
 | PDF display | `2026-10-15-windbook-pdf-display.md` | Look & feel | Own PDF renderer (framework PdfRenderer, PDFs no longer opened through Readium), auto-cropped margins, vertical scroll / page by page per book, `book_preferences` (schema 2), EPUB edge spacing, no crash on missing EPUB resources, landscape covers | Done (branch `pdf-display`) |
 | PDF comfort | `2026-10-16-windbook-pdf-comfort.md` | PDF display | Light PDF import (no full-size Readium cover), per-book zoom memory with reading-order volume keys. Reflow removed by owner decision on 2026-10-20; legacy choices reopen vertically | Done; Reflow removal on `remove-pdf-reflow` (pending merge) |
@@ -19,3 +19,5 @@ The spec covers eight milestones. Each milestone is shippable on its own (signed
 | M8 PDF annotations & Play readiness | `…-m8-pdf-play.md` | androidx.pdf stable (gate) | PDF search/highlights/ink, a11y audit, baseline profiles + benchmarks, AAB + Play listing | Plan at M7 done |
 
 Excluded by decision: read aloud / TTS playback, AI assistant, and the benchmark's ✗ items.
+
+Folder source increment: Tasks 1–7 implemented and independently reviewed; Task 8 integration/device evidence is recorded in the folder checklist; independent whole-branch review is pending. EPUB/PDF source reading is available; six additional adapters remain in `2026-10-21-ebook-format-readers.md`.

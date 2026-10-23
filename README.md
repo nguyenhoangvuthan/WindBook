@@ -7,6 +7,14 @@ PDF supports vertical scrolling and page-by-page reading, margin cropping and
 remembered zoom. Reflow was removed by owner decision on 2026-10-20; books
 with that saved mode reopen vertically at their saved page.
 
+Folder browsing uses Android's folder picker to remember a read-only grant. Open
+**Book folders**, choose a folder, select extensions and recursive scanning, then
+scan manually. Typing a location does not grant access. Stop preserves results
+already committed; hiding or disconnecting never deletes source files. EPUB/PDF
+open from their original folder, with bounded temporary preparation for the active
+book. Discovery supports eight formats; the six additional reader adapters are
+still pending. See [folder verification](docs/testing/folder-library-checklist.md).
+
 - Design spec: [docs/superpowers/specs/2026-10-13-windbook-design.md](docs/superpowers/specs/2026-10-13-windbook-design.md)
 - Roadmap: [docs/superpowers/plans/2026-10-13-windbook-roadmap.md](docs/superpowers/plans/2026-10-13-windbook-roadmap.md)
 - Manual test results: [docs/testing/m1-manual-checklist.md](docs/testing/m1-manual-checklist.md)
@@ -67,7 +75,7 @@ Back up `~/keys/windbook-release.jks` and its passwords somewhere safe (two copi
 ## 3. Automated tests
 
 ```bash
-# Unit tests (no device needed): about 90 tests
+# Unit tests (no device needed): 317 tests at the folder-library checkpoint
 ./gradlew :core:model:test :core:data:testDebugUnitTest :reader:testDebugUnitTest :app:testDebugUnitTest
 
 # Lint
@@ -88,7 +96,7 @@ Use **one** of the options below. When it's ready, `adb devices` must list exact
 ### A. Android emulator (easiest)
 
 ```bash
-~/Android/Sdk/emulator/emulator -avd Neo3GT_API_36 -gpu swiftshader_indirect &
+QT_QPA_PLATFORM=xcb setsid nohup ~/Android/Sdk/emulator/emulator -avd Neo3GT_API_36 -no-snapshot-load -cores 4 -gpu swiftshader_indirect > /dev/null 2>&1 &
 adb wait-for-device && adb shell getprop sys.boot_completed   # repeat until it prints 1
 ```
 

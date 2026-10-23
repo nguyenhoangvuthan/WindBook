@@ -96,4 +96,47 @@ class NormalizedPublicationWriterTest {
         Unit
     }
 
+    @Test fun rejectsProcessingInstructionsAnywhereAndReleasesPartialOutput() = runBlocking {
+        val instruction = "<?xml-stylesheet type=\"text/css\" href=\"https://example.org/book.css\"?>"
+        for ((index, text) in listOf(
+            instruction + "<html xmlns=\"http://www.w3.org/1999/xhtml\"><body><p>Text</p></body></html>",
+            "<html xmlns=\"http://www.w3.org/1999/xhtml\"><body>$instruction<p>Text</p></body></html>",
+            "<html xmlns=\"http://www.w3.org/1999/xhtml\"><body><p>Text</p></body></html><?custom local?>",
+        ).withIndex()) {
+            val workspace = SessionWorkspace(tmp.newFolder("instruction$index"))
+            val lease = workspace.create()
+            try {
+                val input = lease.stage(text.byteInputStream())
+                val reserved = workspace.usedBytes
+                val error = assertThrows(IllegalArgumentException::class.java) { runBlocking {
+                    NormalizedPublicationWriter().write(NormalizedDocument("id", "title", listOf(NormalizedSection("text/0001.xhtml", null, input)), emptyList()), lease)
+                } }
+                assertTrue(error.message.orEmpty().contains("Processing instructions"))
+                assertEquals(reserved, workspace.usedBytes)
+                assertEquals(listOf(input), lease.directory.listFiles()!!.toList())
+            } finally { lease.close() }
+            assertEquals(0L, workspace.usedBytes)
+        }
+    }
+
+    @Test fun serializedSectionMustFitLimitAfterIdsAndXmlDeclaration() = runBlocking {
+        val workspace = SessionWorkspace(tmp.newFolder("serialized-limit"))
+        val lease = workspace.create()
+        try {
+            val prefix = "<html xmlns=\"http://www.w3.org/1999/xhtml\"><body><p>"
+            val suffix = "</p></body></html>"
+            val text = prefix + "x".repeat(65520 - prefix.length - suffix.length) + suffix
+            assertEquals(65520, text.length)
+            val input = lease.stage(text.byteInputStream())
+            val reserved = workspace.usedBytes
+            val error = assertThrows(Exception::class.java) { runBlocking {
+                NormalizedPublicationWriter().write(NormalizedDocument("id", "title", listOf(NormalizedSection("text/0001.xhtml", null, input)), emptyList()), lease)
+            } }
+            assertTrue(generateSequence(error as Throwable?) { it.cause }.any { it.message.orEmpty().contains("Serialized section exceeds") })
+            assertEquals(reserved, workspace.usedBytes)
+            assertEquals(listOf(input), lease.directory.listFiles()!!.toList())
+        } finally { lease.close() }
+        assertEquals(0L, workspace.usedBytes)
+    }
+
 }

@@ -57,12 +57,11 @@ class NormalizedPublicationWriter {
                             count += read
                         }
                         require(count <= 65536) { "Normalized section exceeds 64 Ki UTF-16 units" }
-                        normalizedUnits += count
-                        require(normalizedUnits <= 32L * 1024 * 1024) { "Normalized text exceeds 64 MiB" }
                         String(buffer, 0, count)
                     }
                     zip.putNextEntry(ZipEntry("EPUB/${section.href}").apply { time = 0 })
-                    writeXhtml(text, section.href, hrefs.toSet(), zip)
+                    normalizedUnits += writeXhtml(text, section.href, hrefs.toSet(), zip)
+                    require(normalizedUnits <= 32L * 1024 * 1024) { "Normalized text exceeds 64 MiB" }
                     zip.closeEntry()
                 }
                 document.resources.forEach { resource ->
@@ -79,10 +78,20 @@ class NormalizedPublicationWriter {
         }
     }
 
-    private fun writeXhtml(text: String, href: String, available: Set<String>, output: java.io.OutputStream) {
+    private fun writeXhtml(text: String, href: String, available: Set<String>, output: java.io.OutputStream): Long {
         require(!text.contains("<!DOCTYPE", ignoreCase = true) && !text.contains("<!ENTITY", ignoreCase = true))
         val factory = DocumentBuilderFactory.newInstance().apply { isNamespaceAware = true; isExpandEntityReferences = false }
         val dom = factory.newDocumentBuilder().parse(InputSource(StringReader(text)))
+        val pending = java.util.ArrayDeque<org.w3c.dom.Node>().apply { add(dom) }
+        while (pending.isNotEmpty()) {
+            val node = pending.removeLast()
+            require(node.nodeType != org.w3c.dom.Node.PROCESSING_INSTRUCTION_NODE) { "Processing instructions are unsupported" }
+            var child = node.firstChild
+            while (child != null) {
+                pending.add(child)
+                child = child.nextSibling
+            }
+        }
         require(dom.documentElement.localName == "html" && dom.documentElement.namespaceURI == "http://www.w3.org/1999/xhtml")
         val elements = dom.getElementsByTagName("*")
         var paragraph = 0
@@ -125,7 +134,20 @@ class NormalizedPublicationWriter {
             dom.documentElement.setAttribute("id", id)
         }
         val transformer = TransformerFactory.newInstance().newTransformer().apply { setOutputProperty(OutputKeys.ENCODING, "UTF-8"); setOutputProperty(OutputKeys.INDENT, "no") }
-        transformer.transform(DOMSource(dom), StreamResult(output))
+        var serializedUnits = 0L
+        val encoded = output.writer(Charsets.UTF_8)
+        val bounded = object : java.io.Writer() {
+            override fun write(chars: CharArray, offset: Int, length: Int) {
+                require(serializedUnits + length <= 65536) { "Serialized section exceeds 64 Ki UTF-16 units" }
+                serializedUnits += length
+                encoded.write(chars, offset, length)
+            }
+            override fun flush() = encoded.flush()
+            override fun close() = flush()
+        }
+        transformer.transform(DOMSource(dom), StreamResult(bounded))
+        bounded.flush()
+        return serializedUnits
     }
 
     private fun packageXml(document: NormalizedDocument): String =

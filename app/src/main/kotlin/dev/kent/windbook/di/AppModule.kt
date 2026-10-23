@@ -75,6 +75,10 @@ object AppModule {
         FolderRepository(db, grants::persistedReadTrees, grants::releaseRead, grants::persistRead)
 
     @Provides @Singleton
+    fun folderObservations(inputs: dev.kent.windbook.folders.RepositoryFolderObservations):
+        dev.kent.windbook.folders.FolderObservations = inputs
+
+    @Provides @Singleton
     fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Provides @Singleton

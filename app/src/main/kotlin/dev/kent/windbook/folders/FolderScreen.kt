@@ -34,17 +34,26 @@ fun FolderRoute(folderId: String?, onOpenBook: (String) -> Unit, onBack: () -> U
             data.data?.let { viewModel.onTreeGranted(it, data.flags) }
         }
     }
-    FolderScreen(state, FolderActions(viewModel::onLocationEdited, viewModel::setOptions,
-        { viewModel.scan() }, { viewModel.stop() }, viewModel::setQuery, { viewModel.disconnect() },
-        { picker.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(
+    val renderedFolderId = state.resolvedFolderId
+    FolderScreen(state, FolderActions(
+        onLocationEdited = viewModel::onLocationEdited,
+        setOptions = { viewModel.setOptions(it, renderedFolderId) },
+        scan = { viewModel.scan(renderedFolderId) }, stop = { viewModel.stop(renderedFolderId) }, setQuery = viewModel::setQuery,
+        disconnect = { viewModel.disconnect(renderedFolderId) },
+        pickFolder = { picker.launch(Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).addFlags(
             Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)) },
-        { viewModel.selectFolder(it) }, onOpenBook, { viewModel.restore(it) }, onBack, viewModel::showHidden))
+        selectFolder = { viewModel.selectFolder(it) },
+        openBook = { viewModel.openBook(renderedFolderId, it, onOpenBook) },
+        restore = { viewModel.restore(it, renderedFolderId) }, back = onBack, showHidden = viewModel::showHidden,
+        setRecursive = { viewModel.setRecursive(it, renderedFolderId) }, toggleExtension = { viewModel.toggleExtension(it, renderedFolderId) },
+        setExtensions = { viewModel.setExtensions(it, renderedFolderId) },
+    ))
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FolderScreen(state: FolderUiState, actions: FolderActions) {
-    var confirmDisconnect by remember { mutableStateOf(false) }
+    var confirmDisconnect by remember(state.resolvedFolderId) { mutableStateOf(false) }
     val results = remember(state.entries, state.query, state.options.extensions, state.showHidden) {
         state.entries.filter { (state.query.isBlank() || (it.relativePath.contains(state.query.trim(), true) || it.title.contains(state.query.trim(), true))) &&
             (state.showHidden || !it.hidden) &&
@@ -79,25 +88,24 @@ fun FolderScreen(state: FolderUiState, actions: FolderActions) {
         }
         item {
             Row(Modifier.fillMaxWidth().toggleable(state.options.recursive, role = Role.Checkbox) {
-                actions.setOptions(state.options.copy(recursive = it))
+                actions.setRecursive(it)
             }, verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(state.options.recursive, null)
                 Text(stringResource(R.string.folder_recursive))
             }
             Text(stringResource(R.string.folder_extensions), style = MaterialTheme.typography.titleMedium)
             Row {
-                TextButton(onClick = { actions.setOptions(state.options.copy(extensions = BookFormat.entries.toSet())) }) {
+                TextButton(onClick = { actions.setExtensions(BookFormat.entries.toSet()) }) {
                     Text(stringResource(R.string.folder_all))
                 }
-                TextButton(onClick = { actions.setOptions(state.options.copy(extensions = emptySet())) }) {
+                TextButton(onClick = { actions.setExtensions(emptySet()) }) {
                     Text(stringResource(R.string.folder_clear))
                 }
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BookFormat.entries.forEach { format ->
                     FilterChip(selected = format in state.options.extensions, onClick = {
-                        actions.setOptions(state.options.copy(extensions = if (format in state.options.extensions)
-                            state.options.extensions - format else state.options.extensions + format))
+                        actions.toggleExtension(format)
                     }, label = { Text(".${format.extension}") })
                 }
             }

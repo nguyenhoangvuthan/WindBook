@@ -20,7 +20,7 @@ class FolderScreenTest {
     }
     @Test fun allAndClearDispatchRealOptions() {
         var options = ScanOptions()
-        compose.setContent { FolderScreen(FolderUiState(), FolderActions(setOptions = { options = it })) }
+        compose.setContent { FolderScreen(FolderUiState(), FolderActions(setExtensions = { options = options.copy(extensions = it) })) }
         compose.onNodeWithText("All").performScrollTo().performClick()
         compose.waitForIdle()
         assertEquals(BookFormat.entries.toSet(), options.extensions)

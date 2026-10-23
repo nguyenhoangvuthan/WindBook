@@ -31,10 +31,12 @@ class FolderViewModel @Inject constructor(
     private val scans: FolderScanCoordinator,
     private val db: WindBookDatabase,
     @ApplicationContext private val context: Context,
+    private val observations: FolderObservations,
 ) : ViewModel() {
     private val mutable = MutableStateFlow(FolderUiState())
     val state = mutable.asStateFlow()
     private val commands = Mutex()
+    private var selectionVersion = 0L
     private var entriesJob: Job? = null
     private var progressJob: Job? = null
 
@@ -48,10 +50,11 @@ class FolderViewModel @Inject constructor(
     }
 
     fun onLocationEdited(value: String) {
+        selectionVersion++
         entriesJob?.cancel()
         progressJob?.cancel()
         mutable.update { it.copy(locationHint = value, resolvedFolderId = null, selectedLocation = "",
-            connected = false, entries = emptyList()) }
+            connected = false, entries = emptyList(), progress = dev.kent.windbook.core.data.folders.ScanProgress("", "IDLE")) }
     }
 
     fun selectFolder(id: String) = command {
@@ -82,25 +85,37 @@ class FolderViewModel @Inject constructor(
     }
 
     private fun select(id: String, location: String, options: ScanOptions, connected: Boolean) {
+        val version = ++selectionVersion
         mutable.update { it.copy(resolvedFolderId = id, locationHint = location, selectedLocation = location,
-            connected = connected, options = options, message = null) }
+            connected = connected, options = options, message = null, entries = emptyList(),
+            progress = dev.kent.windbook.core.data.folders.ScanProgress("", "IDLE")) }
         entriesJob?.cancel()
         entriesJob = viewModelScope.launch {
-            repository.observeEntries(id, "", emptySet(), includeHidden = true).collect { rows ->
-                mutable.update { it.copy(entries = rows) }
+            observations.entries(id).collect { rows ->
+                mutable.update { if (selectionVersion == version && it.resolvedFolderId == id) it.copy(entries = rows) else it }
             }
         }
         progressJob?.cancel()
         progressJob = viewModelScope.launch {
-            scans.observe(id).collect { progress -> mutable.update { it.copy(progress = progress) } }
+            observations.progress(id).collect { progress ->
+                mutable.update { if (selectionVersion == version && it.resolvedFolderId == id) it.copy(progress = progress) else it }
+            }
         }
     }
 
-    fun setOptions(options: ScanOptions) = command {
+    fun setRecursive(recursive: Boolean, folderId: String? = state.value.resolvedFolderId) = updateOptions(folderId) { it.copy(recursive = recursive) }
+    fun toggleExtension(format: dev.kent.windbook.core.model.BookFormat, folderId: String? = state.value.resolvedFolderId) = updateOptions(folderId) {
+        it.copy(extensions = if (format in it.extensions) it.extensions - format else it.extensions + format)
+    }
+    fun setExtensions(extensions: Set<dev.kent.windbook.core.model.BookFormat>, folderId: String? = state.value.resolvedFolderId) = updateOptions(folderId) { it.copy(extensions = extensions) }
+    fun setOptions(options: ScanOptions, folderId: String? = state.value.resolvedFolderId) = updateOptions(folderId) { options }
+
+    private fun updateOptions(folderId: String?, change: (ScanOptions) -> ScanOptions) = rootCommand(folderId) {
+        val options = change(state.value.options)
         mutable.update { it.copy(options = options) }
-        val id = state.value.resolvedFolderId ?: return@command
-        val folder = db.folderDao().find(id) ?: return@command
-        if (folder.disconnectedAt != null) return@command
+        val id = state.value.resolvedFolderId ?: return@rootCommand
+        val folder = db.folderDao().find(id) ?: return@rootCommand
+        if (folder.disconnectedAt != null) return@rootCommand
         repository.save(folder.treeUri, folder.displayLocation, options)
         val progress = scans.observe(id).first()
         if (progress.state == "RUNNING") {
@@ -108,23 +123,39 @@ class FolderViewModel @Inject constructor(
         }
     }
 
-    fun scan() = command {
+    fun scan(folderId: String? = state.value.resolvedFolderId) = rootCommand(folderId) {
         if (state.value.connected && state.value.options.extensions.isNotEmpty())
             state.value.resolvedFolderId?.let { scans.start(it) }
     }
-    fun stop() = command { scans.stop(state.value.progress.runId) }
+    fun stop(folderId: String? = state.value.resolvedFolderId) = rootCommand(folderId) {
+        state.value.resolvedFolderId?.let { id ->
+            val progress = scans.observe(id).first()
+            if (progress.state == "RUNNING") scans.stop(progress.runId)
+        }
+    }
+    fun openBook(folderId: String?, bookId: String, open: (String) -> Unit) {
+        if (folderId != null && folderId == state.value.resolvedFolderId &&
+            state.value.entries.any { it.bookId == bookId && !it.hidden }) open(bookId)
+    }
     fun setQuery(query: String) { mutable.update { it.copy(query = query) } }
     fun showHidden(value: Boolean) { mutable.update { it.copy(showHidden = value) } }
-    fun restore(bookId: String) = command {
+    fun restore(bookId: String, folderId: String? = state.value.resolvedFolderId) = rootCommand(folderId) {
         // Explicitly restore only a hidden external record belonging to this selected folder.
         if (state.value.entries.any { it.bookId == bookId && it.hidden })
             db.libraryDao().restoreExternal(bookId, System.currentTimeMillis())
     }
-    fun disconnect() = command {
+    fun disconnect(folderId: String? = state.value.resolvedFolderId) = rootCommand(folderId) {
         state.value.resolvedFolderId?.let { id ->
             val progress = scans.observe(id).first()
             if (progress.state == "RUNNING") scans.stop(progress.runId)
             repository.disconnectFolder(id)
+        }
+    }
+
+    private fun rootCommand(root: String?, action: suspend () -> Unit): Job {
+        val version = selectionVersion
+        return command {
+            if (version == selectionVersion && root == state.value.resolvedFolderId) action()
         }
     }
 

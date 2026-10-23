@@ -35,4 +35,7 @@ data class FolderActions(
     val restore: (String) -> Unit = {},
     val back: () -> Unit = {},
     val showHidden: (Boolean) -> Unit = {},
+    val setRecursive: (Boolean) -> Unit = {},
+    val toggleExtension: (dev.kent.windbook.core.model.BookFormat) -> Unit = {},
+    val setExtensions: (Set<dev.kent.windbook.core.model.BookFormat>) -> Unit = {},
 )

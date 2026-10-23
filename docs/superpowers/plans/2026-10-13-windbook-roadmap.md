@@ -20,4 +20,4 @@ The spec covers eight milestones. Each milestone is shippable on its own (signed
 
 Excluded by decision: read aloud / TTS playback, AI assistant, and the benchmark's ✗ items.
 
-Folder source increment: Tasks 1–7 implemented and independently reviewed; Task 8 integration/device evidence is recorded in the folder checklist; independent whole-branch review is pending. EPUB/PDF source reading is available; six additional adapters remain in `2026-10-21-ebook-format-readers.md`.
+Folder source increment: Tasks 1–7 implemented and independently reviewed; Task 8 integration/device evidence is recorded in the folder checklist; independent whole-branch review and the consolidated fix-wave rereview are complete (Approved at `b4b702c`). EPUB/PDF source reading is available; six additional adapters remain in `2026-10-21-ebook-format-readers.md`.

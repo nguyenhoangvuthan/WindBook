@@ -272,6 +272,21 @@ class ReaderViewModelTest {
         vm.reconnect(BookSource.External("content://test/document/z", DocumentKey("test", "z")))
         assertEquals("old-locator", (vm.awaitSettled() as ReaderUiState.Ready).initialLocatorJson)
     }
+    @Test fun reconnectSameDocumentThroughNewGrant_freshOpenRetainsPosition() = runTest {
+        external(java.security.MessageDigest.getInstance("SHA-256").digest(bookFile.readBytes()).joinToString("") { "%02x".format(it) })
+        library.saveProgress("a", "old-locator", .4)
+        deniedUris = setOf("content://test/document/a")
+        val replacement = BookSource.External("content://test/tree/new/document/a", DocumentKey("test", "a"))
+        val originalId = db.sourceDao().forBook("a").single().id
+        val vm = viewModel("a", verifiedOpener { FakeSession(BookFormat.EPUB) })
+        assertEquals(ReaderUiState.Reconnect, vm.awaitSettled())
+        vm.reconnect(replacement)
+        assertEquals("old-locator", (vm.awaitSettled() as ReaderUiState.Ready).initialLocatorJson)
+        assertEquals(originalId, db.sourceDao().forBook("a").single().id)
+        val fresh = viewModel("a", verifiedOpener { FakeSession(BookFormat.EPUB) })
+        assertEquals("old-locator", (fresh.awaitSettled() as ReaderUiState.Ready).initialLocatorJson)
+        assertEquals(listOf(replacement), sources.sources("a"))
+    }
     @Test fun hiddenOwnedMatch_requiresRestoreBeforeRedirect() = runTest {
         external()
         val sha = java.security.MessageDigest.getInstance("SHA-256").digest(bookFile.readBytes()).joinToString("") { "%02x".format(it) }

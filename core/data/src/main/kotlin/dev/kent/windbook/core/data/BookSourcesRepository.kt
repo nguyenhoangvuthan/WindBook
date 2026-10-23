@@ -71,7 +71,8 @@ class BookSourcesRepository(
             is BookSource.External -> BookSourceEntity(UUID.randomUUID().toString(), target, "EXTERNAL", uri = source.uri,
                 authority = source.key.authority, documentId = source.key.documentId)
         }
-        val verified = row.copy(bookId = target, verifiedSha256 = sha, availability = "AVAILABLE")
+        val verified = row.copy(bookId = target, uri = (source as? BookSource.External)?.uri ?: row.uri,
+            verifiedSha256 = sha, availability = "AVAILABLE")
         if (existing == null) db.sourceDao().insert(verified) else db.sourceDao().update(verified)
         return result
     }

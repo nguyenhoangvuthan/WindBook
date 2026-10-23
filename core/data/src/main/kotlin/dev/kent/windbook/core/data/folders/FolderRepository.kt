@@ -142,6 +142,7 @@ class FolderRepository(
     ): ScanRunEntity? = mutations.withLock {
         require(entries.size <= 100)
         initializeLocked()
+        val heldTrees = persistedReadTrees()
         db.withWriteTransaction {
             val run = db.folderDao().run(runId)?.takeIf { it.state == "RUNNING" }
                 ?: return@withWriteTransaction null
@@ -165,8 +166,15 @@ class FolderRepository(
                     db.sourceDao().insert(source)
                     added++
                 } else {
-                    // Keep canonical URI, reading identity, hash and hidden state on rediscovery.
-                    source = source.copy(size = document.size, mtime = document.modifiedAt,
+                    // Retain usable canonical grants; repair revoked tree access only with the
+                    // provider's discovered URI. Identity, memberships and reading data stay stable.
+                    val oldUri = android.net.Uri.parse(requireNotNull(source.uri))
+                    val oldTree = if (DocumentsContract.isTreeUri(oldUri))
+                        DocumentsContract.buildTreeDocumentUri(oldUri.authority,
+                            DocumentsContract.getTreeDocumentId(oldUri)).toString() else null
+                    val repairAccess = oldTree != null && oldTree !in heldTrees
+                    source = source.copy(uri = if (repairAccess) document.uri else source.uri,
+                        size = document.size, mtime = document.modifiedAt,
                         availability = if (source.availability in setOf("MISSING", "DISCONNECTED", "ACCESS_DENIED"))
                             "UNVERIFIED" else source.availability)
                     db.sourceDao().update(source)

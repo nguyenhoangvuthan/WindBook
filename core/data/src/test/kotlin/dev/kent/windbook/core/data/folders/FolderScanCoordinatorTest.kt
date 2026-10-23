@@ -40,6 +40,8 @@ class FolderScanCoordinatorTest {
         }
 
     @Test fun repeatedAndOverlappingScans_reuseIdentityKeepHiddenAndFilterObservedEntries() = runTest {
+        // A usable canonical grant remains preferred across overlapping discovery.
+        repo = FolderRepository(db, { setOf(tree, "content://scan.test/tree/other") }, {}, { _, _ -> }) { 99 }
         val coordinator = FolderScanCoordinator(repo, FolderScanner(access), backgroundScope)
         val folder = repo.save(tree, "Root", ScanOptions())
         children = { uri, _ -> flowOf(doc("one", "Alpha.pdf", uri = uri), doc("two", "Beta.EPUB", uri = uri)) }
@@ -223,6 +225,27 @@ class FolderScanCoordinatorTest {
         entered.await()
         val result = terminal(c, other, c.start(other))
         assertEquals("COMPLETE", result.state); assertEquals(1L, result.added)
+    }
+
+    @Test fun overlappingNewRoot_repairsRevokedCanonicalAccessWithoutChangingReadingIdentity() = runTest {
+        val otherTree = "content://scan.test/tree/other"
+        val held = mutableSetOf(tree)
+        repo = FolderRepository(db, { held.toSet() }, { held.remove(it) }, { _, _ -> }) { 99 }
+        val folder = repo.save(tree, "Root", ScanOptions())
+        val c = FolderScanCoordinator(repo, FolderScanner(access), backgroundScope)
+        children = { uri, _ -> flowOf(doc("shared", uri = uri)) }
+        terminal(c, folder, c.start(folder))
+        val before = db.sourceDao().findDocument("scan.test", "shared")!!
+        db.libraryDao().upsertProgress(ReadingProgressEntity(before.bookId, "anchor", .5, 1))
+        held.remove(tree); held.add(otherTree)
+        val other = repo.save(otherTree, "New grant", ScanOptions())
+        terminal(c, other, c.start(other))
+        val after = db.sourceDao().findDocument("scan.test", "shared")!!
+        assertEquals(before.id, after.id)
+        assertEquals(before.bookId, after.bookId)
+        assertEquals("$otherTree/document/shared", after.uri)
+        assertEquals(2, db.folderDao().memberships(after.id).size)
+        assertEquals("anchor", db.libraryDao().progress(after.bookId)!!.locatorJson)
     }
 
     @Test fun successfulReconciliation_retainsCanonicalGrantUntilLastConnectedFolderDisconnects() = runTest {

@@ -26,6 +26,15 @@ internal fun startStorageMaintenance(
     initializeFolders: suspend () -> Unit,
     initializeSources: suspend () -> Unit,
 ) {
-    scope.launch { initializeFolders() }
-    scope.launch { initializeSources() }
+    suspend fun maintain(initialize: suspend () -> Unit) {
+        try {
+            initialize()
+        } catch (_: java.io.IOException) {
+            // Storage may be unavailable at startup. Acquisition retries and reports the failure.
+        } catch (_: SecurityException) {
+            // Persisted provider permissions may have been revoked while the app was stopped.
+        }
+    }
+    scope.launch { maintain(initializeFolders) }
+    scope.launch { maintain(initializeSources) }
 }

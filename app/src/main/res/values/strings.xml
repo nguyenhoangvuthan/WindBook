@@ -121,4 +121,13 @@
     <string name="folder_show_hidden">Show hidden books</string>
     <string name="folder_restore">Restore</string>
     <string name="folder_internal_storage">Internal storage</string>
+    <string name="reader_text_encoding">Text encoding</string>
+    <string name="reader_encoding_required">Choose the text encoding to open this book.</string>
+    <string name="reader_encoding_utf8">UTF-8</string>
+    <string name="reader_encoding_utf16_le">UTF-16 little endian</string>
+    <string name="reader_encoding_utf16_be">UTF-16 big endian</string>
+    <string name="reader_encoding_windows1258">Windows-1258 (Vietnamese)</string>
+    <string name="reader_encoding_cancel">Cancel</string>
+    <string name="reader_encoding_back">Back</string>
+    <string name="reader_text_too_large">This text book exceeds the supported size.</string>
 </resources>

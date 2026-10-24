@@ -51,7 +51,7 @@ object AppModule {
     fun readium(@ApplicationContext context: Context): ReadiumServices = ReadiumServices(context)
 
     @Provides @Singleton
-    fun bookOpener(readium: ReadiumServices): BookOpener = ReaderEngine(readium)
+    fun bookOpener(readium: ReadiumServices): BookOpener = ReaderEngine(readium, adapters = listOf(dev.kent.windbook.reader.formats.TxtAdapter(readium)))
 
     @Provides @Singleton
     fun sourceAccess(readium: ReadiumServices): SourceAccess = readium.sourceAccess

@@ -34,6 +34,7 @@ data class BookSourceEntity(
     val mtime: Long? = null,
     @ColumnInfo(name = "verified_sha256") val verifiedSha256: String? = null,
     val availability: String = "UNVERIFIED",
+    @ColumnInfo(name = "txt_encoding_override") val txtEncodingOverride: String? = null,
 )
 
 @Entity(

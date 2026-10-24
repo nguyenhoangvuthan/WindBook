@@ -116,6 +116,13 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit, onReplaceReader: (String) ->
 
     ImmersiveReadingWindow()
 
+    var encodingPicker by remember { mutableStateOf(false) }
+    if (encodingPicker) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { encodingPicker = false },
+        title = { Text(stringResource(R.string.reader_text_encoding)) },
+        text = { TextEncodingChoices { encodingPicker = false; viewModel.chooseTextEncoding(it) } },
+        confirmButton = { TextButton(onClick = { encodingPicker = false }) { Text(stringResource(R.string.reader_encoding_cancel)) } },
+    )
     when (val current = state) {
         ReaderUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         is ReaderUiState.Error -> ReaderErrorScreen(
@@ -123,6 +130,11 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit, onReplaceReader: (String) ->
             onBack = onBack,
             onRemove = { viewModel.removeBook(onRemoved = onBack) },
         )
+        ReaderUiState.EncodingRequired -> Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
+            Text(stringResource(R.string.reader_encoding_required), style = MaterialTheme.typography.titleLarge)
+            TextEncodingChoices(viewModel::chooseTextEncoding)
+            TextButton(onClick = onBack) { Text(stringResource(R.string.reader_encoding_back)) }
+        }
         ReaderUiState.Reconnect -> ReaderSourceMessage(
             R.string.reader_source_unavailable, R.string.reader_reconnect, onReconnect, onBack,
         )
@@ -158,6 +170,10 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit, onReplaceReader: (String) ->
             } else if (current.session.surface == NavigationSurface.PUBLICATION) {
                 ReaderSurface(current, viewModel)
             }
+            if (overlay && current.session.textEncoding != null) TextButton(
+                onClick = { encodingPicker = true },
+                modifier = Modifier.align(Alignment.CenterEnd),
+            ) { Text(stringResource(R.string.reader_text_encoding)) }
             ReaderOverlay(
                 visible = overlay,
                 title = current.title,
@@ -179,10 +195,10 @@ private fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewModel
     val dispatcher = LocalKeyEventDispatcher.current
     val darkTheme = isSystemInDarkTheme()
     val hostRef = remember { mutableStateOf<ReaderHostFragment?>(null) }
-    val callbacks = remember(viewModel) {
+    val callbacks = remember(viewModel, state.session) {
         object : ReaderHostFragment.Callbacks {
             override fun onLocatorChanged(locatorJson: String, progression: Double, chapterTitle: String?) =
-                viewModel.onLocatorChanged(locatorJson, progression, chapterTitle)
+                viewModel.onLocatorChanged(locatorJson, progression, chapterTitle, expectedSession = state.session)
             override fun onCenterTap() = viewModel.toggleOverlay()
         }
     }
@@ -350,6 +366,7 @@ private fun ReaderErrorScreen(error: ReaderError, onBack: () -> Unit, onRemove: 
         ReaderError.NOT_FOUND -> R.string.reader_error_not_found
         ReaderError.FILE_MISSING -> R.string.reader_error_file_missing
         ReaderError.CANNOT_OPEN -> R.string.reader_error_cannot_open
+        ReaderError.TEXT_TOO_LARGE -> R.string.reader_text_too_large
     }
     Column(
         Modifier.fillMaxSize().padding(32.dp),
@@ -376,5 +393,15 @@ internal fun ReaderSourceMessage(message: Int, action: Int, onAction: () -> Unit
         Spacer(Modifier.height(24.dp))
         Button(onClick = onAction) { Text(stringResource(action)) }
         TextButton(onClick = onBack) { Text(stringResource(R.string.back)) }
+    }
+}
+
+@Composable
+private fun TextEncodingChoices(onChoose: (dev.kent.windbook.reader.formats.TextEncoding) -> Unit) {
+    val labels = listOf(R.string.reader_encoding_utf8, R.string.reader_encoding_utf16_le, R.string.reader_encoding_utf16_be, R.string.reader_encoding_windows1258)
+    Column {
+        dev.kent.windbook.reader.formats.TextEncoding.entries.forEachIndexed { index, encoding ->
+            TextButton(onClick = { onChoose(encoding) }) { Text(stringResource(labels[index])) }
+        }
     }
 }

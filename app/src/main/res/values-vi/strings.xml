@@ -115,4 +115,13 @@
     <string name="folder_show_hidden">Hiện sách đã ẩn</string>
     <string name="folder_restore">Khôi phục</string>
     <string name="folder_internal_storage">Bộ nhớ trong</string>
+    <string name="reader_text_encoding">Mã hóa văn bản</string>
+    <string name="reader_encoding_required">Chọn mã hóa văn bản để mở sách này.</string>
+    <string name="reader_encoding_utf8">UTF-8</string>
+    <string name="reader_encoding_utf16_le">UTF-16 little endian</string>
+    <string name="reader_encoding_utf16_be">UTF-16 big endian</string>
+    <string name="reader_encoding_windows1258">Windows-1258 (tiếng Việt)</string>
+    <string name="reader_encoding_cancel">Hủy</string>
+    <string name="reader_encoding_back">Quay lại</string>
+    <string name="reader_text_too_large">Sách văn bản này vượt quá kích thước được hỗ trợ.</string>
 </resources>

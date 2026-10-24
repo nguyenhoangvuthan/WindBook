@@ -25,6 +25,38 @@ class BookSourcesRepository(
         }
     }
 
+    private suspend fun sourceRow(bookId: String, source: BookSource) = db.sourceDao().forBook(bookId).firstOrNull { row ->
+        when (source) {
+            is BookSource.Owned -> row.kind == "OWNED" && row.localPath == source.path
+            is BookSource.External -> row.authority == source.key.authority && row.documentId == source.key.documentId
+        }
+    }
+    suspend fun textEncoding(bookId: String, source: BookSource): String? = sourceRow(bookId, source)?.txtEncodingOverride
+    suspend fun setTextEncoding(bookId: String, source: BookSource, encoding: String) = db.withWriteTransaction {
+        require(encoding in setOf("UTF8", "UTF16_LE", "UTF16_BE", "WINDOWS_1258"))
+        val row = sourceRow(bookId, source)
+        if (row != null) db.sourceDao().update(row.copy(txtEncodingOverride = encoding))
+        else {
+            require(source is BookSource.Owned)
+            db.sourceDao().insert(BookSourceEntity(UUID.randomUUID().toString(), bookId, "OWNED", localPath = source.path, txtEncodingOverride = encoding))
+        }
+    }
+    /** Restore this derived revision and atomically mirror it for Library/Reading queries. */
+    suspend fun activateTextEncoding(bookId: String, encoding: String): String? = db.withWriteTransaction {
+        val state = db.sourceDao().textProgress(bookId, encoding)
+        db.sourceDao().activateTextEncoding(bookId, encoding)
+        if (state == null) db.sourceDao().clearProgress(bookId)
+        else db.libraryDao().upsertProgress(dev.kent.windbook.core.data.db.ReadingProgressEntity(bookId, state.locatorJson, state.progression, state.updatedAt))
+        state?.locatorJson
+    }
+    suspend fun saveTextProgress(bookId: String, encoding: String, locator: String, progression: Double) = db.withWriteTransaction {
+        val now = clock()
+        db.sourceDao().upsertTextProgress(dev.kent.windbook.core.data.db.TextReadingStateEntity(bookId, encoding, locator, progression, now))
+        if (db.libraryDao().findIncludingHidden(bookId)?.activeTextEncoding == encoding) {
+            db.libraryDao().upsertProgress(dev.kent.windbook.core.data.db.ReadingProgressEntity(bookId, locator, progression, now))
+        }
+    }
+
     /** Identity decisions and source transfers commit together; no reading row is removed. */
     suspend fun verify(bookId: String, source: BookSource, sha256: String): Verification =
         db.withWriteTransaction { verifyLocked(bookId, source, sha256) }
@@ -41,7 +73,7 @@ class BookSourcesRepository(
             is BookSource.Owned -> db.sourceDao().forBook(bookId).firstOrNull { it.localPath == source.path }
         }
         val match = books.findBySha(sha)?.takeIf { it.id != bookId }
-        val hasData = books.progress(bookId) != null || db.bookPreferencesDao().json(bookId) != null ||
+        val hasData = db.sourceDao().hasTextProgress(bookId) || books.progress(bookId) != null || db.bookPreferencesDao().json(bookId) != null ||
             book.lastOpenedAt != null || book.status != "TO_READ"
         val decision = SourceRevisionPolicy.decide(book.sha256, sha, match != null, hasData, match?.deletedAt != null)
         if (decision == RevisionDecision.HIDDEN) return Verification.HiddenMatch(requireNotNull(match).id)
@@ -53,7 +85,7 @@ class BookSourcesRepository(
                 if (match?.deletedAt != null) return Verification.HiddenMatch(match.id)
                 target = match?.id ?: UUID.randomUUID().toString().also { id ->
                     books.insert(book.copy(id = id, sha256 = sha, filePath = null, coverPath = null,
-                        status = "TO_READ", lastOpenedAt = null, addedAt = clock(), updatedAt = clock()))
+                        status = "TO_READ", lastOpenedAt = null, activeTextEncoding = null, addedAt = clock(), updatedAt = clock()))
                 }
                 result = Verification.Changed(target)
             }

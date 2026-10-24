@@ -134,20 +134,12 @@ class NormalizedPublicationWriter {
             dom.documentElement.setAttribute("id", id)
         }
         val transformer = TransformerFactory.newInstance().newTransformer().apply { setOutputProperty(OutputKeys.ENCODING, "UTF-8"); setOutputProperty(OutputKeys.INDENT, "no") }
-        var serializedUnits = 0L
+        // Android's transformer emits numeric surrogate halves on some releases.
         val encoded = output.writer(Charsets.UTF_8)
-        val bounded = object : java.io.Writer() {
-            override fun write(chars: CharArray, offset: Int, length: Int) {
-                require(serializedUnits + length <= 65536) { "Serialized section exceeds 64 Ki UTF-16 units" }
-                serializedUnits += length
-                encoded.write(chars, offset, length)
-            }
-            override fun flush() = encoded.flush()
-            override fun close() = flush()
-        }
+        val bounded = XmlScalarWriter(encoded)
         transformer.transform(DOMSource(dom), StreamResult(bounded))
-        bounded.flush()
-        return serializedUnits
+        bounded.finish()
+        return bounded.units
     }
 
     private fun packageXml(document: NormalizedDocument): String =

@@ -40,7 +40,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class ReaderError { NOT_FOUND, FILE_MISSING, CANNOT_OPEN }
+enum class ReaderError { NOT_FOUND, FILE_MISSING, CANNOT_OPEN, TEXT_TOO_LARGE }
 
 sealed interface ReaderUiState {
     data object Loading : ReaderUiState
@@ -50,6 +50,7 @@ sealed interface ReaderUiState {
         val initialLocatorJson: String?,
     ) : ReaderUiState
     data class Error(val error: ReaderError) : ReaderUiState
+    data object EncodingRequired : ReaderUiState
     data object Reconnect : ReaderUiState
     data class Changed(val newBookId: String) : ReaderUiState
     data class Redirect(val bookId: String) : ReaderUiState
@@ -100,11 +101,15 @@ class ReaderViewModel @AssistedInject constructor(
         private set
 
     /** Keeps only the newest pending locator; the writer always persists the latest one. */
-    private val locatorUpdates = MutableSharedFlow<Pair<String, Double>>(
+    private val locatorUpdates = MutableSharedFlow<LocatorUpdate>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
     )
 
+    private data class LocatorUpdate(val json: String, val progression: Double, val encoding: String?, val generation: Long)
+    private var openGeneration = 0L
+    private var activeSource: BookSource? = null
+    private var activeEncoding: String? = null
     private var session: ReaderSession? = null
 
     private var openJob: Job? = null
@@ -113,14 +118,17 @@ class ReaderViewModel @AssistedInject constructor(
     init {
         openJob = viewModelScope.launch { open() }
         viewModelScope.launch {
-            locatorUpdates.collect { (json, progression) ->
-                library.saveProgress(bookId, json, progression)
+            locatorUpdates.collect { (json, progression, encoding, generation) ->
+                if (generation != openGeneration) return@collect
+                if (encoding != null) sources.saveTextProgress(bookId, encoding, json, progression)
+                else library.saveProgress(bookId, json, progression)
             }
         }
     }
 
     private suspend fun open(replacement: BookSource? = null) {
         pendingReplacement = replacement
+        openGeneration++
         _state.value = ReaderUiState.Loading
         val book = library.book(bookId) ?: run {
             _state.value = ReaderUiState.Error(ReaderError.NOT_FOUND)
@@ -152,14 +160,22 @@ class ReaderViewModel @AssistedInject constructor(
                     enrichment = try { metadata.read(lease, book.format).getOrNull() }
                         catch (e: CancellationException) { throw e }
                         catch (_: Exception) { null }
+                    val encoding = if (book.format == dev.kent.windbook.core.model.BookFormat.TXT)
+                        sources.textEncoding(bookId, source)?.let(dev.kent.windbook.reader.formats.TextEncoding::valueOf) else null
                     val transferred = lease
                     lease = null // BookOpener consumes the lease on success, failure and cancellation.
-                    opener.open(transferred, book.format)
+                    if (book.format == dev.kent.windbook.core.model.BookFormat.TXT) {
+                        opener.openText(transferred, encoding)
+                    } else opener.open(transferred, book.format)
                 } else {
                     val owned = source as BookSource.Owned
                     if (!File(owned.path).isFile) continue
                     acquiredAny = true
-                    opener.open(File(owned.path), book.format)
+                    if (book.format == dev.kent.windbook.core.model.BookFormat.TXT) {
+                        val encoding = sources.textEncoding(bookId, source)?.let(dev.kent.windbook.reader.formats.TextEncoding::valueOf)
+                        val transferred = sourceAccess.acquire(source)
+                        opener.openText(transferred, encoding)
+                    } else opener.open(File(owned.path), book.format)
                 }
                 opened = result.getOrThrow()
                 currentCoroutineContext().ensureActive()
@@ -175,13 +191,17 @@ class ReaderViewModel @AssistedInject constructor(
                     } catch (e: CancellationException) { throw e }
                     catch (_: Exception) { /* Metadata is optional; a valid reader keeps its filename fallback. */ }
                 }
-                val savedLocator = library.savedLocator(bookId)
+                val interpretation = opened.textEncoding?.name
+                val savedLocator = if (interpretation != null) sources.activateTextEncoding(bookId, interpretation)
+                    else library.savedLocator(bookId)
                 library.markOpened(bookId)
                 currentCoroutineContext().ensureActive()
                 val title = library.book(bookId)?.title ?: book.title
                 currentCoroutineContext().ensureActive()
                 finished.value = book.status == ReadingStatus.FINISHED
                 latestLocatorJson = savedLocator
+                activeSource = source
+                activeEncoding = interpretation
                 session = opened
                 _state.value = ReaderUiState.Ready(opened, title, savedLocator)
                 if (firstPages != null) viewModelScope.launch {
@@ -194,6 +214,11 @@ class ReaderViewModel @AssistedInject constructor(
                 return
             } catch (e: CancellationException) {
                 throw e
+            } catch (_: dev.kent.windbook.reader.formats.TextEncodingException) {
+                activeSource = source
+                pending = ReaderUiState.EncodingRequired
+            } catch (_: dev.kent.windbook.reader.formats.TextSizeException) {
+                pending = ReaderUiState.Error(ReaderError.TEXT_TOO_LARGE)
             } catch (_: Exception) {
                 // A denied/missing source can coexist with a healthy owned or external source.
             } finally {
@@ -208,6 +233,25 @@ class ReaderViewModel @AssistedInject constructor(
         }
     }
 
+    fun chooseTextEncoding(encoding: dev.kent.windbook.reader.formats.TextEncoding) {
+        val source = activeSource ?: return
+        val previous = openJob
+        val oldEncoding = activeEncoding
+        val oldLocator = latestLocatorJson
+        val oldProgression = _progression.value
+        openGeneration++
+        _state.value = ReaderUiState.Loading
+        openJob = viewModelScope.launch {
+            withContext(NonCancellable) { previous?.cancelAndJoin() }
+            if (oldEncoding != null && oldLocator != null) sources.saveTextProgress(bookId, oldEncoding, oldLocator, oldProgression)
+            session?.close(); session = null
+            sources.setTextEncoding(bookId, source, encoding.name)
+            activeEncoding = null
+            latestLocatorJson = null
+            open(pendingReplacement)
+        }
+    }
+
     fun reconnect(source: BookSource) = startOpen(source)
 
     fun restoreHiddenMatch() {
@@ -218,6 +262,7 @@ class ReaderViewModel @AssistedInject constructor(
     private fun startOpen(replacement: BookSource?, restoreBookId: String? = null) {
         val previous = openJob
         // Guard the action before Room can suspend, so repeated Restore taps cannot launch peers.
+        openGeneration++
         _state.value = ReaderUiState.Loading
         openJob = viewModelScope.launch {
             // Keep cancellation chains joined too: a newer attempt must wait for all prior cleanup.
@@ -232,12 +277,12 @@ class ReaderViewModel @AssistedInject constructor(
         }
     }
 
-    fun onLocatorChanged(locatorJson: String, progression: Double, chapterTitle: String?) {
-        if (_state.value !is ReaderUiState.Ready) return
+    fun onLocatorChanged(locatorJson: String, progression: Double, chapterTitle: String?, expectedSession: ReaderSession? = null) {
+        if (_state.value !is ReaderUiState.Ready || (expectedSession != null && expectedSession !== session)) return
         latestLocatorJson = locatorJson
         _progression.value = progression
         _chapterTitle.value = chapterTitle
-        locatorUpdates.tryEmit(locatorJson to progression)
+        locatorUpdates.tryEmit(LocatorUpdate(locatorJson, progression, activeEncoding, openGeneration))
     }
 
     fun toggleOverlay() = _overlayVisible.update { !it }

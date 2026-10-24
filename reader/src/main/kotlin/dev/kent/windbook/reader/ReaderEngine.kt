@@ -35,7 +35,9 @@ class ReaderEngine(
     }
 
     /** Consumes the already fingerprinted lease; never opens the provider URI again. */
-    override suspend fun open(source: SourceLease, format: BookFormat): Result<ReaderSession> {
+    override suspend fun open(source: SourceLease, format: BookFormat): Result<ReaderSession> = openConfigured(source, format, null)
+    override suspend fun openText(source: SourceLease, encoding: dev.kent.windbook.reader.formats.TextEncoding?): Result<ReaderSession> = openConfigured(source, BookFormat.TXT, encoding)
+    private suspend fun openConfigured(source: SourceLease, format: BookFormat, encoding: dev.kent.windbook.reader.formats.TextEncoding?): Result<ReaderSession> {
         if (!capabilities.canRead(format)) {
             source.close()
             return unsupported(format)
@@ -52,7 +54,11 @@ class ReaderEngine(
                     } catch (e: Throwable) { publication.close(); throw e }
                 }
                 BookFormat.PDF -> PdfReaderSession(PdfDocumentHandle.open(source.openDescriptor()), source)
-                else -> adapters.getValue(format).open(source).getOrThrow()
+                else -> {
+                    val adapter = adapters.getValue(format)
+                    if (adapter is dev.kent.windbook.reader.formats.TxtAdapter) adapter.open(source, encoding).getOrThrow()
+                    else adapter.open(source).getOrThrow()
+                }
             }
         }
     }
@@ -67,6 +73,7 @@ internal class ReadiumReaderSession(
     val positionCount: Int,
     private val source: SourceLease? = null,
     private val preparation: dev.kent.windbook.reader.source.SessionLease? = null,
+    override val textEncoding: dev.kent.windbook.reader.formats.TextEncoding? = null,
 ) : ReaderSession {
     private val closed = java.util.concurrent.atomic.AtomicBoolean()
     override fun close() {

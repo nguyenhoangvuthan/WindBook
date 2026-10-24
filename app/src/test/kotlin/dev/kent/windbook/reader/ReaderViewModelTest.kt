@@ -105,6 +105,44 @@ class ReaderViewModelTest {
     private suspend fun ReaderViewModel.awaitSettled(): ReaderUiState =
         state.first { it !is ReaderUiState.Loading }
 
+    @Test fun readableTextCanSwitchEncodingAndRestorePriorPassage() = runTest {
+        db.libraryDao().update(db.libraryDao().findIncludingHidden("a")!!.copy(format = "TXT"))
+        val textOpener = object : BookOpener {
+            override suspend fun open(source: BookSource, format: BookFormat): Result<ReaderSession> = error("must use snapshot")
+            override suspend fun openText(source: SourceLease, encoding: dev.kent.windbook.reader.formats.TextEncoding?): Result<ReaderSession> {
+                source.close()
+                return Result.success(object : ReaderSession {
+                    override val format = BookFormat.TXT
+                    override val textEncoding = encoding ?: dev.kent.windbook.reader.formats.TextEncoding.UTF8
+                    override fun close() = Unit
+                })
+            }
+        }
+        val vm = viewModel("a", textOpener)
+        val oldSession = (vm.awaitSettled() as ReaderUiState.Ready).session
+        vm.onLocatorChanged("utf8-passage", .3, null)
+        vm.chooseTextEncoding(dev.kent.windbook.reader.formats.TextEncoding.WINDOWS_1258)
+        assertEquals(null, (vm.awaitSettled() as ReaderUiState.Ready).initialLocatorJson)
+        vm.onLocatorChanged("old-late-callback", .9, null, expectedSession = oldSession)
+        assertEquals(null, vm.latestLocatorJson)
+        assertEquals(null, library.savedLocator("a"))
+        vm.onLocatorChanged("windows-passage", .6, null)
+        vm.chooseTextEncoding(dev.kent.windbook.reader.formats.TextEncoding.UTF8)
+        assertEquals("utf8-passage", (vm.awaitSettled() as ReaderUiState.Ready).initialLocatorJson)
+        assertEquals("utf8-passage", library.savedLocator("a"))
+        assertEquals("UTF8", sources.textEncoding("a", BookSource.Owned(bookFile.path)))
+    }
+    @Test fun malformedTextOffersEncodingInsteadOfReconnect() = runTest {
+        db.libraryDao().update(db.libraryDao().findIncludingHidden("a")!!.copy(format = "TXT"))
+        val failing = object : BookOpener {
+            override suspend fun open(source: BookSource, format: BookFormat): Result<ReaderSession> = error("must use acquired source")
+            override suspend fun openText(source: SourceLease, encoding: dev.kent.windbook.reader.formats.TextEncoding?): Result<ReaderSession> {
+                source.close()
+                return Result.failure(dev.kent.windbook.reader.formats.TextEncodingException(java.nio.charset.MalformedInputException(1)))
+            }
+        }
+        assertEquals(ReaderUiState.EncodingRequired, viewModel("a", failing).awaitSettled())
+    }
     @Test fun ready_containsSavedLocator() = runTest {
         library.saveProgress("a", """{"href":"c3"}""", 0.6)
 

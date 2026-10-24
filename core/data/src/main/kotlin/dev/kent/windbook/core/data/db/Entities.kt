@@ -29,6 +29,7 @@ data class BookEntity(
     @ColumnInfo(name = "last_opened_at") val lastOpenedAt: Long?,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(name = "deleted_at") val deletedAt: Long?,
+    @ColumnInfo(name = "active_text_encoding") val activeTextEncoding: String? = null,
 )
 
 @Entity(
@@ -68,5 +69,15 @@ data class BookWithProgressRow(
 data class BookPreferencesEntity(
     @PrimaryKey @ColumnInfo(name = "book_id") val bookId: String,
     val json: String,
+    @ColumnInfo(name = "updated_at") val updatedAt: Long,
+)
+
+@Entity(tableName = "text_reading_states", primaryKeys = ["book_id", "encoding"],
+    foreignKeys = [ForeignKey(entity = BookEntity::class, parentColumns = ["id"], childColumns = ["book_id"], onDelete = ForeignKey.CASCADE)])
+data class TextReadingStateEntity(
+    @ColumnInfo(name = "book_id") val bookId: String,
+    val encoding: String,
+    @ColumnInfo(name = "locator_json") val locatorJson: String,
+    val progression: Double,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
 )

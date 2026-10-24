@@ -31,6 +31,34 @@ class BookSourcesRepositoryTest {
         db.sourceDao().insert(BookSourceEntity("source-$id", id, "EXTERNAL", uri = value.uri,
             authority = value.key.authority, documentId = value.key.documentId, size = 12, mtime = 100, verifiedSha256 = sha))
     }
+    @Test fun textEncodingHistoryIsSharedAcrossSourcesAndMirrorsActiveProgress() = runTest {
+        book("a", "same"); addSource(sha = "same")
+        val other = BookSource.External("content://test/document/b", DocumentKey("test", "b"))
+        repository.reconnect("a", other, "same")
+        repository.setTextEncoding("a", source, "UTF8")
+        repository.activateTextEncoding("a", "UTF8")
+        repository.saveTextProgress("a", "UTF8", "first", .3)
+        assertEquals("first", repository.activateTextEncoding("a", "UTF8"))
+        repository.setTextEncoding("a", other, "WINDOWS_1258")
+        assertEquals("UTF8", repository.textEncoding("a", source))
+        assertNull(repository.activateTextEncoding("a", "WINDOWS_1258"))
+        assertNull(db.libraryDao().progress("a"))
+        repository.saveTextProgress("a", "UTF8", "late-old-session", .4)
+        assertNull(db.libraryDao().progress("a"))
+        repository.saveTextProgress("a", "WINDOWS_1258", "second", .7)
+        assertEquals("second", db.libraryDao().progress("a")!!.locatorJson)
+        assertEquals("late-old-session", repository.activateTextEncoding("a", "UTF8"))
+        assertEquals("late-old-session", db.libraryDao().progress("a")!!.locatorJson)
+    }
+    @Test fun textHistoryPreventsUnreadDuplicateRedirect() = runTest {
+        book("canonical", "same"); book("a"); addSource()
+        repository.activateTextEncoding("a", "UTF8")
+        repository.saveTextProgress("a", "UTF8", "anchor", .2)
+        repository.activateTextEncoding("a", "WINDOWS_1258")
+        assertNull(db.libraryDao().progress("a"))
+        assertEquals(Verification.Ready("a", source), repository.verify("a", source, "same"))
+        assertEquals("anchor", repository.activateTextEncoding("a", "UTF8"))
+    }
     @Test fun unchangedMetadataWithDifferentBytes_keepsOldProgressAndCreatesNewRevision() = runTest {
         book("a", "old"); addSource(sha = "old")
         db.libraryDao().upsertProgress(ReadingProgressEntity("a", "old-locator", .4, 1))

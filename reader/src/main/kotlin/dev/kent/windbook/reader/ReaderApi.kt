@@ -11,11 +11,13 @@ enum class NavigationSurface { PUBLICATION, PDF, IMAGES }
 interface ReaderSession : AutoCloseable {
     val surface: NavigationSurface get() = NavigationSurface.PUBLICATION
     val format: BookFormat
+    val textEncoding: dev.kent.windbook.reader.formats.TextEncoding? get() = null
 }
 
 fun interface BookOpener {
     val capabilities: dev.kent.windbook.reader.formats.FormatCapabilities get() = dev.kent.windbook.reader.formats.FormatCapabilities.BUILT_IN
     suspend fun open(source: BookSource, format: BookFormat): Result<ReaderSession>
+    suspend fun openText(source: SourceLease, encoding: dev.kent.windbook.reader.formats.TextEncoding?): Result<ReaderSession> = open(source, BookFormat.TXT)
     suspend fun open(file: File, format: BookFormat): Result<ReaderSession> = open(BookSource.Owned(file.path), format)
     /** Transfers ownership, even on failure. Implementations supporting verified sources override this. */
     suspend fun open(source: SourceLease, format: BookFormat): Result<ReaderSession> {

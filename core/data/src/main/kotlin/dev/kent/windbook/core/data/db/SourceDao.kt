@@ -7,6 +7,17 @@ import androidx.room3.Update
 
 @Dao
 interface SourceDao {
+    @Insert(onConflict = androidx.room3.OnConflictStrategy.REPLACE)
+    suspend fun upsertTextProgress(state: TextReadingStateEntity)
+    @Query("SELECT * FROM text_reading_states WHERE book_id = :bookId AND encoding = :encoding")
+    suspend fun textProgress(bookId: String, encoding: String): TextReadingStateEntity?
+    @Query("SELECT EXISTS(SELECT 1 FROM text_reading_states WHERE book_id = :bookId)")
+    suspend fun hasTextProgress(bookId: String): Boolean
+    @Query("UPDATE books SET active_text_encoding = :encoding WHERE id = :bookId")
+    suspend fun activateTextEncoding(bookId: String, encoding: String)
+    @Query("DELETE FROM reading_progress WHERE book_id = :bookId")
+    suspend fun clearProgress(bookId: String)
+
     @Insert
     suspend fun insert(source: BookSourceEntity)
 

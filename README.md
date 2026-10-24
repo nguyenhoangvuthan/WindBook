@@ -1,6 +1,6 @@
 # WindBook
 
-A private, offline EPUB/PDF reader for Android 12+ (minSdk 31, targetSdk 36), built with Kotlin, Jetpack Compose and Readium.
+A private, offline EPUB/PDF/TXT reader for Android 12+ (minSdk 31, targetSdk 36), built with Kotlin, Jetpack Compose and Readium.
 Current version: **v0.1.0 (Milestone 1: core reading loop)**. It imports books, shows a library and opens EPUB/PDF. It always reopens at the exact page, even after rotation or the app being killed. UI in English and Vietnamese.
 
 PDF supports vertical scrolling and page-by-page reading, margin cropping and
@@ -10,10 +10,10 @@ with that saved mode reopen vertically at their saved page.
 Folder browsing uses Android's folder picker to remember a read-only grant. Open
 **Book folders**, choose a folder, select extensions and recursive scanning, then
 scan manually. Typing a location does not grant access. Stop preserves results
-already committed; hiding or disconnecting never deletes source files. EPUB/PDF
+already committed; hiding or disconnecting never deletes source files. EPUB/PDF/TXT
 open from their original folder, with bounded temporary preparation for the active
-book. Discovery supports eight formats; the six additional reader adapters are
-still pending. See [folder verification](docs/testing/folder-library-checklist.md).
+book. Discovery supports eight formats; reading supports EPUB, PDF and TXT.
+FB2/CBZ/CBR/MOBI/AZW3 readers are paused by owner decision. See [folder verification](docs/testing/folder-library-checklist.md).
 
 - Design spec: [docs/superpowers/specs/2026-10-13-windbook-design.md](docs/superpowers/specs/2026-10-13-windbook-design.md)
 - Roadmap: [docs/superpowers/plans/2026-10-13-windbook-roadmap.md](docs/superpowers/plans/2026-10-13-windbook-roadmap.md)
@@ -75,7 +75,7 @@ Back up `~/keys/windbook-release.jks` and its passwords somewhere safe (two copi
 ## 3. Automated tests
 
 ```bash
-# Unit tests (no device needed): 317 tests at the folder-library checkpoint
+# Unit tests (no device needed): 346 tests at the EPUB/PDF/TXT status-bar checkpoint
 ./gradlew :core:model:test :core:data:testDebugUnitTest :reader:testDebugUnitTest :app:testDebugUnitTest
 
 # Lint
@@ -184,7 +184,7 @@ Do the steps in order. Write ✅ / ❌ (and a note) in the matching row of [docs
 **5. Reading controls**
 - Open the EPUB. Tap the **right edge** to go to the next page, the **left edge** to go back. Tap the **centre**.
 - Expect: pages turn. The centre tap shows a top bar (back arrow + title) and a bottom bar (progress line + "Chapter · %"). Tap the centre again to hide them.
-- The first time, Android may show "Viewing full screen". Tap **Got it**.
+- Fullscreen reading keeps the status bar (clock, battery and notifications) visible. Pages and controls stay below it and clear of camera cutouts, including landscape. Only the navigation bar hides; swipe to reveal it. See [system-bar checks](docs/testing/reader-system-bars-checklist.md).
 
 **6. Volume keys**
 - Press **volume down** a few times, then **volume up**.

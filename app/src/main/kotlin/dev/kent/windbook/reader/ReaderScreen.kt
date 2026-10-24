@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
@@ -123,71 +124,86 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit, onReplaceReader: (String) ->
         text = { TextEncodingChoices { encodingPicker = false; viewModel.chooseTextEncoding(it) } },
         confirmButton = { TextButton(onClick = { encodingPicker = false }) { Text(stringResource(R.string.reader_encoding_cancel)) } },
     )
-    when (val current = state) {
-        ReaderUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        is ReaderUiState.Error -> ReaderErrorScreen(
-            error = current.error,
-            onBack = onBack,
-            onRemove = { viewModel.removeBook(onRemoved = onBack) },
-        )
-        ReaderUiState.EncodingRequired -> Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
-            Text(stringResource(R.string.reader_encoding_required), style = MaterialTheme.typography.titleLarge)
-            TextEncodingChoices(viewModel::chooseTextEncoding)
-            TextButton(onClick = onBack) { Text(stringResource(R.string.reader_encoding_back)) }
-        }
-        ReaderUiState.Reconnect -> ReaderSourceMessage(
-            R.string.reader_source_unavailable, R.string.reader_reconnect, onReconnect, onBack,
-        )
-        is ReaderUiState.Changed -> ReaderSourceMessage(
-            R.string.reader_source_changed, R.string.reader_open_revision,
-            { onReplaceReader(current.newBookId) }, onBack,
-        )
-        is ReaderUiState.HiddenMatch -> ReaderSourceMessage(
-            R.string.reader_hidden_match, R.string.reader_restore, viewModel::restoreHiddenMatch, onBack,
-        )
-        is ReaderUiState.Redirect -> {
-            LaunchedEffect(current.bookId) { onReplaceReader(current.bookId) }
-        }
-        is ReaderUiState.Ready -> Box(Modifier.fillMaxSize()) {
-            val pdf = current.session as? PdfSession
-            val pdfDisplay by viewModel.pdfDisplay.collectAsStateWithLifecycle()
-            if (current.session.surface == NavigationSurface.PDF) {
-                requireNotNull(pdf)
-                pdfDisplay?.let { display ->
-                    val initialPage = remember(pdf) { viewModel.initialPdfPage() }
-                    PdfReaderView(
-                        source = pdf.pages,
-                        layout = display.layout,
-                        cropMargins = display.cropMargins,
-                        initialPage = initialPage,
-                        onPageChanged = viewModel::onPdfPageChanged,
-                        onCenterTap = viewModel::toggleOverlay,
-                        initialZoom = display.zoom,
-                        initialZoomX = display.zoomX,
-                        onZoomChanged = viewModel::setPdfZoom,
-                    )
-                }
-            } else if (current.session.surface == NavigationSurface.PUBLICATION) {
-                ReaderSurface(current, viewModel)
-            }
-            if (overlay && current.session.textEncoding != null) TextButton(
-                onClick = { encodingPicker = true },
-                modifier = Modifier.align(Alignment.CenterEnd),
-            ) { Text(stringResource(R.string.reader_text_encoding)) }
-            ReaderOverlay(
-                visible = overlay,
-                title = current.title,
-                chapterTitle = chapterTitle,
-                progression = progression,
-                canMarkFinished = canMarkFinished,
-                onMarkFinished = viewModel::markFinished,
+    ReaderViewport {
+        when (val current = state) {
+            ReaderUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            is ReaderUiState.Error -> ReaderErrorScreen(
+                error = current.error,
                 onBack = onBack,
-                pdfDisplay = if (pdf != null) pdfDisplay else null,
-                onPdfLayoutChange = viewModel::setPdfLayout,
-                onCropMarginsChange = viewModel::setCropMargins,
+                onRemove = { viewModel.removeBook(onRemoved = onBack) },
             )
+            ReaderUiState.EncodingRequired -> Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
+                Text(stringResource(R.string.reader_encoding_required), style = MaterialTheme.typography.titleLarge)
+                TextEncodingChoices(viewModel::chooseTextEncoding)
+                TextButton(onClick = onBack) { Text(stringResource(R.string.reader_encoding_back)) }
+            }
+            ReaderUiState.Reconnect -> ReaderSourceMessage(
+                R.string.reader_source_unavailable, R.string.reader_reconnect, onReconnect, onBack,
+            )
+            is ReaderUiState.Changed -> ReaderSourceMessage(
+                R.string.reader_source_changed, R.string.reader_open_revision,
+                { onReplaceReader(current.newBookId) }, onBack,
+            )
+            is ReaderUiState.HiddenMatch -> ReaderSourceMessage(
+                R.string.reader_hidden_match, R.string.reader_restore, viewModel::restoreHiddenMatch, onBack,
+            )
+            is ReaderUiState.Redirect -> {
+                LaunchedEffect(current.bookId) { onReplaceReader(current.bookId) }
+            }
+            is ReaderUiState.Ready -> Box(Modifier.fillMaxSize()) {
+                val pdf = current.session as? PdfSession
+                val pdfDisplay by viewModel.pdfDisplay.collectAsStateWithLifecycle()
+                if (current.session.surface == NavigationSurface.PDF) {
+                    requireNotNull(pdf)
+                    pdfDisplay?.let { display ->
+                        val initialPage = remember(pdf) { viewModel.initialPdfPage() }
+                        PdfReaderView(
+                            source = pdf.pages,
+                            layout = display.layout,
+                            cropMargins = display.cropMargins,
+                            initialPage = initialPage,
+                            onPageChanged = viewModel::onPdfPageChanged,
+                            onCenterTap = viewModel::toggleOverlay,
+                            initialZoom = display.zoom,
+                            initialZoomX = display.zoomX,
+                            onZoomChanged = viewModel::setPdfZoom,
+                        )
+                    }
+                } else if (current.session.surface == NavigationSurface.PUBLICATION) {
+                    ReaderSurface(current, viewModel)
+                }
+                if (overlay && current.session.textEncoding != null) TextButton(
+                    onClick = { encodingPicker = true },
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                ) { Text(stringResource(R.string.reader_text_encoding)) }
+                ReaderOverlay(
+                    visible = overlay,
+                    title = current.title,
+                    chapterTitle = chapterTitle,
+                    progression = progression,
+                    canMarkFinished = canMarkFinished,
+                    onMarkFinished = viewModel::markFinished,
+                    onBack = onBack,
+                    pdfDisplay = if (pdf != null) pdfDisplay else null,
+                    onPdfLayoutChange = viewModel::setPdfLayout,
+                    onCropMarginsChange = viewModel::setCropMargins,
+                )
+            }
         }
     }
+}
+
+/** Reserve real system-bar and camera bounds once for every reader state and format. */
+@Composable
+internal fun ReaderViewport(
+    insets: WindowInsets = WindowInsets.safeDrawing,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        Modifier.fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .windowInsetsPadding(insets),
+    ) { content() }
 }
 
 @Composable
@@ -230,7 +246,7 @@ private fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewModel
     }
 }
 
-/** Hides system bars (swipe to peek) and keeps the screen on while the reader is shown. */
+/** Keep status information visible; only the navigation bar hides during reading. */
 @Composable
 private fun ImmersiveReadingWindow() {
     val activity = LocalActivity.current ?: return
@@ -238,7 +254,8 @@ private fun ImmersiveReadingWindow() {
     DisposableEffect(activity) {
         val controller = WindowCompat.getInsetsController(activity.window, view)
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        controller.hide(WindowInsetsCompat.Type.systemBars())
+        controller.show(WindowInsetsCompat.Type.statusBars())
+        controller.hide(WindowInsetsCompat.Type.navigationBars())
         view.keepScreenOn = true
         onDispose {
             controller.show(WindowInsetsCompat.Type.systemBars())

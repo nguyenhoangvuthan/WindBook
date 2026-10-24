@@ -1,6 +1,6 @@
 # Folder library verification
 
-This increment discovers EPUB, PDF, MOBI, AZW3, FB2, CBZ, CBR and TXT through a read-only Android folder grant. Only EPUB/PDF reading is implemented here. The six additional readers remain in `2026-10-21-ebook-format-readers.md`.
+This increment discovers EPUB, PDF, MOBI, AZW3, FB2, CBZ, CBR and TXT through a read-only Android folder grant. EPUB/PDF/TXT reading is implemented and reviewed. On 2026-10-24 the owner paused the five other readers in `2026-10-21-ebook-format-readers.md`; discovery of those formats does not enable reading.
 
 Use synthetic files only for recorded evidence. Never modify the owner's external library. Each source must retain its bytes after scanning, reading, disconnecting and reconnecting.
 

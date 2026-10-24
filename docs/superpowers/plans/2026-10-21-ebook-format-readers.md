@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-21-folder-library-design.md` (owner approved 2026-10-21).
 
-**Status:** Owner approved on 2026-10-22, including Junrar/slf4j, libmobi, NDK installation and subagent-driven execution.
+**Status:** Owner approved on 2026-10-22, including Junrar/slf4j, libmobi, NDK installation and subagent-driven execution. Tasks 1–2 are complete and independently reviewed. On 2026-10-24 the owner paused Tasks 3–7: EPUB/PDF/TXT are sufficient for now; fix fullscreen status-bar visibility and deliver that scope. The remaining formats are deferred, not completed.
 
 ## Global Constraints
 

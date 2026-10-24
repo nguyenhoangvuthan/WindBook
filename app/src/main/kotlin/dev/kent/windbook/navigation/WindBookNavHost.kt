@@ -25,7 +25,7 @@ fun WindBookNavHost() {
         bottomBar = {
             if (currentTab != null) WindBookTabBar(selected = currentTab, onSelect = { backStack.selectTab(it) })
         },
-        // Screens handle their own status-bar inset; the reader must stay edge to edge.
+        // Screens handle their own insets, including the reader's shared safe viewport.
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
     ) { padding ->
         NavDisplay(

@@ -182,9 +182,10 @@ class FolderRepository(
                         DocumentsContract.buildTreeDocumentUri(oldUri.authority,
                             DocumentsContract.getTreeDocumentId(oldUri)).toString() else null
                     val repairAccess = oldTree != null && oldTree !in heldTrees
+                    val changedStamp = source.size != document.size || source.mtime != document.modifiedAt
                     source = source.copy(uri = if (repairAccess) document.uri else source.uri,
                         size = document.size, mtime = document.modifiedAt,
-                        availability = if (source.availability in setOf("MISSING", "DISCONNECTED", "ACCESS_DENIED"))
+                        availability = if (changedStamp || source.availability in setOf("MISSING", "DISCONNECTED", "ACCESS_DENIED"))
                             "UNVERIFIED" else source.availability)
                     db.sourceDao().update(source)
                     known++

@@ -64,7 +64,7 @@ class BookSourcesRepository(
     suspend fun reconnect(bookId: String, replacement: BookSource, sha256: String): Verification =
         db.withWriteTransaction { verifyLocked(bookId, replacement, sha256) }
 
-    private suspend fun verifyLocked(bookId: String, source: BookSource, sha: String): Verification {
+    private suspend fun verifyLocked(bookId: String, source: BookSource, sha: String, allowRedirect: Boolean = true): Verification {
         val books = db.libraryDao()
         val book = requireNotNull(books.findIncludingHidden(bookId))
         if (book.deletedAt != null) return Verification.HiddenMatch(bookId)
@@ -75,7 +75,10 @@ class BookSourcesRepository(
         val match = books.findBySha(sha)?.takeIf { it.id != bookId }
         val hasData = db.annotationDao().hasAnnotations(bookId) || db.sourceDao().hasTextProgress(bookId) || books.progress(bookId) != null || db.bookPreferencesDao().json(bookId) != null ||
             book.lastOpenedAt != null || book.status != "TO_READ"
-        val decision = SourceRevisionPolicy.decide(book.sha256, sha, match != null, hasData, match?.deletedAt != null)
+        val proposed = SourceRevisionPolicy.decide(book.sha256, sha, match != null, hasData, match?.deletedAt != null)
+        // A background cover must not tombstone an ID already captured by a pending reader.
+        // Foreground verification still performs the existing explicit redirect.
+        val decision = if (!allowRedirect && proposed == RevisionDecision.REDIRECT) RevisionDecision.READY else proposed
         if (decision == RevisionDecision.HIDDEN) return Verification.HiddenMatch(requireNotNull(match).id)
         var target = bookId
         var result: Verification = Verification.Ready(bookId, source)
@@ -108,6 +111,35 @@ class BookSourcesRepository(
         if (existing == null) db.sourceDao().insert(verified) else db.sourceDao().update(verified)
         return result
     }
+
+    suspend fun folderCoverCandidates(runId: String, afterSourceId: String = "", limit: Int = 64): List<dev.kent.windbook.core.data.folders.FolderCoverCandidate> {
+        require(limit in 1..100)
+        return db.sourceDao().folderCoverCandidates(runId, afterSourceId, limit).map { it.candidate(runId) }
+    }
+
+    /** Stop/disconnect/revision changes and publication share the same database transaction. */
+    suspend fun commitFolderMetadata(candidate: dev.kent.windbook.core.data.folders.FolderCoverCandidate,
+        sha256: String, metadata: ExtractedMetadata, coverPath: String?): dev.kent.windbook.core.data.folders.FolderMetadataCommit = db.withWriteTransaction {
+        val current = db.sourceDao().folderCoverCandidate(candidate.runId, candidate.source.id)
+            ?.candidate(candidate.runId) ?: return@withWriteTransaction dev.kent.windbook.core.data.folders.FolderMetadataCommit(false)
+        if (current != candidate) return@withWriteTransaction dev.kent.windbook.core.data.folders.FolderMetadataCommit(false)
+        val source = BookSource.External(requireNotNull(current.source.uri),
+            DocumentKey(requireNotNull(current.source.authority), requireNotNull(current.source.documentId)))
+        val target = when (val verified = verifyLocked(current.source.bookId, source, sha256, allowRedirect = false)) {
+            is Verification.Ready -> verified.bookId
+            is Verification.Redirect -> verified.bookId
+            is Verification.Changed -> verified.newBookId
+            is Verification.HiddenMatch -> return@withWriteTransaction dev.kent.windbook.core.data.folders.FolderMetadataCommit(false)
+        }
+        val book = db.libraryDao().findById(target) ?: return@withWriteTransaction dev.kent.windbook.core.data.folders.FolderMetadataCommit(false)
+        db.libraryDao().update(book.copy(title = metadata.title?.takeIf { it.isNotBlank() } ?: book.title,
+            author = metadata.author ?: book.author, coverPath = coverPath ?: book.coverPath, updatedAt = clock()))
+        dev.kent.windbook.core.data.folders.FolderMetadataCommit(true,
+            book.coverPath?.takeIf { coverPath != null && it != coverPath })
+    }
+
+    /** Include hidden/revision rows: their images remain durable reading data. */
+    suspend fun coverIsReferenced(path: String): Boolean = db.sourceDao().coverIsReferenced(path)
 
     suspend fun enrich(bookId: String, metadata: ExtractedMetadata, coverPath: String?) = db.withWriteTransaction {
         val book = db.libraryDao().findIncludingHidden(bookId) ?: return@withWriteTransaction

@@ -39,6 +39,43 @@ class FolderScanCoordinatorTest {
             withTimeout(10_000) { coordinator.observe(folder).first { it.runId == id && it.state != "RUNNING" } }
         }
 
+    @Test fun coversRunAfterDiscoveryAndBeforeCompleteWithoutReadingAnyBook() = runTest {
+        val folder = repo.save(tree, "Root", ScanOptions())
+        children = { _, _ -> flowOf(doc("one")) }
+        var during: ScanProgress? = null
+        lateinit var coordinator: FolderScanCoordinator
+        coordinator = FolderScanCoordinator(repo, FolderScanner(access), backgroundScope, FolderBookEnricher { run ->
+            val progress = coordinator.observe(folder).first { it.runId == run }
+            during = progress
+            assertEquals(1L, progress.matched)
+        })
+        val done = terminal(coordinator, folder, coordinator.start(folder))
+        assertNotNull("Scan must prepare covers before completion", during)
+        val observed = requireNotNull(during)
+        assertEquals("RUNNING", observed.state)
+        assertTrue(observed.preparingCovers)
+        assertEquals("COMPLETE", done.state)
+        assertFalse(done.preparingCovers)
+    }
+
+    @Test fun stopInvalidatesRunAndCancelsCoverPreparation() = runTest {
+        val folder = repo.save(tree, "Root", ScanOptions())
+        children = { _, _ -> flowOf(doc("one")) }
+        var cancelled = false
+        val coordinator = FolderScanCoordinator(repo, FolderScanner(access), backgroundScope, FolderBookEnricher {
+            try { awaitCancellation() } finally { cancelled = true }
+        })
+        val id = coordinator.start(folder)
+        val preparing = withContext(Dispatchers.Default) {
+            withTimeout(10_000) { coordinator.observe(folder).first { it.preparingCovers || it.state != "RUNNING" } }
+        }
+        assertTrue("Run should wait in the cancellable cover phase", preparing.preparingCovers)
+        coordinator.stop(id)
+        assertTrue(cancelled)
+        assertEquals("INTERRUPTED", db.folderDao().run(id)!!.state)
+        assertFalse(coordinator.observe(folder).first().preparingCovers)
+    }
+
     @Test fun repeatedAndOverlappingScans_reuseIdentityKeepHiddenAndFilterObservedEntries() = runTest {
         // A usable canonical grant remains preferred across overlapping discovery.
         repo = FolderRepository(db, { setOf(tree, "content://scan.test/tree/other") }, {}, { _, _ -> }) { 99 }

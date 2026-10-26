@@ -254,6 +254,18 @@ class ReaderViewModelTest {
         override suspend fun open(source: SourceLease, format: BookFormat): Result<ReaderSession> =
             try { Result.success(block(source)) } finally { source.close() }
     }
+    @Test fun verifiedExternalCoverIsReusedWithoutReextractingOrOrphaningIt() = runTest {
+        external()
+        val cached = files.writeCover("folder-cached", byteArrayOf(1, 2, 3))
+        db.libraryDao().update(db.libraryDao().findById("a")!!.copy(coverPath = cached.path))
+        var extractions = 0
+        metadata = SourceMetadata { _, _ -> extractions++; Result.success(ExtractedMetadata("Fresh title", null, byteArrayOf(4))) }
+        assertTrue(viewModel("a", verifiedOpener { FakeSession(BookFormat.EPUB) }).awaitSettled() is ReaderUiState.Ready)
+        assertEquals(0, extractions)
+        assertEquals(cached.path, library.book("a")!!.coverPath)
+        assertEquals(1, files.coversDir.listFiles()!!.size)
+    }
+
     @Test fun changedBytes_neverOpenOrApplySavedLocatorAndRetainOriginalProgress() = runTest {
         external("old"); library.saveProgress("a", "old-locator", .4)
         var callsBeforeVerification = 0

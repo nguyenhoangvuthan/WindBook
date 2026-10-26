@@ -160,4 +160,5 @@
     <string name="notes_start_handle">Đầu vùng chọn</string>
     <string name="notes_end_handle">Cuối vùng chọn</string>
     <string name="licences_body">Phông chữ Literata: SIL Open Font License 1.1\nReadium Kotlin Toolkit: BSD 3-Clause\nAndroidX, Hilt, Coil, Kotlin: Apache License 2.0\nBiểu tượng Lucide Book Open: giấy phép ISC\n© 2026 Lucide Icons and Contributors</string>
+    <string name="folder_preparing_covers">Đang lấy ảnh bìa…</string>
 </resources>

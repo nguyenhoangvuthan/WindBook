@@ -27,3 +27,5 @@ Daily feedback increment (2026-10-27): recursive EPUB/PDF/TXT folder-task scan, 
 Settings alignment correction (2026-10-27,0.1.2): consistent label column, typography and row spacing; actual Vietnamese/English/large-font verification and varied real EPUB/PDF import/read checks. No broader milestone or paused-reader scope change. See `docs/testing/settings-library-checklist.md`.
 
 Minimal launcher icon (2026-10-27,0.1.3): owner-approved Lucide Book Open outline, bronze/cream and themed monochrome, with ISC notice packaged.385JVM tests/lint0errors9baseline warnings, independent review and actual API31/36 launcher checks pass. Deliverable in main-checkout `publish/`; see `docs/testing/launcher-icon-checklist.md`.
+
+Folder covers correction (2026-10-27,0.1.4): scan prepares persistent EPUB/PDF shelf covers before any reader opens; safe cancellation/revisions/cache cleanup and existing-folder backfill verified.408JVM tests, baseline-only lint and independent fix-wave review pass;24 fresh real books save24 covers without opening. Existing libraries rescan to fill missing covers. See `docs/testing/folder-covers-checklist.md`.

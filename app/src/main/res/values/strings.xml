@@ -165,4 +165,5 @@
     <string name="notes_no_text">No selectable text at this point.</string>
     <string name="notes_start_handle">Selection start</string>
     <string name="notes_end_handle">Selection end</string>
+    <string name="folder_preparing_covers">Preparing book covers…</string>
 </resources>

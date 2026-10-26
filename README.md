@@ -3,9 +3,9 @@
 A private, offline EPUB/PDF/TXT reader for Android 12+ (minSdk 31, targetSdk 36), built with Kotlin, Jetpack Compose and Readium.
 Delivery APKs and their SHA-256 checksums are exported to **`publish/` at the main
 checkout root**, including when builds run in a nested worktree. Delivery files stay
-untracked. Latest APK: `publish/WindBook-0.1.3-minimal-icon-debug.apk`.
+untracked. Latest APK: `publish/WindBook-0.1.4-folder-covers-debug.apk`.
 
-Current version: **v0.1.3 (minimal launcher icon)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese.
+Current version: **v0.1.4 (folder covers)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese.
 
 PDF opens page by page by default; explicit saved layout choices are preserved.
 Vertical scrolling, margin cropping and remembered zoom remain available. Fullscreen
@@ -14,7 +14,11 @@ reading keeps the system status bar visible. Reflow remains removed.
 Open **Settings → Book folders** to choose EPUB/PDF/TXT scan defaults. In **Book
 folders**, type a device folder path or choose one, keep recursive scanning enabled
 and press **Scan folder**. Android asks for read access once if needed, then the
-scan starts automatically. All matching descendants are scanned; results can be
+scan starts automatically. After discovery, the scan saves embedded EPUB covers
+and PDF first-page covers to the shelf before reporting completion; books do not
+need to be opened first. Rescan a previously added folder to fill missing covers.
+Cover preparation is sequential, cancellable and cached; books without an embedded
+cover retain their title fallback. All matching descendants are scanned; results can be
 sorted by title or time added to WindBook. A typed path never grants access by
 itself, and a Linux computer path does not refer to a folder on the phone.
 

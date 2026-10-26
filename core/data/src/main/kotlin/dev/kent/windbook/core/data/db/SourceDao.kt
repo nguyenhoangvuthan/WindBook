@@ -18,6 +18,37 @@ interface SourceDao {
     @Query("DELETE FROM reading_progress WHERE book_id = :bookId")
     suspend fun clearProgress(bookId: String)
 
+    @Query("""
+        SELECT s.*, b.format AS bookFormat, b.sha256 AS bookSha256,
+            b.cover_path AS coverPath, m.relative_path AS relativePath
+        FROM book_sources s JOIN books b ON b.id = s.book_id
+        JOIN folder_memberships m ON m.source_id = s.id
+        JOIN folders f ON f.id = m.folder_id
+        JOIN scan_runs r ON r.folder_id = f.id AND r.id = :runId
+        WHERE r.state = 'RUNNING' AND m.last_seen_run = r.id AND m.present = 1
+            AND f.disconnected_at IS NULL AND b.deleted_at IS NULL
+            AND s.kind = 'EXTERNAL' AND b.format IN ('EPUB', 'PDF')
+            AND s.id > :afterSourceId ORDER BY s.id LIMIT :limit
+    """)
+    suspend fun folderCoverCandidates(runId: String, afterSourceId: String, limit: Int): List<FolderCoverRow>
+
+    @Query("""
+        SELECT s.*, b.format AS bookFormat, b.sha256 AS bookSha256,
+            b.cover_path AS coverPath, m.relative_path AS relativePath
+        FROM book_sources s JOIN books b ON b.id = s.book_id
+        JOIN folder_memberships m ON m.source_id = s.id
+        JOIN folders f ON f.id = m.folder_id
+        JOIN scan_runs r ON r.folder_id = f.id AND r.id = :runId
+        WHERE r.state = 'RUNNING' AND m.last_seen_run = r.id AND m.present = 1
+            AND f.disconnected_at IS NULL AND b.deleted_at IS NULL
+            AND s.kind = 'EXTERNAL' AND b.format IN ('EPUB', 'PDF')
+            AND s.id = :sourceId
+    """)
+    suspend fun folderCoverCandidate(runId: String, sourceId: String): FolderCoverRow?
+
+    @Query("SELECT EXISTS(SELECT 1 FROM books WHERE cover_path = :path)")
+    suspend fun coverIsReferenced(path: String): Boolean
+
     @Insert
     suspend fun insert(source: BookSourceEntity)
 
@@ -66,4 +97,15 @@ interface SourceDao {
         )
     """)
     suspend fun connectedSourceUsesGrant(treeUri: String): Boolean
+}
+
+data class FolderCoverRow(
+    @androidx.room3.Embedded val source: BookSourceEntity,
+    val bookFormat: String,
+    val bookSha256: String?,
+    val coverPath: String?,
+    val relativePath: String,
+) {
+    fun candidate(runId: String) = dev.kent.windbook.core.data.folders.FolderCoverCandidate(
+        runId, source, dev.kent.windbook.core.model.BookFormat.valueOf(bookFormat), bookSha256, coverPath, relativePath)
 }

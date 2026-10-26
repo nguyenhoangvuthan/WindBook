@@ -156,7 +156,7 @@ fun FolderScreen(state: FolderUiState, actions: FolderActions,
             }
             Text(stringResource(R.string.folder_counts, state.progress.examined, state.progress.matched,
                 state.progress.added, state.progress.known, state.progress.unreadable + state.progress.directoryErrors))
-            Text(stringResource(when (state.progress.state) {
+            Text(stringResource(if (state.progress.preparingCovers) R.string.folder_preparing_covers else when (state.progress.state) {
                 "RUNNING" -> R.string.folder_running
                 "COMPLETE" -> R.string.folder_complete
                 "INCOMPLETE", "INTERRUPTED" -> R.string.folder_incomplete

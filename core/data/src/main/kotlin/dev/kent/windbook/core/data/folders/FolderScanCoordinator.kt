@@ -10,8 +10,9 @@ import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -27,6 +28,7 @@ data class ScanProgress(
     val unreadable: Long = 0,
     val directoryErrors: Long = 0,
     val currentPath: String = "",
+    val preparingCovers: Boolean = false,
 )
 
 /** Bound as one app singleton; scans remain owned by the app when a screen closes. */
@@ -34,7 +36,9 @@ class FolderScanCoordinator(
     private val repository: FolderRepository,
     private val scanner: FolderScanner,
     private val scope: CoroutineScope,
+    private val enricher: FolderBookEnricher = FolderBookEnricher { },
 ) {
+    private val coverRun = MutableStateFlow<String?>(null)
     private val controls = Mutex()
     private var active: Pair<String, Job>? = null
 
@@ -76,6 +80,11 @@ class FolderScanCoordinator(
                         if (event is ScanEvent.Examined && examined % 100 == 0L) flush()
                     }
                     flush()
+                    currentCoroutineContext().ensureActive()
+                    coverRun.value = run.id
+                    enricher.enrich(run.id)
+                    currentCoroutineContext().ensureActive()
+                    coverRun.value = null
                     repository.finishScan(run.id, if (complete) "COMPLETE" else "INCOMPLETE")
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -85,6 +94,7 @@ class FolderScanCoordinator(
                     flush()
                     repository.finishScan(run.id, "INCOMPLETE")
                 } finally {
+                    if (coverRun.value == run.id) coverRun.value = null
                     withContext(NonCancellable) { repository.finishScan(run.id, "INTERRUPTED") }
                 }
             }
@@ -110,8 +120,8 @@ class FolderScanCoordinator(
         active = null
     }
 
-    fun observe(folderId: String): Flow<ScanProgress> = repository.observeRun(folderId).map { run ->
-        run?.progress() ?: ScanProgress("", "IDLE")
+    fun observe(folderId: String): Flow<ScanProgress> = combine(repository.observeRun(folderId), coverRun) { run, covering ->
+        run?.progress()?.copy(preparingCovers = run.state == "RUNNING" && run.id == covering) ?: ScanProgress("", "IDLE")
     }
 }
 

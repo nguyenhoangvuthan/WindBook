@@ -82,9 +82,14 @@ object AppModule {
     fun applicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Provides @Singleton
-    fun folderScans(folders: FolderRepository, @ApplicationContext context: Context, scope: CoroutineScope): FolderScanCoordinator =
-        FolderScanCoordinator(folders, FolderScanner(DocumentsTreeAccess(context.contentResolver)),
-            scope)
+    fun folderCoverLoader(books: BookSourcesRepository, access: SourceAccess, metadata: SourceMetadata,
+        files: BookFileStore): dev.kent.windbook.core.data.folders.FolderBookEnricher =
+        dev.kent.windbook.folders.FolderCoverLoader(books, access, metadata, files)
+
+    @Provides @Singleton
+    fun folderScans(folders: FolderRepository, @ApplicationContext context: Context, scope: CoroutineScope,
+        covers: dev.kent.windbook.core.data.folders.FolderBookEnricher): FolderScanCoordinator =
+        FolderScanCoordinator(folders, FolderScanner(DocumentsTreeAccess(context.contentResolver)), scope, covers)
 
     @Provides @Singleton
     fun bookSources(db: WindBookDatabase, folders: FolderRepository): BookSourcesRepository =

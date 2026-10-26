@@ -157,9 +157,13 @@ class ReaderViewModel @AssistedInject constructor(
                         is Verification.Ready -> Unit
                     }
                     acquiredAny = true
-                    enrichment = try { metadata.read(lease, book.format).getOrNull() }
-                        catch (e: CancellationException) { throw e }
-                        catch (_: Exception) { null }
+                    val verifiedBook = library.book(bookId)
+                    val cachedCover = verifiedBook?.sha256 == sha && verifiedBook.coverPath?.let { File(it).isFile } == true
+                    if (!cachedCover) {
+                        enrichment = try { metadata.read(lease, book.format).getOrNull() }
+                            catch (e: CancellationException) { throw e }
+                            catch (_: Exception) { null }
+                    }
                     val encoding = if (book.format == dev.kent.windbook.core.model.BookFormat.TXT)
                         sources.textEncoding(bookId, source)?.let(dev.kent.windbook.reader.formats.TextEncoding::valueOf) else null
                     val transferred = lease

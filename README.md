@@ -1,19 +1,31 @@
 # WindBook
 
 A private, offline EPUB/PDF/TXT reader for Android 12+ (minSdk 31, targetSdk 36), built with Kotlin, Jetpack Compose and Readium.
-Current version: **v0.1.0 (Milestone 1: core reading loop)**. It imports books, shows a library and opens EPUB/PDF. It always reopens at the exact page, even after rotation or the app being killed. UI in English and Vietnamese.
+Current version: **v0.1.1 (daily reading feedback)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese.
 
-PDF supports vertical scrolling and page-by-page reading, margin cropping and
-remembered zoom. Reflow was removed by owner decision on 2026-10-20; books
-with that saved mode reopen vertically at their saved page.
+PDF opens page by page by default; explicit saved layout choices are preserved.
+Vertical scrolling, margin cropping and remembered zoom remain available. Fullscreen
+reading keeps the system status bar visible. Reflow remains removed.
 
-Folder browsing uses Android's folder picker to remember a read-only grant. Open
-**Book folders**, choose a folder, select extensions and recursive scanning, then
-scan manually. Typing a location does not grant access. Stop preserves results
-already committed; hiding or disconnecting never deletes source files. EPUB/PDF/TXT
-open from their original folder, with bounded temporary preparation for the active
-book. Discovery supports eight formats; reading supports EPUB, PDF and TXT.
-FB2/CBZ/CBR/MOBI/AZW3 readers are paused by owner decision. See [folder verification](docs/testing/folder-library-checklist.md).
+Open **Settings → Book folders** to choose EPUB/PDF/TXT scan defaults. In **Book
+folders**, type a device folder path or choose one, keep recursive scanning enabled
+and press **Scan folder**. Android asks for read access once if needed, then the
+scan starts automatically. All matching descendants are scanned; results can be
+sorted by title or time added to WindBook. A typed path never grants access by
+itself, and a Linux computer path does not refer to a folder on the phone.
+
+EPUB/PDF/TXT open from their source folder, with bounded temporary preparation for
+the active book. Scanning, hiding and disconnecting do not modify source files.
+FB2/CBZ/CBR/MOBI/AZW3 remain paused. **Add books** still imports EPUB/PDF only.
+
+On **Android 15+**, long-press PDF text, adjust the handles, then choose a highlight
+color or **Note**. The **Notes** tab supports search, edit, delete and returning to
+the passage. Older Android versions still read PDFs and explain that text selection
+is unavailable. EPUB and scanned-PDF notes remain deferred. Notes are stored in
+WindBook; the source PDF stays unchanged.
+
+See [daily feedback verification](docs/testing/daily-reading-feedback-checklist.md)
+and [folder verification](docs/testing/folder-library-checklist.md).
 
 - Design spec: [docs/superpowers/specs/2026-10-13-windbook-design.md](docs/superpowers/specs/2026-10-13-windbook-design.md)
 - Roadmap: [docs/superpowers/plans/2026-10-13-windbook-roadmap.md](docs/superpowers/plans/2026-10-13-windbook-roadmap.md)
@@ -75,7 +87,7 @@ Back up `~/keys/windbook-release.jks` and its passwords somewhere safe (two copi
 ## 3. Automated tests
 
 ```bash
-# Unit tests (no device needed): 346 tests at the EPUB/PDF/TXT status-bar checkpoint
+# Unit tests (no device needed): 385 tests at the daily-reading-feedback checkpoint
 ./gradlew :core:model:test :core:data:testDebugUnitTest :reader:testDebugUnitTest :app:testDebugUnitTest
 
 # Lint

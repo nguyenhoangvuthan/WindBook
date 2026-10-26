@@ -180,7 +180,11 @@ internal fun PdfTextPageOverlay(source: PdfPageSource,page: Int,crop: CropBox,si
                     }
                 }
             }
-            Popup(popupPositionProvider=positionProvider,onDismissRequest=ui.onClear) {
+            // Handles live in the page window: outside-touch dismissal would clear selection
+            // on their initial down event, before the drag detector can consume movement.
+            // Page taps already clear selection explicitly; Back behavior remains unchanged.
+            Popup(popupPositionProvider=positionProvider,onDismissRequest=ui.onClear,
+                properties=androidx.compose.ui.window.PopupProperties(dismissOnClickOutside=false)) {
                 Surface(shape=MaterialTheme.shapes.small,shadowElevation=6.dp,color=MaterialTheme.colorScheme.surfaceContainerHigh) {
                     var colors by remember(anchor,ui.activeIds) { mutableStateOf(false) }
                     Column(Modifier.padding(horizontal=6.dp,vertical=4.dp)) {

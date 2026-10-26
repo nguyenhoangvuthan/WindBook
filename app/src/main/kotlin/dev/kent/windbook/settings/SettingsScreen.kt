@@ -5,6 +5,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -84,21 +86,26 @@ fun SettingsScreen(state: SettingsUiState, onLanguageChange: (AppLanguage) -> Un
                             onClick = { onLanguageChange(language) },
                             role = Role.RadioButton,
                         )
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                        .heightIn(min = 56.dp)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    Text(stringResource(language.labelRes), style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f))
+                    Spacer(Modifier.width(16.dp))
                     RadioButton(selected = language == state.language, onClick = null)
-                    Spacer(Modifier.width(12.dp))
-                    Text(stringResource(language.labelRes), style = MaterialTheme.typography.bodyLarge)
                 }
             }
         }
 
         SettingsGroup(stringResource(R.string.settings_folder_scanning)) {
-            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(R.string.settings_scan_defaults_hint), style = MaterialTheme.typography.bodySmall)
                 FolderScanOptions(state.scanOptions, onScanRecursiveChange, onScanExtensionToggle, onScanExtensionsChange)
-                TextButton(onClick = onFolders) { Text(stringResource(R.string.folder_title)) }
+                Text(stringResource(R.string.folder_title), style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onFolders)
+                        .heightIn(min = 48.dp).padding(vertical = 12.dp))
             }
         }
 
@@ -117,7 +124,8 @@ fun SettingsScreen(state: SettingsUiState, onLanguageChange: (AppLanguage) -> Un
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(role = Role.Button) { showLicences = true }
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                    .heightIn(min = 56.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
             )
         }
         Spacer(Modifier.height(24.dp))
@@ -152,8 +160,9 @@ private fun SettingsGroup(title: String, content: @Composable ColumnScope.() -> 
 
 @Composable
 private fun ValueRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

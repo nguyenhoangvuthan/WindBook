@@ -1,7 +1,7 @@
 # WindBook
 
 A private, offline EPUB/PDF/TXT reader for Android 12+ (minSdk 31, targetSdk 36), built with Kotlin, Jetpack Compose and Readium.
-Current version: **v0.1.1 (daily reading feedback)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese.
+Current version: **v0.1.2 (Settings alignment)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese.
 
 PDF opens page by page by default; explicit saved layout choices are preserved.
 Vertical scrolling, margin cropping and remembered zoom remain available. Fullscreen
@@ -23,6 +23,9 @@ color or **Note**. The **Notes** tab supports search, edit, delete and returning
 the passage. Older Android versions still read PDFs and explain that text selection
 is unavailable. EPUB and scanned-PDF notes remain deferred. Notes are stored in
 WindBook; the source PDF stays unchanged.
+
+Settings uses consistent text alignment and row spacing. The 0.1.2 check includes
+24 real EPUB/PDF samples; see [Settings and real-library verification](docs/testing/settings-library-checklist.md).
 
 See [daily feedback verification](docs/testing/daily-reading-feedback-checklist.md)
 and [folder verification](docs/testing/folder-library-checklist.md).

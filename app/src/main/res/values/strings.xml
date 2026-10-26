@@ -71,7 +71,7 @@
     <string name="settings_about">About</string>
     <string name="version">Version %1$s</string>
     <string name="licences">Open-source licences</string>
-    <string name="licences_body" translatable="false">Literata typeface: SIL Open Font License 1.1\nReadium Kotlin Toolkit: BSD 3-Clause\nAndroidX, Hilt, Coil, Kotlin: Apache License 2.0</string>
+    <string name="licences_body">Literata typeface: SIL Open Font License 1.1\nReadium Kotlin Toolkit: BSD 3-Clause\nAndroidX, Hilt, Coil, Kotlin: Apache License 2.0\nLucide Book Open icon: ISC License\n© 2026 Lucide Icons and Contributors</string>
     <string name="close">Close</string>
     <string name="cd_view_mode">View</string>
     <string name="layout_vertical">Vertical scroll</string>

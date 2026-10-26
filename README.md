@@ -3,9 +3,9 @@
 A private, offline EPUB/PDF/TXT reader for Android 12+ (minSdk 31, targetSdk 36), built with Kotlin, Jetpack Compose and Readium.
 Delivery APKs and their SHA-256 checksums are exported to **`publish/` at the main
 checkout root**, including when builds run in a nested worktree. Delivery files stay
-untracked. Latest APK: `publish/WindBook-0.1.2-settings-debug.apk`.
+untracked. Latest APK: `publish/WindBook-0.1.3-minimal-icon-debug.apk`.
 
-Current version: **v0.1.2 (Settings alignment)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese.
+Current version: **v0.1.3 (minimal launcher icon)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese.
 
 PDF opens page by page by default; explicit saved layout choices are preserved.
 Vertical scrolling, margin cropping and remembered zoom remain available. Fullscreen
@@ -27,6 +27,10 @@ color or **Note**. The **Notes** tab supports search, edit, delete and returning
 the passage. Older Android versions still read PDFs and explain that text selection
 is unavailable. EPUB and scanned-PDF notes remain deferred. Notes are stored in
 WindBook; the source PDF stays unchanged.
+
+The launcher uses the Lucide Book Open outline in bronze on cream, with Android
+themed-icon support. The icon is free to use under ISC; its notice is bundled in
+the APK and listed under Open-source licences. See [icon provenance](artwork/launcher/README.md).
 
 Settings uses consistent text alignment and row spacing. The 0.1.2 check includes
 24 real EPUB/PDF samples; see [Settings and real-library verification](docs/testing/settings-library-checklist.md).

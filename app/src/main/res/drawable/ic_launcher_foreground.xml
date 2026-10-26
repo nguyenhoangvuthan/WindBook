@@ -1,6 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lucide Book Open. Copyright (c) 2026 Lucide Icons and Contributors.
+     ISC notice: assets/licenses/lucide-LICENSE.txt; provenance: artwork/launcher. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#2B2B2B"
-        android:pathData="M30,38c8,-4 16,-4 24,1v34c-8,-5 -16,-5 -24,-1zM78,38c-8,-4 -16,-4 -24,1v34c8,-5 16,-5 24,-1z" />
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group android:scaleX="2.35" android:scaleY="2.35"
+        android:translateX="25.8" android:translateY="25.8">
+        <path android:fillColor="@android:color/transparent"
+            android:strokeColor="@color/ic_launcher_foreground"
+            android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M12,5v16" />
+        <path android:fillColor="@android:color/transparent"
+            android:strokeColor="@color/ic_launcher_foreground"
+            android:strokeWidth="2" android:strokeLineCap="round" android:strokeLineJoin="round"
+            android:pathData="M20.001,19 A2,2 0,0,0 22,17 V5 a2,2 0,0,0 -1.999,-2 L16,3.002 A5,5 0,0,0 12,5 a5,5 0,0,0 -4,-2 H4 a2,2 0,0,0 -2,2 v12 a2,2 0,0,0 1.999,2 H8 a5,5 0,0,1 4,2 a5,5 0,0,1 4,-2 z" />
+    </group>
 </vector>

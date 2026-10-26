@@ -11,14 +11,16 @@ import kotlinx.coroutines.Dispatchers
 
 @Database(
     entities = [
-        BookEntity::class, ReadingProgressEntity::class, BookPreferencesEntity::class, TextReadingStateEntity::class,
+        AnnotationEntity::class, BookEntity::class, ReadingProgressEntity::class, BookPreferencesEntity::class, TextReadingStateEntity::class,
         FolderEntity::class, BookSourceEntity::class, FolderMembershipEntity::class, ScanRunEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
     autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
 abstract class WindBookDatabase : RoomDatabase() {
+    abstract fun annotationDao(): AnnotationDao
+
     abstract fun libraryDao(): LibraryDao
 
     abstract fun bookPreferencesDao(): BookPreferencesDao
@@ -36,14 +38,14 @@ abstract class WindBookDatabase : RoomDatabase() {
         /** Opens (and migrates) the database file at [path]; tests pass the framework driver. */
         fun open(context: Context, path: String, driver: SQLiteDriver): WindBookDatabase =
             Room.databaseBuilder<WindBookDatabase>(context = context, name = path)
-                .addMigrations(FolderMigration, ScanReconciliationMigration, RevisionIdentityMigration, TextEncodingMigration)
+                .addMigrations(FolderMigration, ScanReconciliationMigration, RevisionIdentityMigration, TextEncodingMigration, AnnotationMigration)
                 .setDriver(driver)
                 .setQueryCoroutineContext(Dispatchers.IO)
                 .build()
 
         fun inMemory(context: Context, driver: SQLiteDriver): WindBookDatabase =
             Room.inMemoryDatabaseBuilder<WindBookDatabase>(context)
-                .addMigrations(FolderMigration, ScanReconciliationMigration, RevisionIdentityMigration, TextEncodingMigration)
+                .addMigrations(FolderMigration, ScanReconciliationMigration, RevisionIdentityMigration, TextEncodingMigration, AnnotationMigration)
                 .setDriver(driver)
                 .setQueryCoroutineContext(Dispatchers.IO)
                 .build()

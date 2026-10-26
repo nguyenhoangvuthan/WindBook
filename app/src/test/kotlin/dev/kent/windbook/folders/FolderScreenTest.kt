@@ -15,19 +15,59 @@ class FolderScreenTest {
     @get:Rule val compose = createComposeRule()
     @Test fun scanRequiresGrantAndExtensionWhileDefaultsIncludeRecursion() {
         compose.setContent { FolderScreen(FolderUiState(), FolderActions()) }
+        compose.onNodeWithTag("folder-list").performScrollToNode(hasText("Scan folder"))
         compose.onNodeWithText("Scan folder").assertIsNotEnabled()
-        compose.onNodeWithText("Include subfolders").assertIsDisplayed()
+        compose.onNodeWithText("Include subfolders").performScrollTo().assertIsDisplayed()
+    }
+    @Test fun typedDeviceLocationCanRequestAScan() {
+        var requested = false
+        compose.setContent { FolderScreen(FolderUiState(locationHint = "/sdcard/Books"), FolderActions(scan = { requested = true })) }
+        compose.onNodeWithText("Scan folder").performScrollTo().assertIsEnabled().performClick()
+        assertEquals(true, requested)
+    }
+    @Test fun collapsedSavedSelectorStaysReachableWithLargeResultsAndOnlySupportedFormats() {
+        val folders = (1..30).map { dev.kent.windbook.core.data.folders.FolderSummary("$it", "Saved $it", ScanOptions(), it != 2, null) }
+        val entries = (1..2376).map { dev.kent.windbook.core.data.folders.FolderEntry("book-$it", "source-$it", "$it.pdf", "$it.pdf",
+            BookFormat.PDF, dev.kent.windbook.core.model.SourceAvailability.AVAILABLE, title = "Synthetic $it") }
+        var selected = ""
+        compose.setContent { FolderScreen(FolderUiState(folders = folders, entries = entries, resolvedFolderId = "1"),
+            FolderActions(selectFolder = { selected = it })) }
+        compose.onNodeWithText("Saved 1").assertDoesNotExist()
+        compose.onNodeWithText("Saved folders").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Saved 1").assertIsSelected()
+        compose.onNodeWithText("Saved 2 · Disconnected").performScrollTo().performClick()
+        assertEquals("2", selected)
+        compose.onNodeWithText("Saved 1").assertDoesNotExist()
+        compose.onNodeWithText("Include subfolders").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(".txt").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(".fb2").assertDoesNotExist()
+        compose.onNodeWithText(".cbz").assertDoesNotExist()
+        compose.onNodeWithText(".mobi").assertDoesNotExist()
+        compose.onNodeWithTag("folder-list").performScrollToNode(hasText("Ready to scan"))
+        compose.onNodeWithText("Ready to scan").assertIsDisplayed()
+        compose.onNodeWithText("Saved 1").assertIsNotDisplayed()
     }
     @Test fun allAndClearDispatchRealOptions() {
         var options = ScanOptions()
         compose.setContent { FolderScreen(FolderUiState(), FolderActions(setExtensions = { options = options.copy(extensions = it) })) }
         compose.onNodeWithText("All").performScrollTo().performClick()
         compose.waitForIdle()
-        assertEquals(BookFormat.entries.toSet(), options.extensions)
+        assertEquals(setOf(BookFormat.EPUB, BookFormat.PDF, BookFormat.TXT), options.extensions)
         compose.onNodeWithText("Clear").performScrollTo().performClick()
         compose.waitForIdle()
         assertEquals(emptySet<BookFormat>(), options.extensions)
     }
+    @Test fun sortMenuExposesTitleAndAddedDirections() {
+        var selected = FolderSort.TITLE_ASC
+        compose.setContent { FolderScreen(FolderUiState(), FolderActions(setSort = { selected = it })) }
+        compose.onNodeWithTag("folder-list").performScrollToNode(hasText("Sort: Title (A–Z)"))
+        compose.onNodeWithText("Sort: Title (A–Z)").performClick()
+        compose.onNodeWithText("Title (Z–A)").assertIsDisplayed()
+        compose.onNodeWithText("Added to WindBook (newest first)").assertIsDisplayed()
+        compose.onNodeWithText("Added to WindBook (oldest first)").performClick()
+        assertEquals(FolderSort.ADDED_OLDEST, selected)
+    }
+
     @Test fun searchMatchesMetadataTitleAndOpensStableId() {
         var opened = ""
         val entry = dev.kent.windbook.core.data.folders.FolderEntry("stable-book", "source", "filename.pdf",
@@ -59,6 +99,7 @@ class FolderScreenTest {
     @org.robolectric.annotation.Config(qualifiers = "vi")
     @Test fun vietnameseDefaultsAndDisabledScan() {
         compose.setContent { FolderScreen(FolderUiState(), FolderActions()) }
+        compose.onNodeWithTag("folder-list").performScrollToNode(hasText("Quét thư mục"))
         compose.onNodeWithText("Quét thư mục").assertIsNotEnabled()
         compose.onNodeWithText("Quét cả thư mục con").performScrollTo().assertIsDisplayed()
     }

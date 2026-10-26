@@ -12,7 +12,7 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import dev.kent.windbook.library.LibraryRoute
-import dev.kent.windbook.notes.NotesScreen
+import dev.kent.windbook.notes.NotesRoute
 import dev.kent.windbook.reader.ReaderRoute
 import dev.kent.windbook.reading.ReadingRoute
 import dev.kent.windbook.settings.SettingsRoute
@@ -47,8 +47,10 @@ fun WindBookNavHost() {
                         onBrowseLibrary = { backStack.selectTab(TopLevelTab.LIBRARY) },
                     )
                 }
-                entry<NotesKey> { NotesScreen() }
-                entry<SettingsKey> { SettingsRoute() }
+                entry<NotesKey> {
+                    NotesRoute(onOpen = { bookId, annotationId -> backStack.openReader(bookId, annotationId) })
+                }
+                entry<SettingsKey> { SettingsRoute(onFolders = { backStack.add(FolderKey()) }) }
                 entry<FolderKey> { key ->
                     dev.kent.windbook.folders.FolderRoute(key.folderId,
                         onOpenBook = { id -> backStack.openReader(id) },
@@ -56,6 +58,7 @@ fun WindBookNavHost() {
                 }
                 entry<ReaderKey> { key ->
                     ReaderRoute(bookId = key.bookId, onBack = { backStack.removeLastOrNull() },
+                        annotationId = key.annotationId, revealRequestId = key.revealRequestId,
                         onReplaceReader = { id ->
                             backStack.removeLastOrNull()
                             backStack.openReader(id)

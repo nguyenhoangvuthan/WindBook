@@ -5,6 +5,11 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
+import android.os.Build
+import dev.kent.windbook.core.model.PdfPoint
+import dev.kent.windbook.core.model.PdfTextAnchor
+import dev.kent.windbook.core.model.PdfTextRect
+import dev.kent.windbook.core.model.PdfTextSelection
 import dev.kent.windbook.core.model.CropBox
 import dev.kent.windbook.core.model.PageSize
 import java.io.File
@@ -37,6 +42,33 @@ class PdfDocumentHandle private constructor(
     private val fallback = firstPage
 
     fun pageSize(page: Int): PageSize = sizes[page] ?: fallback
+
+    suspend fun selectText(page: Int, start: PdfPoint, end: PdfPoint): PdfTextSelection? {
+        if (Build.VERSION.SDK_INT < 35) return null
+        require(page in 0 until pageCount)
+        return withContext(thread) {
+            renderer.openPage(page).use { native ->
+                val width=native.width.toFloat(); val height=native.height.toFloat()
+                sizes[page]=PageSize(width,height)
+                if(listOf(start,end).any { !it.x.isFinite() || !it.y.isFinite() || it.x !in 0f..width || it.y !in 0f..height }) return@withContext null
+                val selected=native.selectContent(
+                    android.graphics.pdf.models.selection.SelectionBoundary(android.graphics.Point(start.x.toInt(),start.y.toInt())),
+                    android.graphics.pdf.models.selection.SelectionBoundary(android.graphics.Point(end.x.toInt(),end.y.toInt())),
+                ) ?: return@withContext null
+                val contents=selected.selectedTextContents
+                if(contents.size>PdfTextAnchor.MAX_RECTS || contents.sumOf { it.text.length.toLong() }>PdfTextAnchor.MAX_QUOTE) return@withContext null
+                if(contents.sumOf { it.bounds.size.toLong() }>PdfTextAnchor.MAX_RECTS) return@withContext null
+                val rectangles=contents.flatMap { it.bounds }.map { r ->
+                    PdfTextRect((r.left/width).coerceIn(0f,1f),(r.top/height).coerceIn(0f,1f),
+                        (r.right/width).coerceIn(0f,1f),(r.bottom/height).coerceIn(0f,1f))
+                }
+                val anchor=PdfTextAnchor(page=page,width=width,height=height,rects=rectangles,quote=contents.joinToString("") { it.text })
+                if(!anchor.isValid()) return@withContext null
+                val first=rectangles.first(); val last=rectangles.last()
+                PdfTextSelection(anchor,PdfPoint(first.left*width,first.bottom*height),PdfPoint(last.right*width,last.bottom*height))
+            }
+        }
+    }
 
     suspend fun measure(page: Int): PageSize = sizes[page] ?: withContext(thread) {
         renderer.openPage(page).use { PageSize(it.width.toFloat(), it.height.toFloat()) }.also { sizes[page] = it }

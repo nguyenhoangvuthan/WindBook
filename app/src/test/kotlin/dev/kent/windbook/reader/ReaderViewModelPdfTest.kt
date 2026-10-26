@@ -3,7 +3,6 @@ package dev.kent.windbook.reader
 import android.graphics.Bitmap
 import androidx.sqlite.driver.AndroidSQLiteDriver
 import androidx.test.core.app.ApplicationProvider
-import app.cash.turbine.test
 import dev.kent.windbook.core.data.DisplayPreferencesRepository
 import dev.kent.windbook.core.data.LibraryRepository
 import dev.kent.windbook.core.data.BookSourcesRepository
@@ -45,7 +44,8 @@ class ReaderViewModelPdfTest {
     private lateinit var library: LibraryRepository
     private lateinit var prefs: DisplayPreferencesRepository
 
-    private class FakePdf(private val size: PageSize, override val pageCount: Int = 10) : PdfSession {
+    private class FakePdf(private val size: PageSize, override val pageCount: Int = 10, val fingerprint: String? = "sha") : PdfSession {
+        override suspend fun annotationFingerprint() = fingerprint
         override val format = BookFormat.PDF
         override val pages = object : PdfPageSource {
             override val pageCount = 10
@@ -79,9 +79,19 @@ class ReaderViewModelPdfTest {
         BookFileStore(tmp.root))
     private fun vm(size: PageSize) = model(BookOpener { _, _ -> Result.success(FakePdf(size)) })
 
-    @Test fun portraitPdfDefaultsToVerticalWithCrop() = runTest {
+    @Test fun annotationRevealRequiresFingerprintOfTheOpenedSession() = runTest {
+        val model=vm(PageSize(400f,600f))
+        val ready=model.state.first { it is ReaderUiState.Ready } as ReaderUiState.Ready
+        assertEquals("sha",model.annotationFingerprint(ready.session as PdfSession))
+        val changed=model(BookOpener { _,_->Result.success(FakePdf(PageSize(400f,600f),fingerprint="changed")) })
+        val opened=changed.state.first { it is ReaderUiState.Ready } as ReaderUiState.Ready
+        org.junit.Assert.assertNull(changed.annotationFingerprint(opened.session as PdfSession))
+        org.junit.Assert.assertNull(model.annotationFingerprint(opened.session))
+    }
+
+    @Test fun portraitPdfDefaultsToPagedWithoutCrop() = runTest {
         val display = vm(PageSize(400f, 600f)).pdfDisplay.filterNotNull().first()
-        assertEquals(EffectiveDisplay(PdfLayout.VERTICAL, true), display)
+        assertEquals(EffectiveDisplay(PdfLayout.PAGED, false), display)
     }
 
     @Test fun slidesDefaultToPagedWithoutCrop() = runTest {
@@ -91,15 +101,12 @@ class ReaderViewModelPdfTest {
 
     @Test fun choosingPagedIsSavedForTheBook() = runTest {
         val model = vm(PageSize(400f, 600f))
-        model.pdfDisplay.test {
-            while (awaitItem() == null) {}
-            model.setPdfLayout(PdfLayout.PAGED)
-            var state = awaitItem()
-            while (state?.layout != PdfLayout.PAGED) state = awaitItem()
-            assertEquals(EffectiveDisplay(PdfLayout.PAGED, false), state)
-            cancelAndIgnoreRemainingEvents()
-        }
-        assertEquals(BookDisplayPrefs(PdfLayout.PAGED, null), prefs.observe("a").first())
+        assertEquals(EffectiveDisplay(PdfLayout.PAGED, false), model.pdfDisplay.filterNotNull().first())
+        model.setPdfLayout(PdfLayout.PAGED)
+        // The effective layout is unchanged; verify the explicit persisted choice.
+        val saved = prefs.observe("a").first { it.pdfLayout == PdfLayout.PAGED }
+        assertEquals(BookDisplayPrefs(PdfLayout.PAGED, null), saved)
+        assertEquals(EffectiveDisplay(PdfLayout.PAGED, false), vm(PageSize(400f, 600f)).pdfDisplay.filterNotNull().first())
     }
 
     @Test fun pageChangeSavesLocatorAndProgress() = runTest {

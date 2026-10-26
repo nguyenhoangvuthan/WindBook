@@ -26,6 +26,9 @@ class PdfPages(
     private val boxLock = Mutex()
     private val ownBoxes = HashMap<Int, CropBox?>()
 
+    override val textSelectionAvailable: Boolean get() = android.os.Build.VERSION.SDK_INT >= 35
+    override suspend fun selectText(page: Int, start: dev.kent.windbook.core.model.PdfPoint, end: dev.kent.windbook.core.model.PdfPoint) = document.selectText(page,start,end)
+
     override val pageCount: Int get() = document.pageCount
 
     override fun pageSize(page: Int): PageSize = document.pageSize(page)

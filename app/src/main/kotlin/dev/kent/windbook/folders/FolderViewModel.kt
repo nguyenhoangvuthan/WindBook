@@ -9,6 +9,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.kent.windbook.R
 import dev.kent.windbook.core.data.db.WindBookDatabase
+import dev.kent.windbook.core.data.LibraryPreferences
+import dev.kent.windbook.core.data.folders.availableFormats
 import dev.kent.windbook.core.data.folders.FolderRepository
 import dev.kent.windbook.core.data.folders.FolderScanCoordinator
 import dev.kent.windbook.core.model.ScanOptions
@@ -33,6 +35,7 @@ class FolderViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val observations: FolderObservations,
     private val opener: dev.kent.windbook.reader.BookOpener,
+    private val preferences: LibraryPreferences,
 ) : ViewModel() {
     fun canRead(format: dev.kent.windbook.core.model.BookFormat): Boolean = opener.capabilities.canRead(format)
 
@@ -42,8 +45,17 @@ class FolderViewModel @Inject constructor(
     private var selectionVersion = 0L
     private var entriesJob: Job? = null
     private var progressJob: Job? = null
+    private var pickerSequence = 0L
+    private var editedOptions = false
+    private var defaultOptions = ScanOptions()
 
     init {
+        viewModelScope.launch {
+            preferences.scanOptions.collect { options ->
+                defaultOptions = options
+                mutable.update { if (it.resolvedFolderId == null && !editedOptions) it.copy(options = options) else it }
+            }
+        }
         viewModelScope.launch {
             repository.observeFolders().collect { folders ->
                 mutable.update { current -> current.copy(folders = folders,
@@ -54,10 +66,13 @@ class FolderViewModel @Inject constructor(
 
     fun onLocationEdited(value: String) {
         selectionVersion++
+        val wasSelected = state.value.resolvedFolderId != null
+        if (wasSelected) editedOptions = false
         entriesJob?.cancel()
         progressJob?.cancel()
         mutable.update { it.copy(locationHint = value, resolvedFolderId = null, selectedLocation = "",
-            connected = false, entries = emptyList(), progress = dev.kent.windbook.core.data.folders.ScanProgress("", "IDLE")) }
+            connected = false, entries = emptyList(), pickerRequest = null, message = null,
+            options = if (wasSelected) defaultOptions else it.options, progress = dev.kent.windbook.core.data.folders.ScanProgress("", "IDLE")) }
     }
 
     fun selectFolder(id: String) = command {
@@ -66,10 +81,34 @@ class FolderViewModel @Inject constructor(
         select(id, folder.displayLocation, summary.options, folder.disconnectedAt == null)
     }
 
-    fun onTreeGranted(uri: Uri, flags: Int) = command {
+    fun requestFolder(folderId: String? = state.value.resolvedFolderId): Job {
+        val options = state.value.options.availableFormats()
+        return rootCommand(folderId) {
+            val version = selectionVersion
+            val folder = folderId?.let { db.folderDao().find(it) }
+            if (version == selectionVersion)
+                issuePicker(folder?.treeUri?.let(FolderLocation::resolve) ?: FolderLocation.resolve(state.value.locationHint), options)
+        }
+    }
+
+    private fun issuePicker(location: FolderLocation?, options: ScanOptions) {
+        mutable.update { it.copy(pickerRequest = FolderPickerRequest(++pickerSequence, selectionVersion, location?.initialUri, options),
+            message = if (location == null && it.locationHint.isNotBlank()) R.string.folder_device_path_hint else null) }
+    }
+
+    fun onPickerCancelled(requestId: Long) {
+        mutable.update { if (it.pickerRequest?.id == requestId) it.copy(pickerRequest = null) else it }
+    }
+
+    fun onTreeGranted(uri: Uri, flags: Int, requestId: Long) = command {
+        val request = state.value.pickerRequest?.takeIf {
+            it.id == requestId && it.selectionVersion == selectionVersion
+        } ?: return@command
+        mutable.update { it.copy(pickerRequest = null) }
         val documentId = DocumentsContract.getTreeDocumentId(uri)
+        val options = request.options
         // Connect first: metadata must be read under the permission actually returned by Android.
-        val id = repository.connect(uri.toString(), documentId, state.value.options, flags)
+        val id = repository.connect(uri.toString(), documentId, options, flags)
         val location = if (uri.authority == "com.android.externalstorage.documents") {
             val volume = documentId.substringBefore(':')
             val root = if (volume == "primary") context.getString(R.string.folder_internal_storage) else volume
@@ -83,14 +122,17 @@ class FolderViewModel @Inject constructor(
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { documentId }
         }
-        repository.save(uri.toString(), location, state.value.options)
-        select(id, location, state.value.options, true)
+        repository.save(uri.toString(), location, options)
+        if (request.selectionVersion != selectionVersion) return@command
+        select(id, location, options, true)
+        if (options.extensions.isNotEmpty()) scans.start(id)
     }
 
     private fun select(id: String, location: String, options: ScanOptions, connected: Boolean) {
         val version = ++selectionVersion
+        editedOptions = false
         mutable.update { it.copy(resolvedFolderId = id, locationHint = location, selectedLocation = location,
-            connected = connected, options = options, message = null, entries = emptyList(),
+            connected = connected, options = options.availableFormats(), message = null, entries = emptyList(), pickerRequest = null,
             progress = dev.kent.windbook.core.data.folders.ScanProgress("", "IDLE")) }
         entriesJob?.cancel()
         entriesJob = viewModelScope.launch {
@@ -114,7 +156,8 @@ class FolderViewModel @Inject constructor(
     fun setOptions(options: ScanOptions, folderId: String? = state.value.resolvedFolderId) = updateOptions(folderId) { options }
 
     private fun updateOptions(folderId: String?, change: (ScanOptions) -> ScanOptions) = rootCommand(folderId) {
-        val options = change(state.value.options)
+        val options = change(state.value.options).availableFormats()
+        editedOptions = true
         mutable.update { it.copy(options = options) }
         val id = state.value.resolvedFolderId ?: return@rootCommand
         val folder = db.folderDao().find(id) ?: return@rootCommand
@@ -126,9 +169,23 @@ class FolderViewModel @Inject constructor(
         }
     }
 
-    fun scan(folderId: String? = state.value.resolvedFolderId) = rootCommand(folderId) {
-        if (state.value.connected && state.value.options.extensions.isNotEmpty())
-            state.value.resolvedFolderId?.let { scans.start(it) }
+    fun scan(folderId: String? = state.value.resolvedFolderId): Job {
+        // The visible choices at the action boundary win over an existing root's hidden defaults.
+        val options = state.value.options.availableFormats()
+        return rootCommand(folderId) {
+            if (options.extensions.isEmpty()) return@rootCommand
+            val version = selectionVersion
+            val saved = folderId?.let { db.folderDao().find(it) }
+            val location = saved?.treeUri?.let(FolderLocation::resolve) ?: FolderLocation.resolve(state.value.locationHint)
+            val id = location?.let {
+                repository.reuseGranted(it.treeUri.toString(), saved?.displayLocation ?: state.value.locationHint, options)
+            }
+            if (version != selectionVersion) return@rootCommand
+            if (id == null) issuePicker(location, options) else {
+                if (state.value.resolvedFolderId != id) select(id, saved?.displayLocation ?: state.value.locationHint, options, true)
+                scans.start(id)
+            }
+        }
     }
     fun stop(folderId: String? = state.value.resolvedFolderId) = rootCommand(folderId) {
         state.value.resolvedFolderId?.let { id ->
@@ -140,6 +197,7 @@ class FolderViewModel @Inject constructor(
         if (folderId != null && folderId == state.value.resolvedFolderId &&
             state.value.entries.any { it.bookId == bookId && !it.hidden }) open(bookId)
     }
+    fun setSort(sort: FolderSort) { mutable.update { it.copy(sort = sort) } }
     fun setQuery(query: String) { mutable.update { it.copy(query = query) } }
     fun showHidden(value: Boolean) { mutable.update { it.copy(showHidden = value) } }
     fun restore(bookId: String, folderId: String? = state.value.resolvedFolderId) = rootCommand(folderId) {

@@ -28,12 +28,9 @@ data class EffectiveDisplay(
     val zoomX: Float = 0f,
 )
 
-/** Landscape books (slides) read page by page; everything else scrolls. Median of pages 1–5. */
-fun defaultPdfLayout(firstPages: List<PageSize>): PdfLayout {
-    if (firstPages.isEmpty()) return PdfLayout.VERTICAL
-    val aspects = firstPages.take(5).map { it.aspect }.sorted()
-    return if (aspects[aspects.size / 2] > 1f) PdfLayout.PAGED else PdfLayout.VERTICAL
-}
+/** New books open page by page; an explicit per-book choice still wins. */
+@Suppress("UNUSED_PARAMETER")
+fun defaultPdfLayout(firstPages: List<PageSize>): PdfLayout = PdfLayout.PAGED
 
 /** Margins are cropped by default except page by page; saved values are clamped to what the view supports. */
 fun BookDisplayPrefs.resolve(firstPages: List<PageSize>): EffectiveDisplay {

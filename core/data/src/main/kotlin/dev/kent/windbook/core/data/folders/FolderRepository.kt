@@ -38,6 +38,7 @@ data class FolderEntry(
     val availability: SourceAvailability,
     val title: String = name,
     val hidden: Boolean = false,
+    val addedAt: Long = 0,
 )
 
 /** All scan writes and connection/grant changes share one lifecycle lock. */
@@ -74,6 +75,14 @@ class FolderRepository(
         saveLocked(treeUri, displayLocation, options, reconnect = true)
     }
 
+    /** Reuse only an actual held read tree, including an explicitly reselected disconnected root. */
+    suspend fun reuseGranted(treeUri: String, displayLocation: String, options: ScanOptions): String? = mutations.withLock {
+        requireTreeUri(treeUri)
+        initializeLocked()
+        if (treeUri !in persistedReadTrees()) return@withLock null
+        saveLocked(treeUri, displayLocation, options, reconnect = true)
+    }
+
     /** Update remembered options; reconnecting a disconnected row requires [connect]. */
     suspend fun save(treeUri: String, displayLocation: String, options: ScanOptions): String = mutations.withLock {
         requireTreeUri(treeUri)
@@ -102,7 +111,7 @@ class FolderRepository(
     fun observeEntries(folderId: String, query: String, formats: Set<BookFormat>, includeHidden: Boolean = false): Flow<List<FolderEntry>> =
         db.folderDao().observeEntries(folderId, includeHidden).onStart { initialize() }.map { rows ->
             rows.map { row -> FolderEntry(row.bookId, row.sourceId, row.relativePath.substringAfterLast('/'),
-                row.relativePath, BookFormat.valueOf(row.format), SourceAvailability.valueOf(row.availability), row.title, row.deletedAt != null) }
+                row.relativePath, BookFormat.valueOf(row.format), SourceAvailability.valueOf(row.availability), row.title, row.deletedAt != null, row.addedAt) }
                 .filter { (formats.isEmpty() || it.format in formats) &&
                     (query.isBlank() || (it.relativePath.contains(query.trim(), ignoreCase = true) || it.title.contains(query.trim(), ignoreCase = true))) }
         }

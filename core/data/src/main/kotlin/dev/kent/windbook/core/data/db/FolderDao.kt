@@ -42,7 +42,7 @@ interface FolderDao {
 
     @Query("""
         SELECT b.id AS bookId, s.id AS sourceId, m.relative_path AS relativePath,
-          b.format, s.availability, b.title, b.deleted_at AS deletedAt
+          b.format, s.availability, b.title, b.deleted_at AS deletedAt, b.added_at AS addedAt
         FROM folder_memberships m JOIN book_sources s ON s.id = m.source_id
         JOIN books b ON b.id = s.book_id
         WHERE m.folder_id = :folderId AND (:includeHidden OR b.deleted_at IS NULL)
@@ -75,4 +75,5 @@ data class FolderEntryRow(
     val availability: String,
     val title: String,
     val deletedAt: Long?,
+    val addedAt: Long,
 )

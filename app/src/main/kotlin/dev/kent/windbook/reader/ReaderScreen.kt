@@ -84,7 +84,7 @@ import dev.kent.windbook.ui.components.uppercaseForUi
 import dev.kent.windbook.ui.icons.WindBookIcons
 
 @Composable
-fun ReaderRoute(bookId: String, onBack: () -> Unit, onReplaceReader: (String) -> Unit) {
+fun ReaderRoute(bookId: String, onBack: () -> Unit, onReplaceReader: (String) -> Unit, annotationId: String? = null, revealRequestId: String? = null) {
     val viewModel = hiltViewModel<ReaderViewModel, ReaderViewModel.Factory>(
         key = bookId,
         creationCallback = { factory -> factory.create(bookId) },
@@ -157,16 +157,8 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit, onReplaceReader: (String) ->
                     requireNotNull(pdf)
                     pdfDisplay?.let { display ->
                         val initialPage = remember(pdf) { viewModel.initialPdfPage() }
-                        PdfReaderView(
-                            source = pdf.pages,
-                            layout = display.layout,
-                            cropMargins = display.cropMargins,
-                            initialPage = initialPage,
-                            onPageChanged = viewModel::onPdfPageChanged,
-                            onCenterTap = viewModel::toggleOverlay,
-                            initialZoom = display.zoom,
-                            initialZoomX = display.zoomX,
-                            onZoomChanged = viewModel::setPdfZoom,
+                        dev.kent.windbook.reader.pdf.PdfNotesReader(
+                            bookId,pdf,viewModel,display,initialPage,annotationId,revealRequestId,
                         )
                     }
                 } else if (current.session.surface == NavigationSurface.PUBLICATION) {

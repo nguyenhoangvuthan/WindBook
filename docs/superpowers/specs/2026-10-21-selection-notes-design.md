@@ -1,7 +1,7 @@
 # Selection notes for EPUB and PDF
 
 Date: 2026-10-21
-Status: proposed design for owner review; not approved for implementation.
+Status: broader design remains proposed. On 2026-10-26 the owner authorized the PDF-text subset first; see `2026-10-26-daily-reading-feedback-design.md` for current scope and the v6→v7 schema correction. EPUB/scan notes and export remain deferred.
 
 Independent builder review: no important unanswered planning questions.
 The Android 12–14 PDF region fallback remains an explicit proposed limit for

@@ -11,6 +11,9 @@ data class PixelRegion(val x: Int, val y: Int, val width: Int, val height: Int)
 
 /** Everything the PDF view needs; the app's tests fake it, production uses [PdfPages]. */
 interface PdfPageSource {
+    val textSelectionAvailable: Boolean get() = false
+    suspend fun selectText(page: Int, start: dev.kent.windbook.core.model.PdfPoint, end: dev.kent.windbook.core.model.PdfPoint): dev.kent.windbook.core.model.PdfTextSelection? = null
+
     val pageCount: Int
 
     /** Best known size of [page] in points; pages not measured yet report the first page's size. */

@@ -48,19 +48,30 @@ class DocumentsTreeAccess(
             val id = it.getColumnIndexOrThrow(Document.COLUMN_DOCUMENT_ID)
             val name = it.getColumnIndexOrThrow(Document.COLUMN_DISPLAY_NAME)
             val mime = it.getColumnIndexOrThrow(Document.COLUMN_MIME_TYPE)
+            var invalidRows = false
             while (true) {
                 currentCoroutineContext().ensureActive()
                 if (!it.moveToNext()) break
                 currentCoroutineContext().ensureActive()
-                val key = DocumentKey(directory.authority,
-                    it.getString(id)?.takeIf(String::isNotEmpty)
-                        ?: throw IllegalStateException("Provider returned no document ID"))
-                requireMember(tree, key)
-                emit(Result.success(TreeDocument(key, DocumentsContract.buildDocumentUriUsingTree(tree, key.documentId).toString(),
-                    it.getString(name).orEmpty(), it.getString(mime) == Document.MIME_TYPE_DIR,
-                    it.optionalLong(Document.COLUMN_SIZE), it.optionalLong(Document.COLUMN_LAST_MODIFIED))))
+                val document = try {
+                    val key = DocumentKey(directory.authority,
+                        it.getString(id)?.takeIf(String::isNotEmpty)
+                            ?: throw IllegalStateException("Provider returned no document ID"))
+                    requireMember(tree, key)
+                    TreeDocument(key, DocumentsContract.buildDocumentUriUsingTree(tree, key.documentId).toString(),
+                        it.getString(name).orEmpty(), it.getString(mime) == Document.MIME_TYPE_DIR,
+                        it.optionalLong(Document.COLUMN_SIZE), it.optionalLong(Document.COLUMN_LAST_MODIFIED))
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    // A malformed row must not conceal later valid siblings. Keep the directory
+                    // incomplete so missing-file reconciliation cannot treat skipped rows as gone.
+                    invalidRows = true
+                    continue
+                }
+                emit(Result.success(document))
             }
-            if (it.extras.getBoolean(DocumentsContract.EXTRA_LOADING, false) ||
+            if (invalidRows || it.extras.getBoolean(DocumentsContract.EXTRA_LOADING, false) ||
                 it.extras.getString(DocumentsContract.EXTRA_ERROR) != null) {
                 throw IllegalStateException("Provider returned an incomplete directory")
             }

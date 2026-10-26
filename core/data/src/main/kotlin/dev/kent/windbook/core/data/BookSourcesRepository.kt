@@ -73,7 +73,7 @@ class BookSourcesRepository(
             is BookSource.Owned -> db.sourceDao().forBook(bookId).firstOrNull { it.localPath == source.path }
         }
         val match = books.findBySha(sha)?.takeIf { it.id != bookId }
-        val hasData = db.sourceDao().hasTextProgress(bookId) || books.progress(bookId) != null || db.bookPreferencesDao().json(bookId) != null ||
+        val hasData = db.annotationDao().hasAnnotations(bookId) || db.sourceDao().hasTextProgress(bookId) || books.progress(bookId) != null || db.bookPreferencesDao().json(bookId) != null ||
             book.lastOpenedAt != null || book.status != "TO_READ"
         val decision = SourceRevisionPolicy.decide(book.sha256, sha, match != null, hasData, match?.deletedAt != null)
         if (decision == RevisionDecision.HIDDEN) return Verification.HiddenMatch(requireNotNull(match).id)

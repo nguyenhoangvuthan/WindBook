@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 data object LibraryKey : NavKey
 
 @Serializable
-data class ReaderKey(val bookId: String) : NavKey
+data class ReaderKey(val bookId: String, val annotationId: String? = null, val revealRequestId: String? = null) : NavKey
 
 @Serializable
 data object ReadingKey : NavKey

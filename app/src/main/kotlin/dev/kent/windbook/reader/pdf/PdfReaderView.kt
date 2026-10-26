@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -95,15 +96,18 @@ fun PdfReaderView(
     initialZoom: Float = 1f,
     initialZoomX: Float = 0f,
     onZoomChanged: (zoom: Float, zoomX: Float) -> Unit = { _, _ -> },
+    annotations: PdfAnnotationUi? = null,
+    reveal: PdfRevealRequest? = null,
 ) {
-    var currentPage by rememberSaveable(source) { mutableIntStateOf(initialPage.coerceIn(0, source.pageCount - 1)) }
+    var currentPage by rememberSaveable(source, reveal?.requestId) { mutableIntStateOf((reveal?.anchor?.page ?: initialPage).coerceIn(0, source.pageCount - 1)) }
+    var revealing by remember(source,reveal?.requestId) { mutableStateOf(reveal!=null) }
     var plan by remember(source, cropMargins) { mutableStateOf<CropPlan?>(null) }
     val pageCrops = remember(source, cropMargins) { mutableStateMapOf<Int, CropBox>() }
     LaunchedEffect(source, cropMargins) {
         if (cropMargins) plan = source.cropPlan()
     }
     val cropFor: (Int) -> CropBox = { page ->
-        if (!cropMargins) CropBox.FULL else pageCrops[page] ?: plan?.boxFor(page) ?: CropBox.FULL
+        if (!cropMargins || (revealing && page==reveal?.anchor?.page)) CropBox.FULL else pageCrops[page] ?: plan?.boxFor(page) ?: CropBox.FULL
     }
     // A new lambda once the plan lands: pages already on screen re-run their effect and get their own box.
     val resolveCrop: suspend (Int) -> Unit = remember(source, cropMargins, plan) {
@@ -114,15 +118,17 @@ fun PdfReaderView(
     }
     val report: (Int) -> Unit = { page ->
         currentPage = page
+        if(reveal!=null && page!=reveal.anchor.page) revealing=false
         onPageChanged(page)
     }
-    when (layout) {
+    key(reveal?.requestId) { when (layout) {
         PdfLayout.VERTICAL -> VerticalPages(
             source, currentPage, cropFor, resolveCrop, report, onCenterTap, modifier,
-            initialZoom, initialZoomX, onZoomChanged,
+            if(revealing) 1f else initialZoom, if(revealing) 0f else initialZoomX,
+            { z,x -> if(!revealing) onZoomChanged(z,x) }, annotations, reveal?.anchor?.takeIf { revealing },
         )
-        PdfLayout.PAGED -> PagedPages(source, currentPage, cropFor, resolveCrop, report, onCenterTap, modifier)
-    }
+        PdfLayout.PAGED -> PagedPages(source, currentPage, cropFor, resolveCrop, report, onCenterTap, modifier,annotations)
+    } }
 }
 
 @Composable
@@ -137,7 +143,10 @@ private fun VerticalPages(
     initialZoom: Float,
     initialZoomX: Float,
     onZoomChanged: (Float, Float) -> Unit,
+    annotations: PdfAnnotationUi?,
+    revealAnchor: dev.kent.windbook.core.model.PdfTextAnchor?,
 ) {
+    val gesturesLocked by rememberUpdatedState(annotations?.locked==true)
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = startPage)
     val hScroll = rememberScrollState()
     val scope = rememberCoroutineScope()
@@ -183,6 +192,13 @@ private fun VerticalPages(
         val viewportW = constraints.maxWidth
         val viewportH = constraints.maxHeight
         val pageWidthPx = (viewportW * zoom).roundToInt()
+        LaunchedEffect(revealAnchor,viewportW,viewportH) {
+            revealAnchor?.let { anchor ->
+                val size=source.measure(anchor.page)
+                val height=renderedHeight(size,CropBox.FULL,viewportW)
+                listState.scrollToItem(anchor.page,dev.kent.windbook.core.model.pdfRevealScrollOffset(anchor,height,viewportH))
+            }
+        }
 
         LaunchedEffect(zoom, pageWidthPx) {
             details.clear()
@@ -210,6 +226,7 @@ private fun VerticalPages(
         }
 
         PageTurnKeys { forward ->
+            if(gesturesLocked) return@PageTurnKeys true
             scope.launch {
                 if (zoom > 1.01f) {
                     readingOrderStep(forward, hScroll, listState, stepX = (viewportW * 0.9f).roundToInt(), stepY = viewportH * 0.9f)
@@ -236,11 +253,23 @@ private fun VerticalPages(
             }
         }
 
+        val zoomAt: (Offset)->Unit = { tap ->
+            if(!gesturesLocked) {
+                val target=if(zoom>1.01f) 1f else DOUBLE_TAP_ZOOM
+                val ratio=target/zoom
+                zoom=target
+                scope.launch {
+                    hScroll.scrollTo(((hScroll.value+tap.x)*ratio-tap.x).roundToInt().coerceAtLeast(0))
+                    listState.scrollBy((listState.firstVisibleItemScrollOffset+tap.y)*(ratio-1f))
+                }
+            }
+        }
         Box(
             Modifier
                 .fillMaxSize()
                 .testTag(PDF_VERTICAL_TAG)
                 .pinchZoom { change, centroid ->
+                    if(gesturesLocked) return@pinchZoom
                     pinching = true
                     val next = (zoom * change).coerceIn(1f, MAX_PDF_ZOOM)
                     val ratio = next / zoom
@@ -252,34 +281,25 @@ private fun VerticalPages(
                         }
                     }
                 }
-                .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = { onCenterTap() },
-                        onDoubleTap = { tap ->
-                            val target = if (zoom > 1.01f) 1f else DOUBLE_TAP_ZOOM
-                            val ratio = target / zoom
-                            zoom = target
-                            scope.launch {
-                                hScroll.scrollTo(((hScroll.value + tap.x) * ratio - tap.x).roundToInt().coerceAtLeast(0))
-                                listState.scrollBy((listState.firstVisibleItemScrollOffset + tap.y) * (ratio - 1f))
-                            }
-                        },
-                    )
+                .pointerInput(gesturesLocked) {
+                    detectTapGestures(onTap={if(!gesturesLocked) onCenterTap()},onDoubleTap=zoomAt)
                 }
-                .horizontalScroll(hScroll, enabled = zoom > 1f),
+                .horizontalScroll(hScroll, enabled = zoom > 1f && !gesturesLocked),
         ) {
             LazyColumn(
                 state = listState,
+                userScrollEnabled = !gesturesLocked,
                 modifier = Modifier.width(with(density) { pageWidthPx.toDp() }).height(with(density) { viewportH.toDp() }),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(count = source.pageCount, key = { it }) { page ->
+                    var measured by remember(page) { mutableStateOf(source.pageSize(page)) }
                     LaunchedEffect(page, resolveCrop) {
-                        source.measure(page)
+                        measured=source.measure(page)
                         resolveCrop(page)
                     }
                     val crop = cropFor(page)
-                    val heightPx = renderedHeight(source.pageSize(page), crop, pageWidthPx)
+                    val heightPx = renderedHeight(measured, crop, pageWidthPx)
                     Box(Modifier.width(with(density) { pageWidthPx.toDp() }).height(with(density) { heightPx.toDp() })) {
                         PageBitmap(source, page, crop, renderWidthPx = viewportW, modifier = Modifier.fillMaxSize())
                         details[page]?.let { (region, tile) ->
@@ -290,6 +310,15 @@ private fun VerticalPages(
                                     .offset { IntOffset(region.x, region.y) }
                                     .size(with(density) { region.width.toDp() }, with(density) { region.height.toDp() }),
                             )
+                        }
+                        annotations?.let { ui ->
+                            PdfTextPageOverlay(source,page,crop,measured,ui,
+                                onPageTap={onCenterTap()},onPageDoubleTap={ tap ->
+                                    val offset=listState.layoutInfo.visibleItemsInfo.firstOrNull {it.index==page}?.offset ?: 0
+                                    zoomAt(Offset(tap.x-hScroll.value,tap.y+offset))
+                                },motionSnapshot=remember(listState,hScroll) {
+                                    { Triple(listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset,hScroll.value,pinching) }
+                                })
                         }
                     }
                 }
@@ -307,7 +336,9 @@ private fun PagedPages(
     onPageChanged: (Int) -> Unit,
     onCenterTap: () -> Unit,
     modifier: Modifier,
+    annotations: PdfAnnotationUi?,
 ) {
+    val gesturesLocked by rememberUpdatedState(annotations?.locked==true)
     val pager = rememberPagerState(initialPage = startPage) { source.pageCount }
     val scope = rememberCoroutineScope()
     var zoom by remember { mutableFloatStateOf(1f) }
@@ -327,6 +358,7 @@ private fun PagedPages(
         val viewportH = constraints.maxHeight
 
         PageTurnKeys { forward ->
+            if(gesturesLocked) return@PageTurnKeys true
             val target = (pager.currentPage + if (forward) 1 else -1).coerceIn(0, source.pageCount - 1)
             scope.launch { pager.animateScrollToPage(target) }
             true
@@ -334,51 +366,43 @@ private fun PagedPages(
 
         HorizontalPager(
             state = pager,
-            userScrollEnabled = zoom == 1f,
+            userScrollEnabled = zoom == 1f && !gesturesLocked,
             beyondViewportPageCount = 1,
             key = { it },
             modifier = Modifier.fillMaxSize().testTag(PDF_PAGED_TAG),
         ) { page ->
+            var size by remember(page) { mutableStateOf(source.pageSize(page)) }
             LaunchedEffect(page, resolveCrop) {
-                source.measure(page)
+                size=source.measure(page)
                 resolveCrop(page)
             }
             val crop = cropFor(page)
-            val size = source.pageSize(page)
             val pageAspect = (crop.width * size.width) / (crop.height * size.height)
             val fitW = if (viewportW / pageAspect <= viewportH) viewportW else (viewportH * pageAspect).roundToInt()
             val fitH = (fitW / pageAspect).roundToInt()
+            val turnAt: (Offset)->Unit = { tap ->
+                if(!gesturesLocked) when {
+                    tap.x<viewportW*.25f -> scope.launch {pager.animateScrollToPage((page-1).coerceAtLeast(0))}
+                    tap.x>viewportW*.75f -> scope.launch {pager.animateScrollToPage((page+1).coerceAtMost(source.pageCount-1))}
+                    else -> onCenterTap()
+                }
+            }
+            val zoomAt: (Offset)->Unit = { tap ->
+                if(!gesturesLocked) {
+                    if(zoom>1f) {zoom=1f;pan=Offset.Zero}
+                    else {zoom=DOUBLE_TAP_ZOOM;pan=(Offset(viewportW/2f,viewportH/2f)-tap)*(DOUBLE_TAP_ZOOM-1f)}
+                }
+            }
             Box(
                 Modifier
                     .fillMaxSize()
-                    .pointerInput(page) {
-                        detectTapGestures(
-                            onTap = { tap ->
-                                when {
-                                    tap.x < viewportW * 0.25f -> scope.launch { pager.animateScrollToPage((page - 1).coerceAtLeast(0)) }
-                                    tap.x > viewportW * 0.75f -> scope.launch { pager.animateScrollToPage((page + 1).coerceAtMost(source.pageCount - 1)) }
-                                    else -> onCenterTap()
-                                }
-                            },
-                            onDoubleTap = { tap ->
-                                if (zoom > 1f) {
-                                    zoom = 1f
-                                    pan = Offset.Zero
-                                } else {
-                                    zoom = DOUBLE_TAP_ZOOM
-                                    pan = (Offset(viewportW / 2f, viewportH / 2f) - tap) * (DOUBLE_TAP_ZOOM - 1f)
-                                }
-                            },
-                        )
+                    .pointerInput(page,gesturesLocked) {
+                        detectTapGestures(onTap=turnAt,onDoubleTap=zoomAt)
                     }
-                    .then(if (zoom > 1f) Modifier.pointerInput(Unit) { detectDragGestures { _, drag -> pan += drag } } else Modifier),
+                    .then(if (zoom > 1f && !gesturesLocked) Modifier.pointerInput(Unit) { detectDragGestures { _, drag -> pan += drag } } else Modifier),
                 contentAlignment = Alignment.Center,
             ) {
-                PageBitmap(
-                    source = source,
-                    page = page,
-                    crop = crop,
-                    renderWidthPx = if (zoom > 1f && pager.currentPage == page) fitW * 2 else fitW,
+                Box(
                     modifier = Modifier
                         .size(with(density) { fitW.toDp() }, with(density) { fitH.toDp() })
                         .graphicsLayer {
@@ -389,7 +413,16 @@ private fun PagedPages(
                                 translationY = pan.y
                             }
                         },
-                )
+                ) {
+                    PageBitmap(source,page,crop,if(zoom>1f && pager.currentPage==page) fitW*2 else fitW,Modifier.fillMaxSize())
+                    annotations?.let { ui ->
+                        fun viewportPoint(tap: Offset)=Offset((viewportW-fitW)/2f+fitW/2f+(tap.x-fitW/2f)*zoom+pan.x,
+                            (viewportH-fitH)/2f+fitH/2f+(tap.y-fitH/2f)*zoom+pan.y)
+                        PdfTextPageOverlay(source,page,crop,size,ui,{turnAt(viewportPoint(it))},{zoomAt(viewportPoint(it))},motionSnapshot=remember(pager) {
+                            { Triple(pager.currentPage to pager.currentPageOffsetFraction,zoom,pan) }
+                        })
+                    }
+                }
             }
         }
     }

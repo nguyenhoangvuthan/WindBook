@@ -77,6 +77,23 @@ class FolderScannerTest {
         assertTrue(events.filterIsInstance<ScanEvent.Finished>().single().complete)
     }
 
+    @Test fun malformedRowsDoNotHideLaterValidSiblingsOrNestedFiles() = runTest {
+        provider.rows["root"] = listOf(row("p", "first.pdf"),
+            arrayOf<Any?>(null, "broken.epub", "application/octet-stream", null, null),
+            row("outside", "escape.pdf"), row("sub", "sub", true), row("t", "last.TXT"))
+        provider.rows["sub"] = listOf(row("e", "nested.EPUB"))
+        val events = FolderScanner(access).scan(tree, root, ScanOptions(setOf(
+            dev.kent.windbook.core.model.BookFormat.EPUB, dev.kent.windbook.core.model.BookFormat.PDF,
+            dev.kent.windbook.core.model.BookFormat.TXT))).toList()
+        assertEquals(setOf("first.pdf", "last.TXT", "sub/nested.EPUB"),
+            events.filterIsInstance<ScanEvent.Found>().map { it.relativePath }.toSet())
+        assertFalse(events.filterIsInstance<ScanEvent.Finished>().single().complete)
+        assertEquals(1, events.filterIsInstance<ScanEvent.DirectoryFailed>().size)
+        assertTrue(provider.cursors.all { it.isClosed })
+        assertEquals(0, provider.contentOpens)
+        assertEquals(0, provider.writes)
+    }
+
     @Test fun cursorFailure_preservesEarlierResultsAndReportsIncomplete() = runTest {
         provider.rows["root"] = listOf(row("p", "first.pdf"), row("e", "second.epub"))
         provider.failAfterFirst = true

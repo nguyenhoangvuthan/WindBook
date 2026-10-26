@@ -25,6 +25,14 @@ import org.robolectric.RobolectricTestRunner
 class FolderViewModelTest {
     @get:Rule val main = MainDispatcherRule()
     private val unusedOpener = dev.kent.windbook.reader.BookOpener { _, _ -> error("Folder actions do not open sessions") }
+    private fun preferences(scope: CoroutineScope): dev.kent.windbook.core.data.LibraryPreferences =
+        dev.kent.windbook.core.data.LibraryPreferences(androidx.datastore.preferences.core.PreferenceDataStoreFactory.create(scope = scope) {
+            java.io.File(ApplicationProvider.getApplicationContext<Context>().cacheDir, "scan-${java.util.UUID.randomUUID()}.preferences_pb")
+        })
+    private suspend fun grant(vm: FolderViewModel, uri: Uri, flags: Int): Job {
+        vm.requestFolder().join()
+        return vm.onTreeGranted(uri, flags, requireNotNull(vm.state.value.pickerRequest).id)
+    }
     private val uri = Uri.parse("content://folders.test/tree/root")
 
     @Test fun returnedReadFlagRequiredAndTypedPathInvalidatesSelection() = runTest {
@@ -33,20 +41,20 @@ class FolderViewModelTest {
         val grants = FolderGrants(context.contentResolver)
         val repo = FolderRepository(db, grants::persistedReadTrees, grants::releaseRead, grants::persistRead)
         val coordinator = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow {} }), backgroundScope)
-        val vm = FolderViewModel(repo, coordinator, db, context, RepositoryFolderObservations(repo, coordinator), unusedOpener)
+        val vm = FolderViewModel(repo, coordinator, db, context, RepositoryFolderObservations(repo, coordinator), unusedOpener, preferences(backgroundScope))
         val store = ViewModelStore().also { it.put("folder", vm) }
         try {
-            vm.onTreeGranted(uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION).join()
+            grant(vm, uri, Intent.FLAG_GRANT_WRITE_URI_PERMISSION).join()
             assertFalse(vm.state.value.canScan)
             assertNotNull(vm.state.value.message)
-            vm.onTreeGranted(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION).join()
+            grant(vm, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION).join()
             val id = vm.state.value.resolvedFolderId
             assertNotNull(id)
             assertTrue(vm.state.value.canScan)
             assertEquals(ScanOptions(), vm.state.value.options)
             vm.onLocationEdited("/storage/other")
             assertNull(vm.state.value.resolvedFolderId)
-            assertFalse(vm.state.value.canScan)
+            assertTrue(vm.state.value.canScan)
             vm.selectFolder(id!!).join()
             vm.setOptions(ScanOptions(emptySet(), false)).join()
             assertFalse(vm.state.value.canScan)
@@ -58,6 +66,148 @@ class FolderViewModelTest {
             db.close()
         }
     }
+    @Test fun grantedFolderStartsScanWithoutASecondScanClick() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = WindBookDatabase.inMemory(context, AndroidSQLiteDriver())
+        val repo = FolderRepository(db, { emptySet() }, {}, { _, _ -> })
+        val coordinator = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow { awaitCancellation() } }), backgroundScope)
+        val vm = FolderViewModel(repo, coordinator, db, context, RepositoryFolderObservations(repo, coordinator), unusedOpener, preferences(backgroundScope))
+        val store = ViewModelStore().also { it.put("folder", vm) }
+        try {
+            grant(vm, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION).join()
+            val id = requireNotNull(vm.state.value.resolvedFolderId)
+            assertEquals("RUNNING", coordinator.observe(id).first().state)
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+    }
+
+    @Test fun typedExactDevicePathReusesItsHeldRootGrant() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = WindBookDatabase.inMemory(context, AndroidSQLiteDriver())
+        val granted = "content://com.android.externalstorage.documents/tree/primary%3ABooks"
+        val repo = FolderRepository(db, { setOf(granted) }, {}, { _, _ -> error("No picker grant should be acquired") })
+        val id = repo.save(granted, "Books", ScanOptions())
+        val scans = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow { awaitCancellation() } }), backgroundScope)
+        val vm = FolderViewModel(repo, scans, db, context, RepositoryFolderObservations(repo, scans), unusedOpener, preferences(backgroundScope))
+        val store = ViewModelStore().also { it.put("folder", vm) }
+        try {
+            vm.onLocationEdited("/sdcard/Books/")
+            vm.scan().join()
+            assertEquals(id, vm.state.value.resolvedFolderId)
+            assertEquals("RUNNING", scans.observe(id).first().state)
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+    }
+
+    @Test fun computerPathScanExplainsDeviceGrantRatherThanSilentlyIgnoringInput() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = WindBookDatabase.inMemory(context, AndroidSQLiteDriver())
+        val repo = FolderRepository(db, { emptySet() }, {}, { _, _ -> })
+        val scans = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow {} }), backgroundScope)
+        val vm = FolderViewModel(repo, scans, db, context, RepositoryFolderObservations(repo, scans), unusedOpener, preferences(backgroundScope))
+        val store = ViewModelStore().also { it.put("folder", vm) }
+        try {
+            vm.onLocationEdited("/home/kent/Library")
+            vm.scan().join()
+            assertEquals(dev.kent.windbook.R.string.folder_device_path_hint, vm.state.value.message)
+            assertNull(vm.state.value.resolvedFolderId)
+            assertTrue(repo.observeFolders().first().isEmpty())
+            assertNotNull(vm.state.value.pickerRequest)
+            assertNull(vm.state.value.pickerRequest!!.initialUri)
+            vm.onPickerCancelled(vm.state.value.pickerRequest!!.id)
+            vm.setExtensions(emptySet()).join()
+            vm.scan().join()
+            assertNull(vm.state.value.pickerRequest)
+            assertTrue(repo.observeFolders().first().isEmpty())
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+    }
+
+    @Test fun typedPathPrepositionsPickerAndStaleResultCannotTargetNewRoot() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = WindBookDatabase.inMemory(context, AndroidSQLiteDriver())
+        var acquisitions = 0
+        val repo = FolderRepository(db, { emptySet() }, {}, { _, _ -> acquisitions++ })
+        val b = repo.save("content://folders.test/tree/b", "B", ScanOptions())
+        val scans = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow {} }), backgroundScope)
+        val vm = FolderViewModel(repo, scans, db, context, RepositoryFolderObservations(repo, scans), unusedOpener, preferences(backgroundScope))
+        val store = ViewModelStore().also { it.put("folder", vm) }
+        try {
+            vm.onLocationEdited("/storage/emulated/0/Books")
+            vm.scan().join()
+            val request = requireNotNull(vm.state.value.pickerRequest)
+            assertEquals("primary:Books", android.provider.DocumentsContract.getDocumentId(request.initialUri!!))
+            vm.selectFolder(b).join()
+            vm.onTreeGranted(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION, request.id).join()
+            assertEquals(b, vm.state.value.resolvedFolderId)
+            assertEquals(0, acquisitions)
+            assertEquals(1, repo.observeFolders().first().size)
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+    }
+
+    @Test fun newFoldersUseSettingsDefaultsWhileSavedFoldersKeepOverrides() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = WindBookDatabase.inMemory(context, AndroidSQLiteDriver())
+        val prefs = preferences(backgroundScope)
+        prefs.setScanOptions(ScanOptions(setOf(BookFormat.TXT), false))
+        val repo = FolderRepository(db, { emptySet() }, {}, { _, _ -> })
+        val saved = repo.save("content://folders.test/tree/saved", "Saved", ScanOptions(setOf(BookFormat.PDF), true))
+        val scans = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow { awaitCancellation() } }), backgroundScope)
+        val vm = FolderViewModel(repo, scans, db, context, RepositoryFolderObservations(repo, scans), unusedOpener, prefs)
+        val store = ViewModelStore().also { it.put("folder", vm) }
+        try {
+            vm.state.first { it.options.extensions == setOf(BookFormat.TXT) }
+            grant(vm, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION).join()
+            assertEquals(ScanOptions(setOf(BookFormat.TXT), false), repo.observeFolders().first().first { it.id == vm.state.value.resolvedFolderId }.options)
+            vm.selectFolder(saved).join()
+            assertEquals(ScanOptions(setOf(BookFormat.PDF), true), vm.state.value.options)
+            prefs.setScanOptions(ScanOptions(setOf(BookFormat.EPUB), false))
+            assertEquals(ScanOptions(setOf(BookFormat.PDF), true), vm.state.value.options)
+            vm.onLocationEdited("/sdcard/New")
+            vm.state.first { it.options == ScanOptions(setOf(BookFormat.EPUB), false) }
+            vm.scan().join()
+            grant(vm, Uri.parse("content://folders.test/tree/new"), Intent.FLAG_GRANT_READ_URI_PERMISSION).join()
+            assertEquals(ScanOptions(setOf(BookFormat.EPUB), false), vm.state.value.options)
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+    }
+
+    @Test fun typedGrantUsesVisibleOptionsRatherThanHiddenSavedOptions() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = WindBookDatabase.inMemory(context, AndroidSQLiteDriver())
+        val granted = "content://com.android.externalstorage.documents/tree/primary%3ABooks"
+        val repo = FolderRepository(db, { setOf(granted) }, {}, { _, _ -> })
+        val id = repo.save(granted, "Books", ScanOptions(setOf(BookFormat.TXT), false))
+        val prefs = preferences(backgroundScope)
+        prefs.setScanOptions(ScanOptions(setOf(BookFormat.PDF), true))
+        val scans = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow { awaitCancellation() } }), backgroundScope)
+        val vm = FolderViewModel(repo, scans, db, context, RepositoryFolderObservations(repo, scans), unusedOpener, prefs)
+        val store = ViewModelStore().also { it.put("folder", vm) }
+        try {
+            vm.state.first { it.options.extensions == setOf(BookFormat.PDF) }
+            vm.onLocationEdited("/sdcard/Books")
+            vm.scan().join()
+            assertEquals(ScanOptions(setOf(BookFormat.PDF), true), vm.state.value.options)
+            assertEquals(ScanOptions(setOf(BookFormat.PDF), true), repo.observeFolders().first().single().options)
+            assertEquals("RUNNING", scans.observe(id).first().state)
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+    }
+
+    @Test fun pickerCompletionUsesTheOptionsShownWhenScanWasRequested() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = WindBookDatabase.inMemory(context, AndroidSQLiteDriver())
+        val repo = FolderRepository(db, { emptySet() }, {}, { _, _ -> })
+        val scans = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow { awaitCancellation() } }), backgroundScope)
+        val vm = FolderViewModel(repo, scans, db, context, RepositoryFolderObservations(repo, scans), unusedOpener, preferences(backgroundScope))
+        val store = ViewModelStore().also { it.put("folder", vm) }
+        try {
+            vm.onLocationEdited("/sdcard/Books")
+            vm.setOptions(ScanOptions(setOf(BookFormat.PDF), false)).join()
+            vm.scan().join()
+            val request = requireNotNull(vm.state.value.pickerRequest)
+            vm.setOptions(ScanOptions(setOf(BookFormat.TXT), true)).join()
+            vm.onTreeGranted(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION, request.id).join()
+            assertEquals(ScanOptions(setOf(BookFormat.PDF), false), repo.observeFolders().first().single().options)
+            assertEquals(ScanOptions(setOf(BookFormat.PDF), false), vm.state.value.options)
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+    }
+
     @Test fun scanOutlivesViewModelAndOptionChangesReplaceDurableRun() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = WindBookDatabase.inMemory(context, AndroidSQLiteDriver())
@@ -65,10 +215,10 @@ class FolderViewModelTest {
         val coordinator = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ ->
             flow { awaitCancellation() }
         }), backgroundScope)
-        val vm = FolderViewModel(repo, coordinator, db, context, RepositoryFolderObservations(repo, coordinator), unusedOpener)
+        val vm = FolderViewModel(repo, coordinator, db, context, RepositoryFolderObservations(repo, coordinator), unusedOpener, preferences(backgroundScope))
         val store = ViewModelStore().also { it.put("folder", vm) }
         try {
-            vm.onTreeGranted(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION).join()
+            grant(vm, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION).join()
             val id = requireNotNull(vm.state.value.resolvedFolderId)
             vm.scan().join()
             val firstRun = coordinator.observe(id).first { it.state == "RUNNING" }
@@ -116,7 +266,7 @@ class FolderViewModelTest {
                 kotlinx.coroutines.flow.flowOf(ScanProgress("old-run", "RUNNING")) else kotlinx.coroutines.flow.flow<ScanProgress> { awaitCancellation() }
         }
         val scans = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow {} }), backgroundScope)
-        val vm = FolderViewModel(repo, scans, db, context, inputs, unusedOpener)
+        val vm = FolderViewModel(repo, scans, db, context, inputs, unusedOpener, preferences(backgroundScope))
         val store = ViewModelStore().also { it.put("folder", vm) }
         try {
             vm.selectFolder(a).join()
@@ -149,7 +299,7 @@ class FolderViewModelTest {
         val a = repo.save(uri.toString(), "A", ScanOptions())
         val b = repo.save("content://folders.test/tree/b", "B", ScanOptions())
         val scans = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow {} }), backgroundScope)
-        val vm = FolderViewModel(repo, scans, db, context, RepositoryFolderObservations(repo, scans), unusedOpener)
+        val vm = FolderViewModel(repo, scans, db, context, RepositoryFolderObservations(repo, scans), unusedOpener, preferences(backgroundScope))
         val store = ViewModelStore().also { it.put("folder", vm) }
         try {
             vm.selectFolder(a).join()
@@ -160,7 +310,7 @@ class FolderViewModelTest {
             val cbz = vm.toggleExtension(BookFormat.CBZ)
             release.complete(Unit)
             blocker.await(); recursive.join(); txt.join(); cbz.join()
-            assertEquals(setOf(BookFormat.EPUB, BookFormat.PDF, BookFormat.TXT, BookFormat.CBZ), vm.state.value.options.extensions)
+            assertEquals(setOf(BookFormat.EPUB, BookFormat.PDF, BookFormat.TXT), vm.state.value.options.extensions)
             assertFalse(vm.state.value.options.recursive)
             assertEquals(vm.state.value.options, repo.observeFolders().first().first { it.id == a }.options)
             grantEntered = CompletableDeferred()

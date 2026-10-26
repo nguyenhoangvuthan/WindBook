@@ -40,22 +40,29 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.kent.windbook.R
+import dev.kent.windbook.folders.FolderScanOptions
+import dev.kent.windbook.core.model.BookFormat
 import dev.kent.windbook.ui.components.ScreenTitle
 import dev.kent.windbook.ui.components.TabScreenInsets
 import dev.kent.windbook.ui.components.uppercaseForUi
 
 @Composable
-fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel()) {
+fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel(), onFolders: () -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     LifecycleStartEffect(viewModel) {
         viewModel.refreshLanguage()
         onStopOrDispose { }
     }
-    SettingsScreen(state, onLanguageChange = viewModel::setLanguage)
+    SettingsScreen(state, onLanguageChange = viewModel::setLanguage, onFolders = onFolders,
+        onScanRecursiveChange = { viewModel.setScanRecursive(it) },
+        onScanExtensionToggle = { viewModel.toggleScanExtension(it) },
+        onScanExtensionsChange = { viewModel.setScanExtensions(it) })
 }
 
 @Composable
-fun SettingsScreen(state: SettingsUiState, onLanguageChange: (AppLanguage) -> Unit) {
+fun SettingsScreen(state: SettingsUiState, onLanguageChange: (AppLanguage) -> Unit,
+    onFolders: () -> Unit = {}, onScanRecursiveChange: (Boolean) -> Unit = {},
+    onScanExtensionToggle: (BookFormat) -> Unit = {}, onScanExtensionsChange: (Set<BookFormat>) -> Unit = {}) {
     var showLicences by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     Column(
@@ -84,6 +91,14 @@ fun SettingsScreen(state: SettingsUiState, onLanguageChange: (AppLanguage) -> Un
                     Spacer(Modifier.width(12.dp))
                     Text(stringResource(language.labelRes), style = MaterialTheme.typography.bodyLarge)
                 }
+            }
+        }
+
+        SettingsGroup(stringResource(R.string.settings_folder_scanning)) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Text(stringResource(R.string.settings_scan_defaults_hint), style = MaterialTheme.typography.bodySmall)
+                FolderScanOptions(state.scanOptions, onScanRecursiveChange, onScanExtensionToggle, onScanExtensionsChange)
+                TextButton(onClick = onFolders) { Text(stringResource(R.string.folder_title)) }
             }
         }
 

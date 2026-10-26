@@ -38,6 +38,7 @@ internal class PdfReaderSession(
     private val document: PdfDocumentHandle,
     private val source: dev.kent.windbook.reader.source.SourceLease? = null,
 ) : PdfSession {
+    override suspend fun annotationFingerprint(): String? = source?.fingerprint()
     override val format = BookFormat.PDF
     override val pageCount: Int get() = document.pageCount
     override val pages: PdfPageSource = PdfPages(document)

@@ -6,6 +6,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -90,6 +96,71 @@ class PdfReaderViewTest {
             dispatcher.dispatch(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_VOLUME_DOWN))
         }
         compose.waitForIdle()
+    }
+
+    @Test fun scrollingWhileNativeSelectionIsPendingRejectsItsOldGeometryResult() {
+        val gate=kotlinx.coroutines.CompletableDeferred<Unit>()
+        val selections=mutableListOf<dev.kent.windbook.core.model.PdfTextSelection?>()
+        var calls=0
+        val anchor=dev.kent.windbook.core.model.PdfTextAnchor(page=0,width=400f,height=600f,
+            rects=listOf(dev.kent.windbook.core.model.PdfTextRect(.2f,.2f,.8f,.3f)),quote="Text")
+        val source=object: PdfPageSource by book {
+            override val textSelectionAvailable=true
+            override suspend fun selectText(page: Int,start: dev.kent.windbook.core.model.PdfPoint,end: dev.kent.windbook.core.model.PdfPoint): dev.kent.windbook.core.model.PdfTextSelection {
+                calls++;gate.await()
+                return dev.kent.windbook.core.model.PdfTextSelection(anchor,start,end)
+            }
+        }
+        compose.setContent {
+            CompositionLocalProvider(LocalKeyEventDispatcher provides dispatcher) {
+                PdfReaderView(source,PdfLayout.VERTICAL,false,0,{}, {},
+                    annotations=PdfAnnotationUi(emptyList(),null,emptyList(),{selections.add(it)},{},{},{},{},{},{ }))
+            }
+        }
+        compose.onNodeWithTag(PDF_VERTICAL_TAG).performTouchInput { longClick(androidx.compose.ui.geometry.Offset(width/2f,width*.35f)) }
+        settle();assertEquals(1,calls)
+        compose.onNodeWithTag(PDF_VERTICAL_TAG).performTouchInput { swipe(center,center.copy(y=center.y-50f),500) }
+        settle()
+        compose.runOnIdle { gate.complete(Unit) }
+        settle();assertTrue(selections.isEmpty())
+    }
+
+    @Test fun tappingSavedTextOpensSharedHorizontalPopupAndColorAction() {
+        val anchor=dev.kent.windbook.core.model.PdfTextAnchor(page=0,width=400f,height=600f,
+            rects=listOf(dev.kent.windbook.core.model.PdfTextRect(.2f,.2f,.8f,.3f)),quote="Selected text")
+        val record=dev.kent.windbook.core.model.PdfTextAnnotation("n","b","sha",anchor,anchor.quote,dev.kent.windbook.core.model.AnnotationColor.GOLD,null,1,1)
+        var active by mutableStateOf(emptyList<String>())
+        var color: dev.kent.windbook.core.model.AnnotationColor?=null
+        compose.setContent {
+            CompositionLocalProvider(LocalKeyEventDispatcher provides dispatcher) {
+                PdfReaderView(source=book,layout=PdfLayout.VERTICAL,cropMargins=false,initialPage=0,onPageChanged={},onCenterTap={},
+                    annotations=PdfAnnotationUi(listOf(record),null,active,{}, {active=it},{},{color=it},{},{active=emptyList()},{ }))
+            }
+        }
+        compose.onNodeWithTag(PDF_VERTICAL_TAG).performTouchInput { click(androidx.compose.ui.geometry.Offset(width/2f,width*1.5f*.25f)) }
+        settle()
+        assertEquals(listOf("n"),active)
+        compose.onNodeWithText("Highlight color").performClick()
+        compose.onNodeWithContentDescription("Gold").assertIsSelected()
+        compose.onNodeWithContentDescription("Blue").performClick()
+        assertEquals(dev.kent.windbook.core.model.AnnotationColor.BLUE,color)
+    }
+
+    @Test fun explicitRevealRequestsReplaceSavedPageEvenWhenSameBookIsAlreadyShown() {
+        val anchor=dev.kent.windbook.core.model.PdfTextAnchor(page=4,width=400f,height=600f,
+            rects=listOf(dev.kent.windbook.core.model.PdfTextRect(.1f,.2f,.4f,.3f)),quote="Target")
+        var request by mutableStateOf<PdfRevealRequest?>(null)
+        compose.setContent {
+            CompositionLocalProvider(LocalKeyEventDispatcher provides dispatcher) {
+                PdfReaderView(source=book,layout=PdfLayout.PAGED,cropMargins=true,initialPage=8,
+                    onPageChanged={pages+=it},onCenterTap={},reveal=request)
+            }
+        }
+        compose.runOnIdle { request=PdfRevealRequest("first",anchor) }
+        settle(); assertEquals(4,pages.last())
+        pressVolumeDown(); settle(); assertEquals(5,pages.last())
+        compose.runOnIdle { request=PdfRevealRequest("second",anchor) }
+        settle(); assertEquals(4,pages.last())
     }
 
     @Test fun verticalStartsAtTheSavedPage() {

@@ -6,10 +6,10 @@ import androidx.navigation3.runtime.NavKey
  * Opens a book without stacking duplicate readers: a double tap must not create two reader
  * entries, because the lower one would later re-save its stale position over the newer one.
  */
-fun MutableList<NavKey>.openReader(bookId: String) {
-    val key = ReaderKey(bookId)
+fun MutableList<NavKey>.openReader(bookId: String, annotationId: String? = null) {
+    val key = ReaderKey(bookId, annotationId, if(annotationId!=null) java.util.UUID.randomUUID().toString() else null)
     if (lastOrNull() == key) return
-    removeAll { it == key }
+    removeAll { it is ReaderKey && it.bookId==bookId }
     add(key)
 }
 

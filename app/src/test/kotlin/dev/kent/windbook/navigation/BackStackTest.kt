@@ -5,6 +5,17 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class BackStackTest {
+    @Test fun repeatedAnnotationNavigationCreatesFreshRequestAndKeepsOneReaderPerBook() {
+        val stack=mutableListOf<NavKey>(LibraryKey,ReaderKey("a"),NotesKey)
+        stack.openReader("a","note")
+        val first=stack.last() as ReaderKey
+        assertEquals("note",first.annotationId)
+        stack.openReader("a","note")
+        val second=stack.last() as ReaderKey
+        org.junit.Assert.assertNotEquals(first.revealRequestId,second.revealRequestId)
+        assertEquals(1,stack.filterIsInstance<ReaderKey>().count {it.bookId=="a"})
+    }
+
     @Test fun folderResultsOpenReaderByStableIdAndReturnToFolder() {
         val stack = mutableListOf<NavKey>(LibraryKey, FolderKey("root"))
         stack.openReader("book")

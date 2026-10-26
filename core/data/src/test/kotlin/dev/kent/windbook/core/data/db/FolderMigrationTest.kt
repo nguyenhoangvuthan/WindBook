@@ -90,7 +90,7 @@ class FolderMigrationTest {
             assertEquals(0L, run.startedAt); assertEquals("", run.currentPath)
         } finally { db.close() }
         AndroidSQLiteDriver().open(path).use { connection ->
-            connection.prepare("PRAGMA user_version").use { assertTrue(it.step()); assertEquals(6L, it.getLong(0)) }
+            connection.prepare("PRAGMA user_version").use { assertTrue(it.step()); assertEquals(7L, it.getLong(0)) }
             connection.prepare("PRAGMA foreign_key_check").use { assertFalse(it.step()) }
         }
     }

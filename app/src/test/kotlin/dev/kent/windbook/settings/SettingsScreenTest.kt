@@ -32,6 +32,13 @@ class SettingsScreenTest {
         assertEquals(listOf(AppLanguage.VIETNAMESE), chosen)
     }
 
+    @Test fun exposesFolderScanDefaultsInSettings() {
+        compose.setContent { SettingsScreen(state, onLanguageChange = {}) }
+        compose.onNodeWithText("Folder scanning", ignoreCase = true).performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Include subfolders").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText(".txt").performScrollTo().assertIsDisplayed()
+    }
+
     @Test fun showsStorageAndVersion() {
         compose.setContent { SettingsScreen(state, onLanguageChange = {}) }
         compose.onNodeWithText("3").performScrollTo().assertIsDisplayed()

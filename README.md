@@ -1,6 +1,10 @@
 # WindBook
 
 A private, offline EPUB/PDF/TXT reader for Android 12+ (minSdk 31, targetSdk 36), built with Kotlin, Jetpack Compose and Readium.
+Delivery APKs and their SHA-256 checksums are exported to **`publish/` at the main
+checkout root**, including when builds run in a nested worktree. Delivery files stay
+untracked. Latest APK: `publish/WindBook-0.1.2-settings-debug.apk`.
+
 Current version: **v0.1.2 (Settings alignment)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese.
 
 PDF opens page by page by default; explicit saved layout choices are preserved.

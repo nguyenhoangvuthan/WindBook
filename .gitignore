@@ -17,3 +17,6 @@ keystore.properties
 
 # Personal library listing (file names of the owner's books)
 metadata_books.json
+
+# Local APK delivery files
+/publish/

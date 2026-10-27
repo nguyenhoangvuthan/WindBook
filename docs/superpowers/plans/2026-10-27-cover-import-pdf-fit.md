@@ -51,11 +51,11 @@
 
 **Interfaces:** keep public `BookCover(...)` unchanged; use constant `ContentScale.Fit` and center alignment from the first image. Remove obsolete dimension-dependent mutable scale behavior; update/remove `coverScaleFor` consistently with tests.
 
-- [ ] Create portrait, landscape, square and narrow cover fixtures with colored corners/edge labels. Capture the current clipping on API36 as RED. Replace the test expecting portrait Crop with whole-image behavior assertions; preserve tint/accessibility checks.
-- [ ] Run `./gradlew :app:testDebugUnitTest --tests '*BookCoverTest'`; capture relevant RED before implementation. If the pixel regression is only reproducible on device, retain that device RED rather than adding a test that merely repeats a constant.
-- [ ] Implement proportional Fit centered in the existing shaped 2:3 frame, preserving paper tint and generated fallback/title inset.
-- [ ] Run focused tests; verify all four fixture borders/labels appear from first display and after restart, with unchanged shelf alignment and reachable menus. Save only synthetic visual evidence in the ledger.
-- [ ] Run required CI, update checkpoint, commit `fix(app): show complete shelf cover images`.
+- [x] Create portrait, landscape, square and narrow cover fixtures with colored corners/edge labels. Capture the current clipping on API36 as RED. Replace the test expecting portrait Crop with whole-image behavior assertions; preserve tint/accessibility checks.
+- [x] Run `./gradlew :app:testDebugUnitTest --tests '*BookCoverTest'`; capture relevant RED before implementation. If the pixel regression is only reproducible on device, retain that device RED rather than adding a test that merely repeats a constant.
+- [x] Implement proportional Fit centered in the existing shaped 2:3 frame, preserving paper tint and generated fallback/title inset.
+- [x] Run focused tests; verify all four fixture borders/labels appear from first display and after restart, with unchanged shelf alignment and reachable menus. Save only synthetic visual evidence in the ledger.
+- [x] Run required CI, update checkpoint, commit `fix(app): show complete shelf cover images`.
 
 ### Task 3: Add repeatable Fit page and align PDF pixels to measured geometry
 

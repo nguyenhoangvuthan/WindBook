@@ -182,6 +182,27 @@ class ExternalSourceDeviceTest {
         assertEquals(0, workspace.activeLeaseCount)
     }
 
+    @Test fun externalSnapshotFingerprintRemainsStableAndHonorsLeaseLifetime() = runBlocking {
+        PdfFixtures.boxed(context.cacheDir, pages = 1)
+        val access = SourceAccess(context, workspace())
+        val acquired = access.acquire(source("pipe-boxed.pdf"))
+        val expected = MessageDigest.getInstance("SHA-256").digest(acquired.file.readBytes())
+            .joinToString("") { "%02x".format(it) }
+        PdfFixtures.boxed(context.cacheDir, pages = 3)
+        repeat(2) { assertEquals(expected, acquired.fingerprint()) }
+        assertFailsWithCancellation(acquired)
+        acquired.close()
+        assertThrows(IllegalStateException::class.java) { runBlocking { acquired.fingerprint() } }
+        assertEquals(0, access.workspace.activeLeaseCount)
+        assertProviderClosed()
+    }
+
+    private fun assertFailsWithCancellation(lease: SourceLease) {
+        assertThrows(CancellationException::class.java) {
+            runBlocking { withContext(Job().apply { cancel() }) { lease.fingerprint() } }
+        }
+    }
+
     @Test fun deniedAndCorruptOpenDoNotRetryAndReleaseAllLeases() = runBlocking {
         val workspace = workspace()
         val engine = ReaderEngine(ReadiumServices(context, null), SourceAccess(context, workspace))

@@ -85,4 +85,47 @@ class SessionWorkspaceTest {
             assertEquals(0L, workspace.usedBytes)
         }
     }
+    @Test fun sourceDigestMatchesCompleteBytesForKnownAndUnknownLength() = runBlocking {
+        val workspace = workspace()
+        for (declared in listOf<Long?>(null, 3L)) {
+            workspace.create().use { lease ->
+                val staged = lease.stageSource(ByteArrayInputStream("abc".toByteArray()), declared)
+                assertEquals("abc", staged.file.readText())
+                assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", staged.sha256)
+                assertEquals(3L, workspace.usedBytes)
+            }
+        }
+        workspace.create().use { lease ->
+            val staged = lease.stageSource(ByteArrayInputStream(byteArrayOf()), null)
+            assertEquals(0L, staged.file.length())
+            assertEquals("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", staged.sha256)
+        }
+        assertEquals(0L, workspace.usedBytes)
+    }
+
+    @Test fun failedHashedCopyReleasesPartialBytesAndClosesInput() = runBlocking {
+        val workspace = workspace()
+        var closed = false
+        val stream = object : ByteArrayInputStream("abcdef".toByteArray()) {
+            var reads = 0
+            override fun read(bytes: ByteArray, offset: Int, length: Int): Int {
+                if (reads++ > 0) throw CancellationException("cancel after partial write")
+                return super.read(bytes, offset, length)
+            }
+            override fun close() { closed = true; super.close() }
+        }
+        workspace.create().use { lease ->
+            assertThrows(CancellationException::class.java) { runBlocking { lease.stageSource(stream) } }
+            assertTrue(closed)
+            assertEquals(0, lease.directory.listFiles()!!.size)
+            assertEquals(0L, workspace.usedBytes)
+            assertThrows(SourceTooLargeException::class.java) { runBlocking { lease.stageSource(ByteArrayInputStream(ByteArray(21))) } }
+            assertEquals(0L, workspace.usedBytes)
+        }
+        workspace(space = 12).create().use { lease ->
+            assertThrows(SourceSpaceException::class.java) { runBlocking { lease.stageSource(ByteArrayInputStream(ByteArray(4))) } }
+            assertEquals(0, lease.directory.listFiles()!!.size)
+        }
+    }
+
 }

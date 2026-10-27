@@ -85,8 +85,8 @@ open class SourceAccess(
                             descriptor.set(fd)
                             currentCoroutineContext().ensureActive()
                             val declaredSize = fd.statSize.takeIf { it >= 0 }
-                            val file = session.stage(ParcelFileDescriptor.AutoCloseInputStream(fd), declaredSize)
-                            SourceLease(file, session, workspace.limits.bufferBytes).also { acquired = it }
+                            val staged = session.stageSource(ParcelFileDescriptor.AutoCloseInputStream(fd), declaredSize)
+                            SourceLease(staged.file, session, workspace.limits.bufferBytes, staged.sha256).also { acquired = it }
                         } catch (e: Throwable) {
                             session.close()
                             throw e
@@ -110,7 +110,9 @@ class SourceLease internal constructor(
     val file: File,
     private val workspace: SessionLease?,
     private val bufferBytes: Int,
+    private val snapshotSha256: String? = null,
 ) : AutoCloseable {
+    init { require(snapshotSha256 == null || workspace?.ownsArtifact(file) == true) }
     private val closed = AtomicBoolean()
     fun openStream(): InputStream {
         check(!closed.get()) { "Source lease is closed" }
@@ -121,6 +123,11 @@ class SourceLease internal constructor(
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
     }
     suspend fun fingerprint(): String = withContext(Dispatchers.IO) {
+        currentCoroutineContext().ensureActive()
+        check(!closed.get()) { "Source lease is closed" }
+        snapshotSha256?.let {
+            return@withContext it
+        }
         val digest = MessageDigest.getInstance("SHA-256")
         openStream().use { input ->
             val buffer = ByteArray(bufferBytes)

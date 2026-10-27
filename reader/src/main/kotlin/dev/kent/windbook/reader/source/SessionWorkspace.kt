@@ -3,6 +3,7 @@ package dev.kent.windbook.reader.source
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -24,6 +25,8 @@ data class SourceLimits(
 }
 class SourceTooLargeException : IOException("Source exceeds the session size limit")
 class SourceSpaceException : IOException("Insufficient session workspace space")
+
+internal data class StagedSource(val file: File, val sha256: String)
 
 /** Process-wide ownership per root: another manager must never clean a live session. */
 class SessionWorkspace(
@@ -55,7 +58,7 @@ class SessionWorkspace(
         SessionLease(directory, this)
     }
 
-    internal suspend fun stage(lease: SessionLease, input: InputStream, declaredSize: Long?): File =
+    internal suspend fun stage(lease: SessionLease, input: InputStream, declaredSize: Long?, digest: MessageDigest? = null): File =
         input.use { stream ->
             withContext(Dispatchers.IO) {
                 state.preparation.withLock {
@@ -80,6 +83,7 @@ class SessionWorkspace(
                                     reserved += count
                                 }
                                 output.write(buffer, 0, count)
+                                digest?.update(buffer, 0, count)
                             }
                         }
                         currentCoroutineContext().ensureActive()
@@ -147,6 +151,13 @@ class SessionLease internal constructor(val directory: File, private val workspa
     internal fun ownsArtifact(file: File): Boolean = !closed.get() && file.canonicalFile in artifacts
     /** Consumes input ownership, including rejection, cancellation and copy failures. */
     suspend fun stage(input: InputStream, declaredSize: Long? = null): File = workspace.stage(this, input, declaredSize).also { artifacts.add(it.canonicalFile) }
+    /** Hashes only the bytes successfully copied into this immutable external snapshot. */
+    internal suspend fun stageSource(input: InputStream, declaredSize: Long? = null): StagedSource {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val file = workspace.stage(this, input, declaredSize, digest)
+        artifacts.add(file.canonicalFile)
+        return StagedSource(file, digest.digest().joinToString("") { "%02x".format(it) })
+    }
     /** Generated output shares the source snapshot's global scratch quota and preparation lock. */
     suspend fun writeArtifact(write: (java.io.OutputStream) -> Unit): File = workspace.writeArtifact(this, write).also { artifacts.add(it.canonicalFile) }
     override fun close() { if (closed.compareAndSet(false, true)) workspace.release(this) }

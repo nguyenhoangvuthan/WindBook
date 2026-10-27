@@ -64,4 +64,11 @@ review-fixes-red.log/review-fixes-green.log, review-final.md, private DB snapsho
 verification-summary.json, actual shelf screenshots and final-apk.json.
 
 Delivery: main-checkout `publish/WindBook-0.1.4-folder-covers-debug.apk`, versionCode5,
-versionName0.1.4; checksum/signature/package version verified. No merge or push.
+versionName0.1.4; checksum/signature/package version verified.
+
+Main integration (2026-10-27): the owner authorized integration and push to
+`origin/main`. Main fast-forwards to the verified `b6fe0de` implementation;
+only handoff documentation changes afterward. Required CI passes on main:
+408 JVM tests, zero failures/errors/skips, lint zero errors and 9 unchanged
+warnings. No new device checks or phone-validation claims.
+The feature worktree remains available; no tag is included in the push.

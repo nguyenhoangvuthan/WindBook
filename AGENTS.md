@@ -2,7 +2,7 @@
 
 Read this file first. It is shared by every AI agent working in this repo (Claude Code, Codex, …) and is the single place for project context, rules, current status and the task queue. **Keep it current:** when you finish or hand off work, update §8 "Current state" and §9 "Task queue" in the same commit as the work.
 
-Last updated: 2026-10-27 (folder import saves covers before opening;0.1.4 phone validation next).
+Last updated: 2026-10-27 (owner authorized integration of version 0.1.4 into main and push to origin/main).
 
 ---
 
@@ -99,8 +99,9 @@ Four Gradle modules. Dependencies point downward only: `:app` → `:reader` → 
 
 ## 8. Current state (update on every hand-off)
 
-- **Active branch/worktree:** `folder-covers` in `.superpowers/worktrees/folder-library`, BASE `e251afd` (completed0.1.3 icon increment). The outer checkout `remove-pdf-reflow` is stale. No merge/push authorized; local `v0.1.0` remains unpushed.
-- **Resume without rediscovery:** read the outer repo `.superpowers/RESUME.md`, then check active-worktree HEAD/short status. Current cover reports are `.superpowers/checks/folder-covers/`; prior icon reports remain in `.superpowers/checks/launcher-icon/`. Current layout/real-book reports are `.superpowers/checks/settings-library/`; previous daily-feedback reports remain in `.superpowers/checks/daily-feedback/`. Do not reread all old plans or rerun green suites solely because a turn was interrupted. CodeGraph is initialized here; CLI `/home/kent/.local/bin/codegraph` (not on shell PATH), use before code searches/reads.
+- **Integration verification (2026-10-27):** required CI on `main` passes all 408 JVM tests (55 model, 132 data, 47 reader, 174 app), with zero failures/errors/skips; lint has zero errors and the same 9 warnings. Log: outer `.superpowers/checks/main-integration/ci.log`. No application code changed during integration.
+- **Active branch/worktree:** `main` at the main checkout. On 2026-10-27 the owner authorized integration and push to `origin/main`; `main` was fast-forwarded to `folder-covers` (`b6fe0de`, version 0.1.4), including all preceding folder/TXT/PDF-note/Settings/icon increments and Reflow removal. The `folder-covers` branch/worktree is retained. Local `v0.1.0` remains unpushed; this request covers `main` only.
+- **Resume without rediscovery:** start with `main` and its short status; the older outer `.superpowers/RESUME.md` describes the pre-integration folder-covers handoff. Current cover reports are `.superpowers/checks/folder-covers/`; prior icon reports remain in `.superpowers/checks/launcher-icon/`. Current layout/real-book reports are `.superpowers/checks/settings-library/`; previous daily-feedback reports remain in `.superpowers/checks/daily-feedback/`. Do not reread all old plans or rerun green suites solely because a turn was interrupted. CodeGraph is initialized here; CLI `/home/kent/.local/bin/codegraph` (not on shell PATH), use before code searches/reads.
 - **Completed base:** M1 core reading loop, look-and-feel, PDF display/comfort; Reflow removed. Folder/source Tasks1–8 and their whole-branch fix-wave review are Approved at `1d64653`. Additional-reader shared preparation and TXT increments are independently Approved at `ab77179`/`98425b3`. Status-bar fix is complete/reviewed at `b2e5910`; fullscreen reading always retains the status bar and respects real system-bar/cutout bounds.
 - **Paused scope:** on 2026-10-24 the owner paused FB2/CBZ/CBR/MOBI/AZW3; EPUB/PDF/TXT suffice. Partial FB2 parser/tests are preserved outside build in ignored additional-reader ledger `paused-task3/`. Do not resume paused readers without a new request. Junrar/slf4j/libmobi/NDK approvals remain historical; no such runtime dependency has been added.
 - **Current owner-authorized feedback (2026-10-26):** folder-as-root scanning of all selected EPUB/PDF/TXT, visible Settings choices, Paged PDF default, title/time-added sort, and explicitly confirmed PDF text selection → save/edit in Notes → exact source revisit. Scope/plan: `docs/superpowers/specs/2026-10-26-daily-reading-feedback-design.md` and companion plan. EPUB/scan notes, OCR and export remain deferred; the broader October21 notes design is not blanket implementation approval.
@@ -116,7 +117,7 @@ Four Gradle modules. Dependencies point downward only: `:app` → `:reader` → 
 ## 9. Task queue
 
 1. Current0.1.4 folder-cover increment is verified; see `docs/testing/folder-covers-checklist.md`. Existing libraries can rescan their folder to populate missing covers. Previous0.1.3 launcher icon increment is verified; see `docs/testing/launcher-icon-checklist.md`. APK delivery location is the main checkout `publish/`, including exports from worktrees. Previous0.1.2 Settings alignment increment is verified; see `docs/testing/settings-library-checklist.md`. Previous0.1.1 folder/PDF-note/migration/API31 gates remain complete at `ba2e516`. Resume from checkpoint; do not repeat historical checks without new changes or evidence.
-2. Owner tests `publish/WindBook-0.1.4-folder-covers-debug.apk` on the Neo 3 GT. Merge/push and pushing `v0.1.0` remain separate owner decisions.
+2. Owner tests `publish/WindBook-0.1.4-folder-covers-debug.apk` on the Neo 3 GT. Integration and push to `origin/main` are authorized on 2026-10-27; verify remote/local HEAD equality after pushing. Pushing `v0.1.0` still requires a separate owner decision.
 3. M2 typography, EPUB/scan notes and paused readers remain future work; do not resume automatically.
 
 **Known limitations retained, not part of current fixes:**

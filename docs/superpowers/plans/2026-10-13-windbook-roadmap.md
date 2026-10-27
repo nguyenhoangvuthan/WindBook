@@ -31,3 +31,11 @@ Minimal launcher icon (2026-10-27,0.1.3): owner-approved Lucide Book Open outlin
 Folder covers correction (2026-10-27,0.1.4): scan prepares persistent EPUB/PDF shelf covers before any reader opens; safe cancellation/revisions/cache cleanup and existing-folder backfill verified.408JVM tests, baseline-only lint and independent fix-wave review pass;24 fresh real books save24 covers without opening. Existing libraries rescan to fill missing covers. See `docs/testing/folder-covers-checklist.md`.
 
 Main integration (2026-10-27): owner authorized fast-forward integration through `folder-covers` (`b6fe0de`, version 0.1.4) and push to `origin/main`. Feature branches/worktrees are retained; tags are outside this push. Physical-phone validation remains open.
+
+Cover and PDF fit correction (2026-10-27,0.1.5): whole shelf covers, repeatable PDF
+Fit page with measured proportional frames, preserved notes/page/vertical zoom and
+error-page tap recovery. External snapshots hash during bounded copy;25-book trials
+remove80.84MB redundant reads but do not demonstrate lower wall time (3515ms versus
+3634ms medians).417JVM/lint0errors9baseline,14source device tests, actual API36
+geometry/note/rescan gates and independent review pass. APK exported to main-root
+publish/; no merge/push of this increment. See `docs/testing/cover-import-pdf-fit-checklist.md`.

@@ -392,10 +392,22 @@ private fun PagedPages(
                 }
                 if (size != null) resolveCrop(page)
             }
+            val turnAt: (Offset)->Unit = { tap ->
+                if(!gesturesLocked) when {
+                    tap.x<viewportW*.25f -> scope.launch {pager.animateScrollToPage((page-1).coerceAtLeast(0))}
+                    tap.x>viewportW*.75f -> scope.launch {pager.animateScrollToPage((page+1).coerceAtMost(source.pageCount-1))}
+                    else -> onCenterTap()
+                }
+            }
             // Native rendering must never draw a differently-shaped page into fallback geometry.
             val measured = size
             if (measured == null) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier.fillMaxSize().pointerInput(page, gesturesLocked) {
+                        detectTapGestures(onTap = turnAt)
+                    },
+                    contentAlignment = Alignment.Center,
+                ) {
                     if (measureFailed) Text(stringResource(R.string.page_render_failed), color = Color.White)
                 }
                 return@HorizontalPager
@@ -404,13 +416,6 @@ private fun PagedPages(
             val pageAspect = (crop.width * measured.width) / (crop.height * measured.height)
             val fitW = if (viewportW / pageAspect <= viewportH) viewportW else (viewportH * pageAspect).roundToInt()
             val fitH = (fitW / pageAspect).roundToInt()
-            val turnAt: (Offset)->Unit = { tap ->
-                if(!gesturesLocked) when {
-                    tap.x<viewportW*.25f -> scope.launch {pager.animateScrollToPage((page-1).coerceAtLeast(0))}
-                    tap.x>viewportW*.75f -> scope.launch {pager.animateScrollToPage((page+1).coerceAtMost(source.pageCount-1))}
-                    else -> onCenterTap()
-                }
-            }
             val zoomAt: (Offset)->Unit = { tap ->
                 if(!gesturesLocked) {
                     if(zoom>1f) {zoom=1f;pan=Offset.Zero}

@@ -154,6 +154,23 @@ class PdfReaderViewTest {
         assertEquals(7,pages.last())
     }
 
+    @Test fun failedMeasurementKeepsControlAndEdgeTapNavigationAvailable() {
+        val source = object : PdfPageSource by book {
+            override suspend fun measure(page: Int): PageSize {
+                if (page == 0) throw java.io.IOException("Cannot measure damaged page")
+                return book.measure(page)
+            }
+        }
+        show(source = source, layout = PdfLayout.PAGED)
+        compose.onNodeWithText("This page can't be shown").assertExists()
+        compose.onNodeWithTag(PDF_PAGED_TAG).performTouchInput { click(center) }
+        settle()
+        assertEquals(1, taps)
+        compose.onNodeWithTag(PDF_PAGED_TAG).performTouchInput { click(centerRight.copy(x=width*.9f)) }
+        settle()
+        assertEquals(1, pages.last())
+    }
+
     @Test fun scrollingWhileNativeSelectionIsPendingRejectsItsOldGeometryResult() {
         val gate=kotlinx.coroutines.CompletableDeferred<Unit>()
         val selections=mutableListOf<dev.kent.windbook.core.model.PdfTextSelection?>()

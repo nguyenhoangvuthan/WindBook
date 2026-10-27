@@ -1,6 +1,6 @@
 # Cover Import Speed and PDF Fit Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Reduce redundant first-import I/O, show whole shelf covers and provide repeatable whole-page PDF fitting.
 
@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-27-cover-import-pdf-fit-design.md` (owner-approved 2026-10-27).
 
-**Status:** owner-approved 2026-10-27; execution in progress. Execution style: one implementer here, one independent final review.
+**Status:** completed 2026-10-27; performance measurements did not demonstrate a wall-time gain. Execution style: one implementer here, one independent final review.
 
 ## Global Constraints
 
@@ -75,11 +75,11 @@
 
 **Files:** modify `app/build.gradle.kts`, `AGENTS.md`, `README.md`, milestone roadmap; create `docs/testing/cover-import-pdf-fit-checklist.md`. Keep benchmark manifests, instrumentation, private screenshots and APKs ignored.
 
-- [ ] Finish matched fresh-import trials from Task 1 on the same source bytes, recording first cover/total time, stage/hash byte counts and memory. Verify all expected covers persist across restart/rescan, source SHA unchanged, reading data unchanged and no workspace/cover-file leak. Report actual improvement and remaining parsing/rendering cost; do not expand scope silently if hashing is not the dominant cost.
-- [ ] Request one independent whole-change review against the approved spec. Every Important/Critical fix receives a failing regression before implementation; rerun affected checks after fixes. Retain the review and exact commit/evidence references.
-- [ ] Set versionCode **6**, versionName **0.1.5**. Run required CI and `./gradlew :app:assembleDebug`; expect all tests PASS and lint zero errors with no warnings above the existing 9. Repeat device checks only for changes introduced by review/version finalization that affect behavior.
-- [ ] Export `publish/WindBook-0.1.5-cover-fit-debug.apk` and adjacent `.apk.sha256` at the main checkout root. Verify exported hash, package version and signature. No new APK is delivered if required verification fails.
-- [ ] Update the checklist, roadmap, README, AGENTS sections 8/9 and resume checkpoint with completed tasks, measured results and exact remaining limitations. Commit `chore(app): prepare cover and PDF fit build` locally. Do not merge/push automatically.
+- [x] Finish matched fresh-import trials from Task 1 on the same source bytes, recording first cover/total time, stage/hash byte counts and memory. Verify all expected covers persist across restart/rescan, source SHA unchanged, reading data unchanged and no workspace/cover-file leak. Report actual improvement and remaining parsing/rendering cost; do not expand scope silently if hashing is not the dominant cost.
+- [x] Request one independent whole-change review against the approved spec. Every Important/Critical fix receives a failing regression before implementation; rerun affected checks after fixes. Retain the review and exact commit/evidence references.
+- [x] Set versionCode **6**, versionName **0.1.5**. Run required CI and `./gradlew :app:assembleDebug`; expect all tests PASS and lint zero errors with no warnings above the existing 9. Repeat device checks only for changes introduced by review/version finalization that affect behavior.
+- [x] Export `publish/WindBook-0.1.5-cover-fit-debug.apk` and adjacent `.apk.sha256` at the main checkout root. Verify exported hash, package version and signature. No new APK is delivered if required verification fails.
+- [x] Update the checklist, roadmap, README, AGENTS sections 8/9 and resume checkpoint with completed tasks, measured results and exact remaining limitations. Commit `chore(app): prepare cover and PDF fit build` locally. Do not merge/push automatically.
 
 ## Required CI before each code commit
 

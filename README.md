@@ -3,9 +3,9 @@
 A private, offline EPUB/PDF/TXT reader for Android 12+ (minSdk 31, targetSdk 36), built with Kotlin, Jetpack Compose and Readium.
 Delivery APKs and their SHA-256 checksums are exported to **`publish/` at the main
 checkout root**, including when builds run in a nested worktree. Delivery files stay
-untracked. Latest APK: `publish/WindBook-0.1.4-folder-covers-debug.apk`.
+untracked. Latest APK: `publish/WindBook-0.1.5-cover-fit-debug.apk`.
 
-Current version: **v0.1.4 (folder covers)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese.
+Current version: **v0.1.5 (cover and PDF fit)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese. Shelf covers display whole within their frames. PDF View → Fit page resets paged zoom/pan and margin cropping while keeping the current page and notes.
 
 PDF opens page by page by default; explicit saved layout choices are preserved.
 Vertical scrolling, margin cropping and remembered zoom remain available. Fullscreen

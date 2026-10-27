@@ -1,6 +1,6 @@
 # Faster initial cover preparation and proportional display
 
-Status: approved by the owner on 2026-10-27; implementation plan approved; execution in progress.
+Status: approved by the owner on 2026-10-27; implementation and verification completed; wall-time acceleration not demonstrated.
 Baseline: main `2ae7699`, WindBook 0.1.4.
 
 ## Owner intent

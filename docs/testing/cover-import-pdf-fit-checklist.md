@@ -75,4 +75,4 @@ cover files intact.178 known test covers and the duplicate large sample retired.
 Delivered APK: `publish/WindBook-0.1.5-cover-fit-debug.apk`,80,261,071bytes,
 SHA256 `d94a5c622a288693a21c3af1d2f12bcedffe23660827a29ce17d3a13d5550aa2`.
 Package dev.kent.windbook, code6/name0.1.5; signature matches0.1.4.
-No main merge, remote push or tag push for this increment.
+Main integration (2026-10-27): owner requested "push all to main"; main fast-forwarded to the reviewed `90b6742`. Feature worktrees and their ignored evidence are retained. Integration CI is recorded in main-root `.superpowers/checks/main-015-integration/ci.log`. Tags are outside this push.

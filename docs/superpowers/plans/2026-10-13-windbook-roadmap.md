@@ -38,4 +38,4 @@ error-page tap recovery. External snapshots hash during bounded copy;25-book tri
 remove80.84MB redundant reads but do not demonstrate lower wall time (3515ms versus
 3634ms medians).417JVM/lint0errors9baseline,14source device tests, actual API36
 geometry/note/rescan gates and independent review pass. APK exported to main-root
-publish/; no merge/push of this increment. See `docs/testing/cover-import-pdf-fit-checklist.md`.
+publish/; integrated into main at `90b6742` under the owner's 2026-10-27 request to push all completed work to `origin/main`. Feature worktrees and local tags are retained. See `docs/testing/cover-import-pdf-fit-checklist.md`.

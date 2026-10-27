@@ -179,6 +179,7 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit, onReplaceReader: (String) ->
                     pdfDisplay = if (pdf != null) pdfDisplay else null,
                     onPdfLayoutChange = viewModel::setPdfLayout,
                     onCropMarginsChange = viewModel::setCropMargins,
+                    onFitPdfPage = viewModel::fitPdfPage,
                 )
             }
         }
@@ -268,6 +269,7 @@ fun ReaderOverlay(
     pdfDisplay: EffectiveDisplay? = null,
     onPdfLayoutChange: (PdfLayout) -> Unit = {},
     onCropMarginsChange: (Boolean) -> Unit = {},
+    onFitPdfPage: () -> Unit = {},
 ) {
     val bar = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.97f)
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
@@ -290,7 +292,7 @@ fun ReaderOverlay(
                     modifier = Modifier.weight(1f),
                 )
                 if (pdfDisplay != null) {
-                    ViewMenu(pdfDisplay, onPdfLayoutChange, onCropMarginsChange)
+                    ViewMenu(pdfDisplay, onPdfLayoutChange, onCropMarginsChange, onFitPdfPage)
                 } else {
                     // Balances the back button so the title is truly centred.
                     Spacer(Modifier.width(48.dp))
@@ -331,6 +333,7 @@ private fun ViewMenu(
     display: EffectiveDisplay,
     onLayoutChange: (PdfLayout) -> Unit,
     onCropChange: (Boolean) -> Unit,
+    onFitPage: () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     Box {
@@ -338,6 +341,10 @@ private fun ViewMenu(
             Icon(WindBookIcons.ViewMode, contentDescription = stringResource(R.string.cd_view_mode))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.fit_page)) },
+                onClick = { open = false; onFitPage() },
+            )
             listOf(
                 PdfLayout.VERTICAL to R.string.layout_vertical,
                 PdfLayout.PAGED to R.string.layout_paged,

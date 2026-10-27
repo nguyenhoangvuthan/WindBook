@@ -132,5 +132,18 @@ class ReaderOverlayTest {
         compose.onNodeWithText("Page by page").assertIsDisplayed()
         compose.onNodeWithText("Reflow").assertDoesNotExist()
     }
+    @Test fun fitPageActionRemainsAvailableWhenAlreadyPagedAndFitted() {
+        var fits = 0
+        compose.setContent {
+            ReaderOverlay(visible = true, title = "Doc", chapterTitle = null, progression = .4,
+                canMarkFinished = false, onMarkFinished = {}, onBack = {},
+                pdfDisplay = EffectiveDisplay(PdfLayout.PAGED, false), onFitPdfPage = { fits++ })
+        }
+        repeat(2) {
+            compose.onNodeWithContentDescription("View").performClick()
+            compose.onNodeWithText("Fit page").performClick()
+        }
+        assertEquals(2, fits)
+    }
 
 }

@@ -98,6 +98,7 @@ fun PdfReaderView(
     onZoomChanged: (zoom: Float, zoomX: Float) -> Unit = { _, _ -> },
     annotations: PdfAnnotationUi? = null,
     reveal: PdfRevealRequest? = null,
+    fitRequestId: Long = 0L,
 ) {
     var currentPage by rememberSaveable(source, reveal?.requestId) { mutableIntStateOf((reveal?.anchor?.page ?: initialPage).coerceIn(0, source.pageCount - 1)) }
     var revealing by remember(source,reveal?.requestId) { mutableStateOf(reveal!=null) }
@@ -127,7 +128,7 @@ fun PdfReaderView(
             if(revealing) 1f else initialZoom, if(revealing) 0f else initialZoomX,
             { z,x -> if(!revealing) onZoomChanged(z,x) }, annotations, reveal?.anchor?.takeIf { revealing },
         )
-        PdfLayout.PAGED -> PagedPages(source, currentPage, cropFor, resolveCrop, report, onCenterTap, modifier,annotations)
+        PdfLayout.PAGED -> PagedPages(source, currentPage, cropFor, resolveCrop, report, onCenterTap, modifier,annotations,fitRequestId)
     } }
 }
 
@@ -337,6 +338,7 @@ private fun PagedPages(
     onCenterTap: () -> Unit,
     modifier: Modifier,
     annotations: PdfAnnotationUi?,
+    fitRequestId: Long,
 ) {
     val gesturesLocked by rememberUpdatedState(annotations?.locked==true)
     val pager = rememberPagerState(initialPage = startPage) { source.pageCount }
@@ -344,6 +346,11 @@ private fun PagedPages(
     var zoom by remember { mutableFloatStateOf(1f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
     val density = LocalDensity.current
+
+    LaunchedEffect(fitRequestId) {
+        zoom = 1f
+        pan = Offset.Zero
+    }
 
     LaunchedEffect(pager) {
         snapshotFlow { pager.currentPage }.distinctUntilChanged().collect { page ->
@@ -371,13 +378,30 @@ private fun PagedPages(
             key = { it },
             modifier = Modifier.fillMaxSize().testTag(PDF_PAGED_TAG),
         ) { page ->
-            var size by remember(page) { mutableStateOf(source.pageSize(page)) }
-            LaunchedEffect(page, resolveCrop) {
-                size=source.measure(page)
-                resolveCrop(page)
+            var size by remember(source, page) { mutableStateOf<dev.kent.windbook.core.model.PageSize?>(null) }
+            var measureFailed by remember(source, page) { mutableStateOf(false) }
+            LaunchedEffect(source, page, resolveCrop) {
+                try {
+                    size = source.measure(page)
+                    measureFailed = false
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    size = null
+                    measureFailed = true
+                }
+                if (size != null) resolveCrop(page)
+            }
+            // Native rendering must never draw a differently-shaped page into fallback geometry.
+            val measured = size
+            if (measured == null) {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    if (measureFailed) Text(stringResource(R.string.page_render_failed), color = Color.White)
+                }
+                return@HorizontalPager
             }
             val crop = cropFor(page)
-            val pageAspect = (crop.width * size.width) / (crop.height * size.height)
+            val pageAspect = (crop.width * measured.width) / (crop.height * measured.height)
             val fitW = if (viewportW / pageAspect <= viewportH) viewportW else (viewportH * pageAspect).roundToInt()
             val fitH = (fitW / pageAspect).roundToInt()
             val turnAt: (Offset)->Unit = { tap ->
@@ -412,13 +436,14 @@ private fun PagedPages(
                                 translationX = pan.x
                                 translationY = pan.y
                             }
-                        },
+                        }
+                        .testTag("pdf-page-$page"),
                 ) {
                     PageBitmap(source,page,crop,if(zoom>1f && pager.currentPage==page) fitW*2 else fitW,Modifier.fillMaxSize())
                     annotations?.let { ui ->
                         fun viewportPoint(tap: Offset)=Offset((viewportW-fitW)/2f+fitW/2f+(tap.x-fitW/2f)*zoom+pan.x,
                             (viewportH-fitH)/2f+fitH/2f+(tap.y-fitH/2f)*zoom+pan.y)
-                        PdfTextPageOverlay(source,page,crop,size,ui,{turnAt(viewportPoint(it))},{zoomAt(viewportPoint(it))},motionSnapshot=remember(pager) {
+                        PdfTextPageOverlay(source,page,crop,measured,ui,{turnAt(viewportPoint(it))},{zoomAt(viewportPoint(it))},motionSnapshot=remember(pager) {
                             { Triple(pager.currentPage to pager.currentPageOffsetFraction,zoom,pan) }
                         })
                     }
@@ -446,9 +471,9 @@ private fun ReportPage(listState: LazyListState, onPageChanged: (Int) -> Unit) {
 /** One page bitmap; a failed page shows a message and leaves its neighbours alone. */
 @Composable
 private fun PageBitmap(source: PdfPageSource, page: Int, crop: CropBox, renderWidthPx: Int, modifier: Modifier) {
-    var image by remember(page, crop, renderWidthPx) { mutableStateOf<ImageBitmap?>(null) }
-    var failed by remember(page, crop, renderWidthPx) { mutableStateOf(false) }
-    LaunchedEffect(page, crop, renderWidthPx) {
+    var image by remember(source, page, crop, renderWidthPx) { mutableStateOf<ImageBitmap?>(null) }
+    var failed by remember(source, page, crop, renderWidthPx) { mutableStateOf(false) }
+    LaunchedEffect(source, page, crop, renderWidthPx) {
         try {
             image = source.render(page, crop, renderWidthPx).asImageBitmap()
         } catch (e: CancellationException) {
@@ -458,7 +483,7 @@ private fun PageBitmap(source: PdfPageSource, page: Int, crop: CropBox, renderWi
         }
     }
     Box(modifier.background(Color.White)) {
-        image?.let { Image(it, contentDescription = null, contentScale = ContentScale.FillBounds, modifier = Modifier.fillMaxSize()) }
+        image?.let { Image(it, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize()) }
         if (failed) {
             Text(
                 stringResource(R.string.page_render_failed),

@@ -86,6 +86,9 @@ class ReaderViewModel @AssistedInject constructor(
     /** How a PDF is shown (null for EPUB or while loading). */
     val pdfDisplay: StateFlow<EffectiveDisplay?> = _pdfDisplay.asStateFlow()
 
+    private val _pdfFitRequestId = MutableStateFlow(0L)
+    val pdfFitRequestId: StateFlow<Long> = _pdfFitRequestId.asStateFlow()
+
     private var currentPrefs = BookDisplayPrefs()
 
     private val finished = MutableStateFlow(false)
@@ -290,6 +293,19 @@ class ReaderViewModel @AssistedInject constructor(
     }
 
     fun toggleOverlay() = _overlayVisible.update { !it }
+
+    /** One combined preference write; the request also resets an already-paged local transform. */
+    fun fitPdfPage() {
+        val pdf = session as? PdfSession ?: return
+        val next = currentPrefs.copy(pdfLayout = PdfLayout.PAGED, cropMargins = false)
+        viewModelScope.launch {
+            displayPrefs.set(bookId, next)
+            if (session === pdf) {
+                _pdfFitRequestId.update { it + 1L }
+                _overlayVisible.value = false
+            }
+        }
+    }
 
     fun setPdfLayout(layout: PdfLayout) = updatePrefs { it.copy(pdfLayout = layout) }
 

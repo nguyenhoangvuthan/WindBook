@@ -24,6 +24,7 @@ import kotlin.math.abs
 internal fun PdfNotesReader(bookId: String,session: PdfSession,reader: ReaderViewModel,display: EffectiveDisplay,
     initialPage: Int,annotationId: String?,revealRequestId: String?) {
     val notes=hiltViewModel<NotesViewModel>(key="pdf-notes:$bookId")
+    val fitRequestId by reader.pdfFitRequestId.collectAsStateWithLifecycle()
     val records by notes.annotations.collectAsStateWithLifecycle()
     val saving by notes.saving.collectAsStateWithLifecycle()
     val failed by notes.failed.collectAsStateWithLifecycle()
@@ -71,7 +72,7 @@ internal fun PdfNotesReader(bookId: String,session: PdfSession,reader: ReaderVie
     }
     Box(Modifier.fillMaxSize()) {
         PdfReaderView(session.pages,display.layout,display.cropMargins,initialPage,reader::onPdfPageChanged,reader::toggleOverlay,
-            initialZoom=display.zoom,initialZoomX=display.zoomX,onZoomChanged=reader::setPdfZoom,reveal=reveal,
+            initialZoom=display.zoom,initialZoomX=display.zoomX,onZoomChanged=reader::setPdfZoom,reveal=reveal,fitRequestId=fitRequestId,
             annotations=PdfAnnotationUi(marks,selection,active,
                 onSelect={selection=it;message=null;if(it!=null) active=emptyList()},onExisting={active=it;if(it.isNotEmpty()) selection=null},
                 onNote={prepare(true)},onColor={color -> if(prepare(false)) notes.highlight(color)},

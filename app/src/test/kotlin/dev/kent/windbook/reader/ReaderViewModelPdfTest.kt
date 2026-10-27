@@ -89,6 +89,37 @@ class ReaderViewModelPdfTest {
         org.junit.Assert.assertNull(model.annotationFingerprint(opened.session))
     }
 
+    @Test fun fitPageWritesCombinedChoicePreservesVerticalZoomAndRepeatsWithoutMovingPage() = runTest {
+        val dao = db.bookPreferencesDao()
+        dao.upsert(BookPreferencesEntity("a", """{"pdfLayout":"VERTICAL","cropMargins":true,"pdfZoom":2,"pdfZoomX":0.5,"future":"keep"}""", 1))
+        val writes = mutableListOf<BookPreferencesEntity>()
+        prefs = DisplayPreferencesRepository(object : dev.kent.windbook.core.data.db.BookPreferencesDao by dao {
+            override suspend fun upsert(entity: BookPreferencesEntity) {
+                writes.add(entity)
+                dao.upsert(entity)
+            }
+        })
+        val model = vm(PageSize(400f, 600f))
+        model.pdfDisplay.filterNotNull().first()
+        model.onPdfPageChanged(4)
+        val beforeLocator = model.latestLocatorJson
+        model.toggleOverlay()
+        model.fitPdfPage()
+        model.pdfFitRequestId.first { it == 1L }
+        assertEquals(false, model.overlayVisible.value)
+        assertEquals(BookDisplayPrefs(PdfLayout.PAGED, false, 2f, .5f), prefs.observe("a").first { it.pdfLayout == PdfLayout.PAGED })
+        assertEquals(1, writes.size)
+        assertEquals("keep", org.json.JSONObject(dao.json("a")!!).getString("future"))
+        assertEquals(beforeLocator, model.latestLocatorJson)
+        assertEquals(4, model.initialPdfPage())
+        model.pdfDisplay.filterNotNull().first { it.layout == PdfLayout.PAGED && !it.cropMargins }
+        model.fitPdfPage()
+        model.pdfFitRequestId.first { it == 2L }
+        assertEquals(2, writes.size)
+        assertEquals(beforeLocator, model.latestLocatorJson)
+        assertEquals(BookDisplayPrefs(PdfLayout.PAGED, false, 2f, .5f), prefs.observe("a").first())
+    }
+
     @Test fun portraitPdfDefaultsToPagedWithoutCrop() = runTest {
         val display = vm(PageSize(400f, 600f)).pdfDisplay.filterNotNull().first()
         assertEquals(EffectiveDisplay(PdfLayout.PAGED, false), display)

@@ -46,6 +46,7 @@ class PdfReaderViewTest {
 
     private class FakeSource(private val sizes: List<PageSize>) : PdfPageSource {
         val rendered = mutableListOf<Int>()
+        val widths = mutableListOf<Pair<Int, Int>>()
         val regions = mutableListOf<Pair<Int, PixelRegion>>()
         override val pageCount = sizes.size
         override fun pageSize(page: Int) = sizes[page]
@@ -55,6 +56,7 @@ class PdfReaderViewTest {
         override suspend fun render(page: Int, crop: CropBox, widthPx: Int, region: PixelRegion?): Bitmap {
             if (region != null) regions += widthPx to region
             rendered += page
+            widths.add(page to widthPx)
             return Bitmap.createBitmap(region?.width ?: widthPx, region?.height ?: renderedHeight(sizes[page], crop, widthPx), Bitmap.Config.ARGB_8888)
         }
     }
@@ -96,6 +98,60 @@ class PdfReaderViewTest {
             dispatcher.dispatch(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_VOLUME_DOWN))
         }
         compose.waitForIdle()
+    }
+
+    @Test fun repeatedFitRequestsResetPagedZoomAndPanWithoutChangingPage() {
+        var fitRequest by mutableStateOf(0L)
+        compose.setContent {
+            CompositionLocalProvider(LocalKeyEventDispatcher provides dispatcher) {
+                PdfReaderView(book, PdfLayout.PAGED, false, 4, { pages += it }, {}, fitRequestId = fitRequest)
+            }
+        }
+        settle()
+        val original = compose.onNodeWithTag("pdf-page-4").fetchSemanticsNode().boundsInRoot
+        val baseWidth = book.widths.last { it.first == 4 }.second
+        repeat(2) {
+            compose.onNodeWithTag(PDF_PAGED_TAG).performTouchInput { doubleClick(center) }
+            settle()
+            assertTrue(book.widths.last { it.first == 4 }.second > baseWidth)
+            compose.onNodeWithTag(PDF_PAGED_TAG).performTouchInput { swipe(center, center.copy(x = center.x + 60f), 300) }
+            settle()
+            compose.runOnIdle { fitRequest++ }
+            settle()
+            assertEquals(original, compose.onNodeWithTag("pdf-page-4").fetchSemanticsNode().boundsInRoot)
+            assertEquals(baseWidth, book.widths.last { it.first == 4 }.second)
+            assertEquals(4, pages.last())
+        }
+    }
+
+    @Test fun mixedPageWaitsForItsOwnMeasurementBeforeRendering() {
+        val gate = kotlinx.coroutines.CompletableDeferred<PageSize>()
+        val mixed = FakeSource(listOf(PageSize(400f,600f), PageSize(800f,400f), PageSize(400f,600f)))
+        val source = object : PdfPageSource by mixed {
+            override fun pageSize(page: Int) = PageSize(400f,600f)
+            override suspend fun measure(page: Int) = if (page == 1) gate.await() else mixed.measure(page)
+        }
+        show(source = source, layout = PdfLayout.PAGED, initialPage = 1)
+        assertTrue("Do not draw the native landscape bitmap into fallback portrait geometry", 1 !in mixed.rendered)
+        compose.runOnIdle { gate.complete(PageSize(800f,400f)) }
+        settle()
+        assertTrue(1 in mixed.rendered)
+        val bounds = compose.onNodeWithTag("pdf-page-1").fetchSemanticsNode().boundsInRoot
+        assertEquals(2f, bounds.width / bounds.height, .01f)
+    }
+
+    @Test fun fittingWhileSwitchingFromVerticalKeepsTheCurrentPage() {
+        var layout by mutableStateOf(PdfLayout.VERTICAL)
+        var request by mutableStateOf(0L)
+        compose.setContent {
+            CompositionLocalProvider(LocalKeyEventDispatcher provides dispatcher) {
+                PdfReaderView(book,layout,false,7,{pages+=it},{},fitRequestId=request)
+            }
+        }
+        settle()
+        compose.runOnIdle { layout=PdfLayout.PAGED;request++ }
+        settle()
+        assertEquals(7,pages.last())
     }
 
     @Test fun scrollingWhileNativeSelectionIsPendingRejectsItsOldGeometryResult() {

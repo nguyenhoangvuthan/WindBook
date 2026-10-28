@@ -20,6 +20,15 @@ The spec covers eight milestones. Each milestone is shippable on its own (signed
 
 Excluded by decision: read aloud / TTS playback, AI assistant, and the benchmark's ✗ items.
 
+Next-priority direction (2026-10-29): owner requested fixing slow scan/update cover
+appearance first, followed by typography/core navigation, offline backup/export,
+and EPUB notes. Written scope is proposed in
+`../specs/2026-10-29-reading-priorities-design.md`, with phased plan
+`2026-10-29-reading-priorities.md`; written approval is pending. These are focused
+subsets of M2/M3/local-M7/M4, not completed milestones. No implementation or new
+performance result is claimed. Cloud sync, scan notes and paused formats remain
+deferred.
+
 Folder source increment: Tasks 1–7 implemented and independently reviewed; Task 8 integration/device evidence is recorded in the folder checklist; independent whole-branch review and the consolidated fix-wave rereview are complete (Approved at `b4b702c`). EPUB/PDF/TXT source reading is available; TXT is independently reviewed at `98425b3`. On 2026-10-24 the owner paused FB2/CBZ/CBR/MOBI/AZW3 and prioritized keeping the status bar visible during fullscreen reading. Remaining format tasks in `2026-10-21-ebook-format-readers.md` are deferred, not complete.
 
 Daily feedback increment (2026-10-27): recursive EPUB/PDF/TXT folder-task scan, visible scan defaults, title/time-added sorting and paged PDF defaults implemented. PDF text highlights/notes on Android15+ include CRUD/search and exact passage revisit; this is a scoped M4 subset, not completion of broader annotations/export. Mandatory385JVM tests, baseline-only lint, actual API31/36 gates and independent review pass. The increment is included in version 0.1.4 on `main`; owner phone testing remains open; EPUB/scan notes and paused readers remain deferred. See `docs/testing/daily-reading-feedback-checklist.md`.

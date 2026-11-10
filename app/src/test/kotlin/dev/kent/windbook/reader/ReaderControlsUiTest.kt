@@ -52,6 +52,28 @@ class ReaderControlsUiTest {
         compose.onNodeWithContentDescription("Reading position").performTouchInput {click(centerLeft + androidx.compose.ui.geometry.Offset(30f,0f))}
         assertEquals(2,jumps.size)
     }
+    @Test fun idleSliderFollowsExternalPageChangesWithoutSeeking() {
+        val fraction=androidx.compose.runtime.mutableDoubleStateOf(.1)
+        val jumps=mutableListOf<Double>()
+        compose.setContent {ReaderPositionSlider(fraction.doubleValue,true) {jumps+=it}}
+        compose.runOnIdle {fraction.doubleValue=.9}
+        compose.onNodeWithContentDescription("Reading position").assert(
+            SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo,
+                androidx.compose.ui.semantics.ProgressBarRangeInfo(.9f,0f..1f)))
+        assertTrue(jumps.isEmpty())
+    }
+    @Test fun activeDragIgnoresExternalPositionAndCancelShowsNewestPage() {
+        val fraction=androidx.compose.runtime.mutableDoubleStateOf(.1)
+        val jumps=mutableListOf<Double>()
+        compose.setContent {ReaderPositionSlider(fraction.doubleValue,true) {jumps+=it}}
+        compose.onNodeWithContentDescription("Reading position").performTouchInput {down(center);moveTo(centerRight)}
+        compose.runOnIdle {fraction.doubleValue=.6}
+        compose.onNodeWithContentDescription("Reading position").performTouchInput {cancel()}
+        compose.onNodeWithContentDescription("Reading position").assert(
+            SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo,
+                androidx.compose.ui.semantics.ProgressBarRangeInfo(.6f,0f..1f)))
+        assertTrue(jumps.isEmpty())
+    }
     @Test fun cancelledSeekDoesNotNavigate() {
         val jumps=mutableListOf<Double>()
         compose.setContent {ReaderPositionSlider(.2,true) {jumps+=it}}

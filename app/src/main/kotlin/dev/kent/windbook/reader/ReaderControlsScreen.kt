@@ -30,6 +30,7 @@ internal fun ReaderReadyScreen(bookId: String,current: ReaderUiState.Ready,reade
     val controls=hiltViewModel<ReaderControlsViewModel,ReaderControlsViewModel.Factory>(key="controls:$bookId",creationCallback={it.create(bookId)})
     val overlay by reader.overlayVisible.collectAsStateWithLifecycle()
     val progression by reader.progression.collectAsStateWithLifecycle()
+    val visibleLocator by reader.currentLocator.collectAsStateWithLifecycle()
     val chapter by reader.chapterTitle.collectAsStateWithLifecycle()
     val finished by reader.canMarkFinished.collectAsStateWithLifecycle()
     val display by reader.pdfDisplay.collectAsStateWithLifecycle()
@@ -80,16 +81,18 @@ internal fun ReaderReadyScreen(bookId: String,current: ReaderUiState.Ready,reade
                 PdfNotesReader(bookId,pdf,reader,prefs,initial,annotationId,revealRequestId,
                     pageJump=request?.let {PdfPageJump(it.id,pdf.pageOf(it.locatorJson))},onPageJumpApplied=controls::completed)
             } else ReaderSurface(current,reader,controls)
-            val page=if(pdf!=null) pdf.pageOf(reader.latestLocatorJson)+1 else null
-            val sliderFraction=if(pdf!=null && pdf.pageCount>1) (page!!-1).toDouble()/(pdf.pageCount-1) else if(pdf!=null) 0.0 else progression
+            val page=if(pdf!=null) pdf.pageOf(visibleLocator)+1 else null
+            val sliderFraction=if(pdf!=null && pdf.pageCount>1) (page!!-1).toDouble()/(pdf.pageCount-1) else if(pdf!=null) 0.0 else LocatorCodec.seekFraction(visibleLocator,current.session.positionCount,progression)
+            key(current.session,display?.layout) {
             ReaderOverlay(visible=overlay,title=current.title,chapterTitle=chapter,progression=progression,
                 canMarkFinished=finished,onMarkFinished=reader::markFinished,onBack=onBack,
                 pdfDisplay=if(pdf!=null) display ?: EffectiveDisplay(PdfLayout.PAGED,false) else null,
                 onPdfLayoutChange=reader::setPdfLayout,onCropMarginsChange=reader::setCropMargins,onFitPdfPage=reader::fitPdfPage,
                 onContents={controls.loadContents();scope.launch {drawer.open()}},onBookmark=controls::bookmark,onBookmarks={showBookmarks=true},
                 onSearch={showSearch=true},onAppearance={appearance=true},onEncoding=if(current.session.textEncoding!=null) onEncoding else null,
-                canBookmark=canBookmark,onSeek=controls::seek,canSeek=request==null,pdfPage=page,pdfPageCount=pdf?.pageCount,onPageEntry={pageEntry=true},
+                canBookmark=canBookmark,onSeek=controls::seek,canSeek=current.session.positionCount>0 && request==null,pdfPage=page,pdfPageCount=pdf?.pageCount,onPageEntry={pageEntry=true},
                 canReturn=canReturn,onReturn=controls::backToLocation,seekFraction=sliderFraction)
+            }
             message?.let {res -> Snackbar(modifier=Modifier.align(Alignment.BottomCenter),action={TextButton(onClick={controls.message.value=null}) {Text(stringResource(R.string.close))}}) {Text(stringResource(res))}}
         }
     }

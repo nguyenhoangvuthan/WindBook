@@ -3,35 +3,43 @@
 A private, offline EPUB/PDF/TXT reader for Android 12+ (minSdk 31, targetSdk 36), built with Kotlin, Jetpack Compose and Readium.
 Delivery APKs and their SHA-256 checksums are exported to **`publish/` at the main
 checkout root**, including when builds run in a nested worktree. Delivery files stay
-untracked. Latest APK: `publish/WindBook-0.1.7-reading-controls-debug.apk`.
+untracked. Latest APK: `publish/WindBook-0.1.8-minimal-library-debug.apk`.
 
-Current version: **v0.1.7 (reading controls)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese. Shelf covers display whole within their frames. PDF View → Fit page resets paged zoom/pan and margin cropping while keeping the current page and notes.
+Current version: **v0.1.8 (minimal library)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese. Shelf covers display whole within their frames. PDF View → Fit page resets paged zoom/pan and margin cropping while keeping the current page and notes.
+
+Library and Reading show cover artwork without title/author captions. Metadata
+remains searchable and accessible to screen readers; unavailable artwork uses a
+neutral book outline. The reader position slider uses a thin track and round thumb
+that follows page changes.
 
 The reader toolbar opens a left contents drawer, including embedded PDF outlines.
 Drag the bottom slider and release to seek; tap the PDF page label to enter a page.
 The overflow menu contains bookmarks, EPUB/TXT search and appearance (Aa), or PDF
 View. Aa supports global defaults and per-book overrides. PDF double-tap keeps zoom.
 Search loads50 results at a time and reports unsupported resources over2MiB.
-See [reading controls verification](docs/testing/reading-controls-checklist.md).
+See [reading controls verification](docs/testing/reading-controls-checklist.md)
+and [minimal library verification](docs/testing/minimal-library-checklist.md).
 
 PDF opens page by page by default; explicit saved layout choices are preserved.
 Vertical scrolling, margin cropping and remembered zoom remain available. Fullscreen
 reading keeps the system status bar visible. Reflow remains removed.
 
-Open **Settings → Book folders** to choose EPUB/PDF/TXT scan defaults. In **Book
-folders**, type a device folder path or choose one, keep recursive scanning enabled
-and press **Scan folder**. Android asks for read access once if needed, then the
+Tap **+ → Choose folder** to select a source folder directly in Android; the scan
+starts after read access is granted. Choose **Choose files** to import EPUB/PDF
+files instead. Global scan defaults remain optional in Settings; per-folder
+EPUB/PDF/TXT choices and recursive scanning are available in **Book folders**.
+For an existing folder, adjust its options and press **Scan folder**. Android asks for read access once if needed, then the
 scan starts automatically. During discovery, the scan saves embedded EPUB covers
 and PDF first-page covers to the shelf before reporting completion; books do not
 need to be opened first. Rescan a previously added folder to fill missing covers.
 Cover preparation is sequential, cancellable and cached; books without an embedded
-cover retain their title fallback. All matching descendants are scanned; results can be
+cover use a neutral book outline. All matching descendants are scanned; results can be
 sorted by title or time added to WindBook. A typed path never grants access by
 itself, and a Linux computer path does not refer to a folder on the phone.
 
 EPUB/PDF/TXT open from their source folder, with bounded temporary preparation for
 the active book. Scanning, hiding and disconnecting do not modify source files.
-FB2/CBZ/CBR/MOBI/AZW3 remain paused. **Add books** still imports EPUB/PDF only.
+FB2/CBZ/CBR/MOBI/AZW3 remain paused. **Choose files** imports EPUB/PDF only; folder scanning also supports TXT.
 
 On **Android 15+**, long-press PDF text, adjust the handles, then choose a highlight
 color or **Note**. The **Notes** tab supports search, edit, delete and returning to

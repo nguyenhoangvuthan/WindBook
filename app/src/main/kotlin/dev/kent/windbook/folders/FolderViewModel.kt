@@ -48,12 +48,14 @@ class FolderViewModel @Inject constructor(
     private var pickerSequence = 0L
     private var editedOptions = false
     private var defaultOptions = ScanOptions()
+    private val defaultsReady = kotlinx.coroutines.CompletableDeferred<Unit>()
 
     init {
         viewModelScope.launch {
             preferences.scanOptions.collect { options ->
                 defaultOptions = options
                 mutable.update { if (it.resolvedFolderId == null && !editedOptions) it.copy(options = options) else it }
+                defaultsReady.complete(Unit)
             }
         }
         viewModelScope.launch {
@@ -82,9 +84,12 @@ class FolderViewModel @Inject constructor(
     }
 
     fun requestFolder(folderId: String? = state.value.resolvedFolderId): Job {
-        val options = state.value.options.availableFormats()
+        val optionsAtClick = state.value.options.availableFormats().takeIf { defaultsReady.isCompleted || editedOptions }
         return rootCommand(folderId) {
             val version = selectionVersion
+            if (optionsAtClick == null) defaultsReady.await()
+            if (version != selectionVersion) return@rootCommand
+            val options = optionsAtClick ?: state.value.options.availableFormats()
             val folder = folderId?.let { db.folderDao().find(it) }
             if (version == selectionVersion)
                 issuePicker(folder?.treeUri?.let(FolderLocation::resolve) ?: FolderLocation.resolve(state.value.locationHint), options)

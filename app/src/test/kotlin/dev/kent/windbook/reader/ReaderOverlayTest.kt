@@ -19,7 +19,7 @@ import org.robolectric.annotation.Config
 class ReaderOverlayTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun visibleOverlayShowsTitleChapterProgressAndBack() {
+    @Test fun visibleOverlayShowsTitleMinimalProgressAndBack() {
         var backs = 0
         compose.setContent {
             ReaderOverlay(
@@ -28,7 +28,8 @@ class ReaderOverlayTest {
             )
         }
         compose.onNodeWithText("DUNE").assertIsDisplayed()
-        compose.onNodeWithText("Book One · 37%").assertIsDisplayed()
+        compose.onNodeWithText("37%").assertIsDisplayed()
+        compose.onNodeWithText("Book One · 37%").assertDoesNotExist()
         compose.onNodeWithText("Mark as finished").assertDoesNotExist()
         compose.onNodeWithContentDescription("Back").performClick()
         assertEquals(1, backs)

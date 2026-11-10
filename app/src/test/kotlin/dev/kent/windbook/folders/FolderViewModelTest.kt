@@ -35,6 +35,37 @@ class FolderViewModelTest {
     }
     private val uri = Uri.parse("content://folders.test/tree/root")
 
+    @Test fun initialFolderPickerWaitsForPersistedScanDefaults() = runTest { initialPickerGate(false) }
+    @Test fun locationEditInvalidatesInitialPickerWhileDefaultsAreLoading() = runTest { initialPickerGate(true) }
+    private suspend fun kotlinx.coroutines.test.TestScope.initialPickerGate(editLocation: Boolean) {
+        val context=ApplicationProvider.getApplicationContext<Context>()
+        val db=WindBookDatabase.inMemory(context,AndroidSQLiteDriver())
+        val release=CompletableDeferred<Unit>()
+        val values=androidx.datastore.preferences.core.preferencesOf(
+            androidx.datastore.preferences.core.stringSetPreferencesKey("scan_extensions") to setOf("PDF"),
+            androidx.datastore.preferences.core.booleanPreferencesKey("scan_recursive") to false)
+        val delayed=object: androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> {
+            override val data=flow {release.await();emit(values);awaitCancellation()}
+            override suspend fun updateData(transform: suspend (androidx.datastore.preferences.core.Preferences)->androidx.datastore.preferences.core.Preferences)=transform(values)
+        }
+        val repo=FolderRepository(db,{emptySet()},{},{_,_->})
+        val scans=FolderScanCoordinator(repo,FolderScanner(TreeAccess {_,_->flow {}}),backgroundScope)
+        val vm=FolderViewModel(repo,scans,db,context,RepositoryFolderObservations(repo,scans),unusedOpener,
+            dev.kent.windbook.core.data.LibraryPreferences(delayed))
+        val store=ViewModelStore().also {it.put("folder",vm)}
+        try {
+            val pending=vm.requestFolder(null)
+            testScheduler.runCurrent()
+            assertNull("Cold entry must not open a picker using placeholder defaults",vm.state.value.pickerRequest)
+            if(editLocation) vm.onLocationEdited("/sdcard/AnotherRoot")
+            release.complete(Unit);pending.join()
+            if(editLocation) assertNull("Edited location cancels the pending initial picker",vm.state.value.pickerRequest)
+            else {
+                assertEquals(ScanOptions(setOf(BookFormat.PDF),false),vm.state.value.pickerRequest!!.options)
+                assertEquals(vm.state.value.options,vm.state.value.pickerRequest!!.options)
+            }
+        } finally {store.clear();vm.viewModelScope.coroutineContext[Job]?.join();backgroundScope.coroutineContext[Job]?.cancelAndJoin();db.close()}
+    }
     @Test fun returnedReadFlagRequiredAndTypedPathInvalidatesSelection() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = WindBookDatabase.inMemory(context, AndroidSQLiteDriver())

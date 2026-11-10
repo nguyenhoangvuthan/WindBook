@@ -50,7 +50,6 @@
     <string name="cd_clear_search">Clear search</string>
     <string name="cd_selected">Selected</string>
     <string name="cd_more_options">More options for %1$s</string>
-    <string name="finished_caption">Finished</string>
     <string name="tab_reading">Reading</string>
     <string name="reading_empty_title">No book in progress</string>
     <string name="reading_empty_body">Books you open appear here, newest first.</string>
@@ -229,4 +228,6 @@
     <string name="reader_defaults">Reading defaults</string>
     <string name="reader_inherit_hint">Unchanged fields use the global defaults.</string>
     <string name="reader_search_limit">A section is too large to search safely. Other reading controls remain available.</string>
+    <string name="add_books_files">Choose files</string>
+    <string name="add_books_folder">Choose folder</string>
 </resources>

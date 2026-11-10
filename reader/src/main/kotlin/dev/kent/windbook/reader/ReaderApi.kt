@@ -12,6 +12,7 @@ interface ReaderSession : AutoCloseable {
     val surface: NavigationSurface get() = NavigationSurface.PUBLICATION
     suspend fun fingerprint(): String? = null
     val format: BookFormat
+    val positionCount: Int get() = 0
     val textEncoding: dev.kent.windbook.reader.formats.TextEncoding? get() = null
 }
 
@@ -34,6 +35,7 @@ interface PdfSession : ReaderSession {
     override val surface: NavigationSurface get() = NavigationSurface.PDF
     suspend fun annotationFingerprint(): String? = null
     val pageCount: Int
+    override val positionCount: Int get() = pageCount
     val pages: dev.kent.windbook.reader.pdf.PdfPageSource
     suspend fun firstPageSizes(): List<dev.kent.windbook.core.model.PageSize>
     fun locatorJsonFor(page: Int): String

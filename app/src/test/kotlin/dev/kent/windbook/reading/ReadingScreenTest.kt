@@ -3,6 +3,7 @@ package dev.kent.windbook.reading
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import dev.kent.windbook.core.model.Book
 import dev.kent.windbook.core.model.BookFormat
@@ -42,7 +43,8 @@ class ReadingScreenTest {
     @Test fun continueOpensTheCurrentBook() {
         val state = ReadingUiState(loaded = true, current = item("1", "Dune"), others = listOf(item("2", "Emma")))
         compose.setContent { ReadingScreen(state, { opened += it }, { browse++ }) }
-        compose.onNodeWithText("Dune").assertIsDisplayed()
+        compose.onNodeWithText("Dune").assertDoesNotExist()
+        compose.onNodeWithText("Author 1").assertDoesNotExist()
         compose.onNodeWithText("Continue").performClick()
         assertEquals(listOf("1"), opened)
     }
@@ -50,7 +52,9 @@ class ReadingScreenTest {
     @Test fun otherBooksOpenFromTheList() {
         val state = ReadingUiState(loaded = true, current = item("1", "Dune"), others = listOf(item("2", "Emma")))
         compose.setContent { ReadingScreen(state, { opened += it }, { browse++ }) }
-        compose.onNodeWithText("Emma").performClick()
+        compose.onNodeWithText("Emma").assertDoesNotExist()
+        compose.onNodeWithText("Author 2").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Emma, Author 2").performClick()
         assertEquals(listOf("2"), opened)
     }
 

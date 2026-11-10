@@ -14,7 +14,7 @@ import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.readium.r2.shared.publication.services.cover
+import dev.kent.windbook.reader.metadata.epubCoverBitmap
 import org.readium.r2.shared.publication.services.positions
 import dev.kent.windbook.reader.metadata.MetadataWorkCoordinator
 import dev.kent.windbook.reader.metadata.pdfContentsFromLinks
@@ -42,7 +42,7 @@ class ReadiumMetadataExtractor(private val services: ReadiumServices, private va
                         title = publication.metadata.title,
                         author = publication.metadata.authors.firstOrNull()?.name,
                         pdfContents = if (format == BookFormat.PDF) pdfContentsFromLinks(publication.tableOfContents, publication.metadata.numberOfPages ?: publication.positions().size, publication.readingOrder.firstOrNull()?.href.toString().substringBefore('#')) else null,
-                        coverWebp = if (format == BookFormat.PDF) pdfCoverWebp(file) else publication.cover()?.let { bitmap ->
+                        coverWebp = if (format == BookFormat.PDF) pdfCoverWebp(file) else epubCoverBitmap(publication)?.let { bitmap ->
                             try { CoverEncoder.encode(bitmap) } finally { bitmap.recycle() }
                         },
                     )

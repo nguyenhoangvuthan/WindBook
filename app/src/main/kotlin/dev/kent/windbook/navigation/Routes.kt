@@ -19,4 +19,4 @@ data object NotesKey : NavKey
 data object SettingsKey : NavKey
 
 @Serializable
-data class FolderKey(val folderId: String? = null) : NavKey
+data class FolderKey(val folderId: String? = null, val pickNewFolder: Boolean = false) : NavKey

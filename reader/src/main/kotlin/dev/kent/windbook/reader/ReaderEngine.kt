@@ -70,7 +70,7 @@ class ReaderEngine(
 internal class ReadiumReaderSession(
     override val format: BookFormat,
     val publication: Publication,
-    val positionCount: Int,
+    override val positionCount: Int,
     private val source: SourceLease? = null,
     private val preparation: dev.kent.windbook.reader.source.SessionLease? = null,
     override val textEncoding: dev.kent.windbook.reader.formats.TextEncoding? = null,

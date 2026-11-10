@@ -299,17 +299,17 @@ fun ReaderOverlay(
                     .navigationBarsPadding(),
             ) {
                 if(onSeek!=null) ReaderPositionSlider(seekFraction,canSeek,onPreview={preview=it},onSeek=onSeek) else ProgressLine(progression)
-                if(canReturn) TextButton(onClick=onReturn) {Text(stringResource(R.string.reader_return))}
                 Row(
-                    Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                    Modifier.padding(start = 16.dp, end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if(pdfPage!=null && pdfPageCount!=null) TextButton(onClick=onPageEntry) {
                         Text(stringResource(R.string.reader_page_count,preview?.let {dev.kent.windbook.core.model.seekPage(it,pdfPageCount)?.plus(1)} ?: pdfPage,pdfPageCount))
                     }
-                    val percent = formatPercent(preview ?: progression)
+                    if(canReturn) IconButton(onClick=onReturn) {Icon(WindBookIcons.Back,contentDescription=stringResource(R.string.reader_return))}
+                    val percent = formatPercent(preview ?: seekFraction)
                     Text(
-                        text = chapterTitle?.let { "$it · $percent" } ?: percent,
+                        text = if(pdfPage==null) percent else "",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

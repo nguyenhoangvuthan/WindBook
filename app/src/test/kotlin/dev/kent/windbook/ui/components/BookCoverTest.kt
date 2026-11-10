@@ -17,9 +17,9 @@ class BookCoverTest {
     }
 
     @Test fun generatedCoverTitleIsDecorativeForAccessibility() {
-        // The title under the cover is what TalkBack reads; the cover's own copy must not duplicate it.
+        // The clickable shelf item owns the accessible label; artwork remains decorative.
         // TalkBack reads the merged tree, which is the default one here.
-        compose.setContent { BookCover("x", "A very long title that goes on and on and on", coverPath = null) }
+        compose.setContent { BookCover("x", coverPath = null) }
         compose.onNodeWithText("A very long title", substring = true).assertDoesNotExist()
     }
 

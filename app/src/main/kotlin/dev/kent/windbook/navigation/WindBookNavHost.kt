@@ -39,7 +39,8 @@ fun WindBookNavHost() {
             entryProvider = entryProvider {
                 entry<LibraryKey> {
                     LibraryRoute(onOpenBook = { id -> backStack.openReader(id) },
-                        onFoldersClick = { backStack.add(FolderKey()) })
+                        onFoldersClick = { backStack.add(FolderKey(pickNewFolder = true)) },
+                        onFolderManagerClick = { backStack.add(FolderKey()) })
                 }
                 entry<ReadingKey> {
                     ReadingRoute(
@@ -52,7 +53,7 @@ fun WindBookNavHost() {
                 }
                 entry<SettingsKey> { SettingsRoute(onFolders = { backStack.add(FolderKey()) }) }
                 entry<FolderKey> { key ->
-                    dev.kent.windbook.folders.FolderRoute(key.folderId,
+                    dev.kent.windbook.folders.FolderRoute(key.folderId, pickNewFolder = key.pickNewFolder,
                         onOpenBook = { id -> backStack.openReader(id) },
                         onBack = { backStack.removeLastOrNull() })
                 }

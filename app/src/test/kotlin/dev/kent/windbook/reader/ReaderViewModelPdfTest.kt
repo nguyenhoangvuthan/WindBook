@@ -79,6 +79,15 @@ class ReaderViewModelPdfTest {
         BookFileStore(tmp.root))
     private fun vm(size: PageSize) = model(BookOpener { _, _ -> Result.success(FakePdf(size)) })
 
+    @Test fun visibleLocatorEmitsEvenWhenCoarseProgressDoesNotChange() = runTest {
+        val model=vm(PageSize(400f,600f))
+        model.state.first {it is ReaderUiState.Ready}
+        model.onLocatorChanged("first anchor",.5,null)
+        assertEquals("first anchor",model.currentLocator.value)
+        model.onLocatorChanged("second anchor",.5,null)
+        assertEquals("second anchor",model.currentLocator.value)
+        assertEquals(.5,model.progression.value,0.0)
+    }
     @Test fun annotationRevealRequiresFingerprintOfTheOpenedSession() = runTest {
         val model=vm(PageSize(400f,600f))
         val ready=model.state.first { it is ReaderUiState.Ready } as ReaderUiState.Ready

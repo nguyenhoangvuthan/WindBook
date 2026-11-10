@@ -25,6 +25,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import dev.kent.windbook.ui.components.accessibleBookLabel
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,20 +78,15 @@ private fun CurrentBookCard(item: LibraryItem, onOpen: (String) -> Unit) {
     val colors = MaterialTheme.colorScheme
     Card(
         onClick = { onOpen(item.book.id) },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().semantics { contentDescription = item.accessibleBookLabel() },
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerLow),
         border = BorderStroke(1.dp, colors.outlineVariant),
     ) {
         Row(Modifier.padding(16.dp)) {
-            BookCover(item.book.id, item.book.title, item.book.coverPath, Modifier.width(96.dp))
+            BookCover(item.book.id, item.book.coverPath, Modifier.width(96.dp))
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
-                Text(item.book.title, style = MaterialTheme.typography.titleLarge, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                item.book.author?.let {
-                    Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, maxLines = 1)
-                }
-                Spacer(Modifier.height(12.dp))
                 ProgressLine(item.progression)
                 Spacer(Modifier.height(4.dp))
                 Text(formatPercent(item.progression), style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
@@ -106,17 +104,13 @@ private fun ReadingRow(item: LibraryItem, onOpen: (String) -> Unit) {
             .fillMaxWidth()
             .clip(MaterialTheme.shapes.small)
             .clickable { onOpen(item.book.id) }
+            .semantics { contentDescription = item.accessibleBookLabel() }
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        BookCover(item.book.id, item.book.title, item.book.coverPath, Modifier.width(48.dp))
+        BookCover(item.book.id, item.book.coverPath, Modifier.width(48.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(item.book.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            item.book.author?.let {
-                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-            }
-            Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ProgressLine(item.progression, Modifier.weight(1f))
                 Spacer(Modifier.width(8.dp))

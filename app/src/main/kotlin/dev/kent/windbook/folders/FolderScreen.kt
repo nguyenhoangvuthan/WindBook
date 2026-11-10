@@ -32,9 +32,16 @@ import dev.kent.windbook.ui.components.TabScreenInsets
 
 @Composable
 fun FolderRoute(folderId: String?, onOpenBook: (String) -> Unit, onBack: () -> Unit,
-    viewModel: FolderViewModel = hiltViewModel()) {
+    viewModel: FolderViewModel = hiltViewModel(), pickNewFolder: Boolean = false) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(folderId) { folderId?.let { viewModel.selectFolder(it) } }
+    var pickerRequested by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(folderId, pickNewFolder) {
+        if (folderId != null) viewModel.selectFolder(folderId)
+        else if (pickNewFolder && !pickerRequested) {
+            pickerRequested = true
+            viewModel.requestFolder(null)
+        }
+    }
     var activePickerId by rememberSaveable { mutableStateOf<Long?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         activePickerId?.let { requestId ->

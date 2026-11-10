@@ -99,9 +99,11 @@ class ReaderViewModel @AssistedInject constructor(
     }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /** Where a re-created reader (rotation, process death) must reopen; updated on every page change. */
-    @Volatile
-    var latestLocatorJson: String? = null
-        private set
+    private val _currentLocator = MutableStateFlow<String?>(null)
+    val currentLocator: StateFlow<String?> = _currentLocator.asStateFlow()
+    var latestLocatorJson: String?
+        get() = _currentLocator.value
+        private set(value) { _currentLocator.value = value }
 
     /** Keeps only the newest pending locator; the writer always persists the latest one. */
     private val locatorUpdates = MutableSharedFlow<LocatorUpdate>(

@@ -1,6 +1,5 @@
 package dev.kent.windbook.reader.metadata
 
-import android.graphics.ImageDecoder
 import android.util.Xml
 import dev.kent.windbook.core.model.EpubArchiveGuard
 import dev.kent.windbook.core.model.ExtractedMetadata
@@ -8,7 +7,6 @@ import java.io.File
 import java.io.IOException
 import java.io.StringReader
 import java.net.URI
-import java.nio.ByteBuffer
 import java.util.zip.ZipFile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -152,14 +150,7 @@ internal class EpubMetadataFastPath(private val onStage: ((String, Long) -> Unit
                 val encoded = bytes(path(opf.substringBeforeLast('/', ""), cover.href), COVER_LIMIT)
                 recorded("coverRead")
                 owner.ensureActive()
-                val bitmap = ImageDecoder.decodeBitmap(ImageDecoder.createSource(ByteBuffer.wrap(encoded))) { decoder, info, _ ->
-                    val width = info.size.width
-                    val height = info.size.height
-                    if (width <= 0 || height <= 0) throw UnsupportedEpub()
-                    val scale = minOf(1.0, 600.0 / maxOf(width, height))
-                    decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-                    decoder.setTargetSize(maxOf(1, (width * scale).toInt()), maxOf(1, (height * scale).toInt()))
-                }
+                val bitmap = decodeCoverRaster(encoded)
                 try {
                     recorded("decode")
                     owner.ensureActive()

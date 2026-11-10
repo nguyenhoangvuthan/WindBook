@@ -27,6 +27,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -59,12 +62,13 @@ data class LibraryActions(
     val onSetStatus: (String, ReadingStatus) -> Unit,
     val onDelete: (String) -> Unit,
     val onFoldersClick: () -> Unit = {},
+    val onFolderManagerClick: () -> Unit = onFoldersClick,
 )
 
 private val IMPORT_MIME_TYPES = arrayOf("application/epub+zip", "application/pdf", "application/octet-stream")
 
 @Composable
-fun LibraryRoute(onOpenBook: (String) -> Unit, onFoldersClick: () -> Unit = {}, viewModel: LibraryViewModel = hiltViewModel()) {
+fun LibraryRoute(onOpenBook: (String) -> Unit, onFoldersClick: () -> Unit = {}, onFolderManagerClick: () -> Unit = onFoldersClick, viewModel: LibraryViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
@@ -101,6 +105,7 @@ fun LibraryRoute(onOpenBook: (String) -> Unit, onFoldersClick: () -> Unit = {}, 
         actions = LibraryActions(
             onOpenBook = onOpenBook,
             onFoldersClick = onFoldersClick,
+            onFolderManagerClick = onFolderManagerClick,
             onImportClick = { picker.launch(IMPORT_MIME_TYPES) },
             onQueryChange = viewModel::onQueryChange,
             onFilterChange = viewModel::onFilterChange,
@@ -132,10 +137,28 @@ fun LibraryScreen(
     actions: LibraryActions,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
+    var adding by rememberSaveable { mutableStateOf(false) }
+    if (adding) androidx.compose.material3.AlertDialog(
+        onDismissRequest = { adding = false },
+        title = { androidx.compose.material3.Text(stringResource(R.string.add_books)) },
+        text = {
+            androidx.compose.foundation.layout.Column {
+                androidx.compose.material3.TextButton(onClick = { adding = false; actions.onImportClick() }) {
+                    androidx.compose.material3.Text(stringResource(R.string.add_books_files))
+                }
+                androidx.compose.material3.TextButton(onClick = { adding = false; actions.onFoldersClick() }) {
+                    androidx.compose.material3.Text(stringResource(R.string.add_books_folder))
+                }
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = { adding = false }) {
+            androidx.compose.material3.Text(stringResource(R.string.cancel))
+        } },
+    )
     Scaffold(
         topBar = {
             androidx.compose.foundation.layout.Column(Modifier.windowInsetsPadding(TabScreenInsets)) {
-            androidx.compose.material3.TextButton(onClick = actions.onFoldersClick) {
+            androidx.compose.material3.TextButton(onClick = actions.onFolderManagerClick) {
                 androidx.compose.material3.Text(stringResource(R.string.folder_title))
             }
             if (!state.isLibraryEmpty) {
@@ -152,7 +175,7 @@ fun LibraryScreen(
             }
         },
         floatingActionButton = {
-            if (!state.isLibraryEmpty) AddBooksFab(importing = state.isImporting, onClick = actions.onImportClick)
+            if (!state.isLibraryEmpty) AddBooksFab(importing = state.isImporting, onClick = { adding = true })
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
         // The tab bar below owns the bottom inset; keep clear of a side nav bar or cutout in landscape.
@@ -163,7 +186,7 @@ fun LibraryScreen(
                 title = stringResource(R.string.tab_library),
                 body = stringResource(R.string.empty_library),
                 actionLabel = stringResource(R.string.add_books),
-                onAction = actions.onImportClick,
+                onAction = { adding = true },
                 modifier = Modifier.padding(padding),
             )
         } else {

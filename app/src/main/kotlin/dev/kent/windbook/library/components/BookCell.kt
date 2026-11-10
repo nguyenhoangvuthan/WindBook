@@ -31,6 +31,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import dev.kent.windbook.ui.components.accessibleBookLabel
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -51,13 +54,13 @@ internal fun ContinueReadingCard(item: LibraryItem, onOpen: (String) -> Unit) {
     val colors = MaterialTheme.colorScheme
     Card(
         onClick = { onOpen(item.book.id) },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().semantics { contentDescription = item.accessibleBookLabel() },
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerLow),
         border = BorderStroke(1.dp, colors.outlineVariant),
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            BookCover(item.book.id, item.book.title, item.book.coverPath, Modifier.width(52.dp))
+            BookCover(item.book.id, item.book.coverPath, Modifier.width(52.dp))
             Spacer(Modifier.width(14.dp))
             Column(Modifier.weight(1f)) {
                 Text(
@@ -65,10 +68,6 @@ internal fun ContinueReadingCard(item: LibraryItem, onOpen: (String) -> Unit) {
                     style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 1.2.sp),
                     color = colors.onSurfaceVariant,
                 )
-                Text(item.book.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                item.book.author?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 1)
-                }
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ProgressLine(item.progression, Modifier.weight(1f))
@@ -91,33 +90,11 @@ internal fun BookCell(item: LibraryItem, layout: LibraryLayout, actions: Library
         onLongClick = { menu = true },
     )
     Box {
-        if (layout == LibraryLayout.GRID) {
-            Column(clickable) {
-                Box {
-                    BookCover(book.id, book.title, book.coverPath, Modifier.fillMaxWidth(), titleEndInset = 28.dp)
-                    MoreButton(book.title, onClick = { menu = true }, modifier = Modifier.align(Alignment.TopEnd))
-                }
-                if (item.progression > 0) {
-                    Spacer(Modifier.height(6.dp))
-                    ProgressLine(item.progression)
-                }
-                Spacer(Modifier.height(6.dp))
-                Text(book.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                BookCaption(item)
-            }
-        } else {
-            Row(clickable.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                BookCover(book.id, book.title, book.coverPath, Modifier.width(48.dp))
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(book.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    BookCaption(item)
-                    if (item.progression > 0) {
-                        Spacer(Modifier.height(6.dp))
-                        ProgressLine(item.progression)
-                    }
-                }
-                MoreButton(book.title, onClick = { menu = true })
+        Box(clickable.fillMaxWidth().semantics { contentDescription = item.accessibleBookLabel() }, contentAlignment = Alignment.Center) {
+            Box(if (layout == LibraryLayout.GRID) Modifier.fillMaxWidth() else Modifier.width(160.dp)) {
+                BookCover(book.id, book.coverPath, Modifier.fillMaxWidth())
+                MoreButton(book.title, onClick = { menu = true }, modifier = Modifier.align(Alignment.TopEnd))
+                if (item.progression > 0) ProgressLine(item.progression, Modifier.align(Alignment.BottomCenter))
             }
         }
         BookMenu(
@@ -143,25 +120,6 @@ internal fun BookCell(item: LibraryItem, layout: LibraryLayout, actions: Library
                 }) { Text(stringResource(R.string.delete)) }
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.cancel)) } },
-        )
-    }
-}
-
-@Composable
-private fun BookCaption(item: LibraryItem) {
-    val finished = item.book.status == ReadingStatus.FINISHED
-    val text = if (finished) stringResource(R.string.finished_caption) else item.book.author ?: return
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        if (finished) {
-            Icon(WindBookIcons.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(4.dp))
-        }
-        Text(
-            text,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
         )
     }
 }

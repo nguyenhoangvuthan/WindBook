@@ -5,6 +5,13 @@ import org.readium.r2.shared.publication.Locator
 
 /** Locator JSON is opaque outside this module; these helpers are the only way in or out. */
 object LocatorCodec {
+    /** UI seek uses the same first/last endpoints as position lookup, without changing saved progress. */
+    fun seekFraction(locatorJson: String?, positionCount: Int, fallback: Double): Double {
+        val position=locatorJson?.toLocatorOrNull()?.locations?.position
+        if(positionCount>0 && position!=null && position in 1..positionCount)
+            return if(positionCount==1) 0.0 else (position-1).toDouble()/(positionCount-1)
+        return if(fallback.isFinite()) fallback.coerceIn(0.0,1.0) else 0.0
+    }
     fun progression(locatorJson: String): Double? =
         locatorJson.toLocatorOrNull()?.locations?.totalProgression
 }

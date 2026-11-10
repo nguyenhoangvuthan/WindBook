@@ -71,6 +71,7 @@ class LibraryScreenTest {
     @Test fun emptyLibraryShowsAddBooks() {
         compose.setContent { LibraryScreen(LibraryUiState(isLibraryEmpty = true), actions) }
         compose.onNodeWithText("Add books").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Choose files").performClick()
         assertEquals(1, importClicks)
     }
 
@@ -123,22 +124,23 @@ class LibraryScreenTest {
 
     @Test fun longPressStillOffersStatusChange() {
         compose.setContent { LibraryScreen(library(dune, layout = LibraryLayout.LIST), actions) }
-        compose.onNodeWithText("Dune").performTouchInput { longClick() }
+        compose.onNodeWithContentDescription("Dune, Frank Herbert").performTouchInput { longClick() }
         compose.onNodeWithText("Mark as finished").performClick()
         assertEquals(listOf("1" to ReadingStatus.FINISHED), statuses)
     }
 
-    @Test fun finishedBookShowsFinishedCaption() {
+    @Test fun finishedBookKeepsShelfFreeOfCaptions() {
         val done = dune.copy(book = dune.book.copy(status = ReadingStatus.FINISHED))
         compose.setContent { LibraryScreen(library(done), actions) }
-        // "Finished" is both the filter pill and the caption that replaces the author.
-        compose.onAllNodesWithText("Finished").assertCountEquals(2)
+        // Status remains in the filter/menu, without adding text under the artwork.
+        compose.onAllNodesWithText("Finished").assertCountEquals(1)
         compose.onNodeWithText("Frank Herbert").assertDoesNotExist()
     }
 
     @Test fun fabAddsBooks() {
         compose.setContent { LibraryScreen(library(dune), actions) }
         compose.onNodeWithContentDescription("Add books").performClick()
+        compose.onNodeWithText("Choose files").performClick()
         assertEquals(1, importClicks)
     }
 

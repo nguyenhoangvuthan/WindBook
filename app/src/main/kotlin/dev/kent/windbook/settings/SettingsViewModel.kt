@@ -37,7 +37,12 @@ class SettingsViewModel @Inject constructor(
     private val locales: AppLocaleController,
     appInfo: AppInfo,
     private val preferences: LibraryPreferences,
+    private val readerPreferences: dev.kent.windbook.core.data.ReaderPreferencesRepository? = null,
 ) : ViewModel() {
+
+    val readingTypography=(readerPreferences?.typography ?: kotlinx.coroutines.flow.flowOf(dev.kent.windbook.core.model.ReaderTypography()))
+        .stateIn(viewModelScope,SharingStarted.Eagerly,dev.kent.windbook.core.model.ReaderTypography())
+    fun setReadingTypography(change: (dev.kent.windbook.core.model.ReaderTypography)->dev.kent.windbook.core.model.ReaderTypography) {viewModelScope.launch {readerPreferences?.update(change)}}
 
     private val scanCommands = Mutex()
     private val language = MutableStateFlow(locales.current())

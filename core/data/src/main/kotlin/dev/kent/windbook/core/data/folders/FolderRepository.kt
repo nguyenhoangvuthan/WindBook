@@ -41,6 +41,8 @@ data class FolderEntry(
     val addedAt: Long = 0,
 )
 
+internal data class CommittedScanBatch(val run: ScanRunEntity, val coverSourceIds: List<String>)
+
 /** All scan writes and connection/grant changes share one lifecycle lock. */
 class FolderRepository(
     private val db: WindBookDatabase,
@@ -148,7 +150,16 @@ class FolderRepository(
         unreadable: Long,
         directoryErrors: Long,
         currentPath: String,
-    ): ScanRunEntity? = mutations.withLock {
+    ): ScanRunEntity? = writeCommittedBatch(runId, entries, examined, unreadable, directoryErrors, currentPath)?.run
+
+    internal suspend fun writeCommittedBatch(
+        runId: String,
+        entries: List<ScanEvent.Found>,
+        examined: Long,
+        unreadable: Long,
+        directoryErrors: Long,
+        currentPath: String,
+    ): CommittedScanBatch? = mutations.withLock {
         require(entries.size <= 100)
         initializeLocked()
         val heldTrees = persistedReadTrees()
@@ -157,6 +168,7 @@ class FolderRepository(
                 ?: return@withWriteTransaction null
             var added = run.added
             var known = run.known
+            val covers = ArrayList<String>(entries.size)
             for (entry in entries) {
                 val document = entry.document
                 var source = db.sourceDao().findDocument(document.key.authority, document.key.documentId)
@@ -192,10 +204,12 @@ class FolderRepository(
                 }
                 db.folderDao().upsertMembership(FolderMembershipEntity(run.folderId, source.id,
                     entry.relativePath, entry.parentKey.documentId, runId, present = true))
+                if (candidateFormat(document.name) in setOf(BookFormat.EPUB, BookFormat.PDF)) covers.add(source.id)
             }
-            run.copy(examined = examined, matched = run.matched + entries.size, added = added, known = known,
+            val updated = run.copy(examined = examined, matched = run.matched + entries.size, added = added, known = known,
                 unreadable = unreadable, directoryErrors = directoryErrors, currentPath = currentPath)
                 .also { db.folderDao().upsertRun(it) }
+            CommittedScanBatch(updated, covers)
         }
     }
 

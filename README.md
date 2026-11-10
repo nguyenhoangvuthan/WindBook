@@ -3,9 +3,16 @@
 A private, offline EPUB/PDF/TXT reader for Android 12+ (minSdk 31, targetSdk 36), built with Kotlin, Jetpack Compose and Readium.
 Delivery APKs and their SHA-256 checksums are exported to **`publish/` at the main
 checkout root**, including when builds run in a nested worktree. Delivery files stay
-untracked. Latest APK: `publish/WindBook-0.1.5-cover-fit-debug.apk`.
+untracked. Latest APK: `publish/WindBook-0.1.7-reading-controls-debug.apk`.
 
-Current version: **v0.1.5 (cover and PDF fit)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese. Shelf covers display whole within their frames. PDF View → Fit page resets paged zoom/pan and margin cropping while keeping the current page and notes.
+Current version: **v0.1.7 (reading controls)**. EPUB/PDF/TXT source reading, recursive folder scans, PDF text highlights and notes. UI in English and Vietnamese. Shelf covers display whole within their frames. PDF View → Fit page resets paged zoom/pan and margin cropping while keeping the current page and notes.
+
+The reader toolbar opens a left contents drawer, including embedded PDF outlines.
+Drag the bottom slider and release to seek; tap the PDF page label to enter a page.
+The overflow menu contains bookmarks, EPUB/TXT search and appearance (Aa), or PDF
+View. Aa supports global defaults and per-book overrides. PDF double-tap keeps zoom.
+Search loads50 results at a time and reports unsupported resources over2MiB.
+See [reading controls verification](docs/testing/reading-controls-checklist.md).
 
 PDF opens page by page by default; explicit saved layout choices are preserved.
 Vertical scrolling, margin cropping and remembered zoom remain available. Fullscreen
@@ -14,7 +21,7 @@ reading keeps the system status bar visible. Reflow remains removed.
 Open **Settings → Book folders** to choose EPUB/PDF/TXT scan defaults. In **Book
 folders**, type a device folder path or choose one, keep recursive scanning enabled
 and press **Scan folder**. Android asks for read access once if needed, then the
-scan starts automatically. After discovery, the scan saves embedded EPUB covers
+scan starts automatically. During discovery, the scan saves embedded EPUB covers
 and PDF first-page covers to the shelf before reporting completion; books do not
 need to be opened first. Rescan a previously added folder to fill missing covers.
 Cover preparation is sequential, cancellable and cached; books without an embedded

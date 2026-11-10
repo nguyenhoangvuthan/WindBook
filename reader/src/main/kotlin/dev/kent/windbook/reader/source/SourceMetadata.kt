@@ -1,7 +1,6 @@
 package dev.kent.windbook.reader.source
 
 import dev.kent.windbook.core.model.BookFormat
-import dev.kent.windbook.core.model.EpubArchiveGuard
 import dev.kent.windbook.core.model.ExtractedMetadata
 import dev.kent.windbook.reader.ReadiumMetadataExtractor
 import dev.kent.windbook.reader.ReadiumServices
@@ -17,9 +16,7 @@ class ReadiumSourceMetadata(services: ReadiumServices) : SourceMetadata {
     private val extractor = ReadiumMetadataExtractor(services)
     override suspend fun read(source: SourceLease, format: BookFormat): Result<ExtractedMetadata> =
         withContext(Dispatchers.IO) {
-            if (format == BookFormat.EPUB) EpubArchiveGuard().inspect(source.file)?.let {
-                return@withContext Result.failure(IllegalArgumentException("Invalid EPUB: $it"))
-            }
+            // The extractor guards the same pinned file before its fast path or Readium fallback.
             extractor.extract(source.file, format)
         }
 }

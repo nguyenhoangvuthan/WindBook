@@ -7,6 +7,7 @@ class ExtractedMetadata(
     val title: String?,
     val author: String?,
     val coverWebp: ByteArray?,
+    val pdfContents: PdfContents? = null,
 )
 
 /** Port implemented by the reader engine; a failure means the file can't be opened. */

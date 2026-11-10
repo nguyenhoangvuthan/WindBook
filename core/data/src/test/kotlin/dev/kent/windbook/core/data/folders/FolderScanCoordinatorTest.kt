@@ -39,6 +39,38 @@ class FolderScanCoordinatorTest {
             withTimeout(10_000) { coordinator.observe(folder).first { it.runId == id && it.state != "RUNNING" } }
         }
 
+    @Test fun queuedCoverIdsAreDeliveredInBoundedBatchesToOneWorker() = runTest {
+        val folder = repo.save(tree, "Root", ScanOptions())
+        children = { _, _ -> (0 until 140).map { doc("batch$it") }.asFlow() }
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val batches = mutableListOf<List<String>>()
+        var active = 0
+        var maximum = 0
+        val enricher = object : FolderBookEnricher {
+            override suspend fun enrich(runId: String) { }
+            override suspend fun enrichBatch(runId: String, sourceIds: List<String>) {
+                active++; maximum = maxOf(maximum, active)
+                batches.add(sourceIds.toList())
+                try {
+                    if (!entered.isCompleted) { entered.complete(Unit); release.await() }
+                } finally { active-- }
+            }
+        }
+        val c = FolderScanCoordinator(repo, FolderScanner(access), backgroundScope, enricher)
+        val run = c.start(folder)
+        try {
+            entered.await()
+            withContext(Dispatchers.Default) { withTimeout(10_000) { c.observe(folder).first { it.matched >= 99 } } }
+        } finally { release.complete(Unit) }
+        assertEquals("COMPLETE", terminal(c, folder, run).state)
+        assertTrue("Queued IDs should share a bounded database batch", batches.any { it.size > 1 })
+        assertTrue(batches.all { it.size <= 16 })
+        assertEquals(140, batches.flatten().size)
+        assertEquals(140, batches.flatten().toSet().size)
+        assertEquals(1, maximum)
+    }
+
     @Test fun coversRunAfterDiscoveryAndBeforeCompleteWithoutReadingAnyBook() = runTest {
         val folder = repo.save(tree, "Root", ScanOptions())
         children = { _, _ -> flowOf(doc("one")) }

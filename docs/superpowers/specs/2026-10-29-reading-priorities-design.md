@@ -1,9 +1,12 @@
 # Cover speed and daily reading priorities
 
 Date: 2026-10-29
-Status: proposed; owner requested the work and confirmed that the delay is cover
-appearance during library scans/updates. Written design and task-plan approval
-are pending under AGENTS.md section 6. No implementation is claimed.
+Status: approved by the owner on 2026-10-29 ("Tôi đã duyệt xong"), including the
+companion phased task plan and sequential execution with independent review.
+Implementation starts on cover-speed; delivery gates remain pending.
+Amended: 2026-11-10. Owner approved the reader toolbar/drawer/seek layout and
+explicitly added embedded PDF contents to this increment. These decisions are
+recorded in sections 3.2–3.3; application implementation remains pending.
 Baseline: WindBook 0.1.5, current main.
 
 ## 1. Intent and delivery order
@@ -74,8 +77,8 @@ not permission to recreate owner-library data or claim repeated evidence.
   Books without an embedded cover retain their existing fallback.
 
 The EPUB fast path is an explicit architectural change relative to October27's
-one-extractor design. Approval of this document would approve only this bounded,
-fallback-backed fast path, not arbitrary new parsers or parallel native rendering.
+one-extractor design. Owner approval covers only this bounded, fallback-backed fast path, not arbitrary
+new parsers or parallel native rendering.
 Cover output retains proportional Fit, maximum600px and current WebP quality80.
 The Add-books metadata path should share the proven extractor without changing
 its EPUB/PDF-only format support in this speed increment.
@@ -137,9 +140,33 @@ overrides intact. Changes to book A cannot leak into book B accidentally.
 
 ### 3.2 Navigation
 
-- A contents sheet for EPUB using the publication's existing TOC; nested entries
-  and current chapter are visible. TXT may expose generated sections as sections,
-  not invented chapter names. Empty TOCs get an honest empty state.
+- Top toolbar, in order: Back, book title, Contents button, overflow menu.
+  Long titles ellipsize while actions retain at least48dp targets. The overflow
+  menu contains Bookmark current location and access to saved bookmarks;
+  Search in book and Aa for EPUB/TXT; View for PDF. Retain the existing Mark
+  finished and TXT encoding actions. PDF full-text search remains deferred;
+  do not offer an action that has no implementation.
+- Contents opens a modal drawer from the left, replacing the previously planned
+  contents sheet. EPUB uses the publication's TOC, PDF uses its embedded outline
+  under section3.3, and TXT may expose generated sections with honest labels.
+  Show nested entries and the current section when known. Distinguish loading,
+  empty, unavailable and failed states; never fabricate chapter names. Back or
+  the scrim closes the drawer before leaving the reader. An accepted destination
+  closes the drawer; invalid entries leave the reading location unchanged.
+- The bottom toolbar has a draggable position slider. EPUB/TXT show percentage
+  and the current section when known; their positions are not physical pages.
+  PDF shows current physical page/total pages; tapping that label opens page-number
+  entry. This number matches the PDF locator, not a printed Roman-numeral label.
+- Dragging previews a target without repeatedly rendering/navigating or saving
+  reading progress. Release performs one jump in the existing session. Cancel,
+  session replacement or a stale target discards the preview. Resolve EPUB/TXT
+  targets through the publication's positions/locators, with TXT encoding pinned.
+  PDF slider endpoints select pages1 and N, including the single-page case;
+  keep the existing persisted PDF progression formula unchanged.
+- Center tap continues toggling the overlay. PDF double-tap continues zooming in
+  both layouts, including when text-selection support is present. Contents opens
+  from its button; do not add a double-tap recognizer to EPUB/TXT or a drawer edge
+  gesture that steals page turns, selection handles or PDF pan gestures.
 - Bookmark current location; list, rename and remove bookmarks per book. Support
   EPUB/PDF/TXT. Persist locator, quote/label if available, book/revision identity
   and TXT encoding when applicable. Typography changes must not move a bookmark
@@ -148,10 +175,13 @@ overrides intact. Changes to book A cannot leak into book B accidentally.
   cancellation on query/book changes, next-page loading and passage navigation.
   Vietnamese accents/case are tested; do not promise accent-insensitive content
   search unless the installed search service actually supports it correctly.
-- PDF gains page-number jump on Android12+. No PDF full-text search or PDF outline
-  parser is included in this increment. A PDF bookmark uses the existing locator.
-- After chapter/search/bookmark jumps, offer Back to previous location. Keep up
-  to10 in-session jump origins. Ordinary page turns do not create history entries.
+- PDF gains page-number jump and embedded contents on Android12+, using the
+  existing metadata adapter rather than a new PDF parser. A PDF bookmark uses
+  the existing locator. PDF full-text search and OCR are outside this increment.
+- After contents/search/bookmark/page-entry/slider jumps, offer Back to previous
+  location. Keep up to10 in-session jump origins. Record one origin per successful
+  jump; previews, failed/same-location jumps, history returns and ordinary page
+  turns do not create history entries.
 - A navigation selection moves the existing reader session, never opens a PDF
   through Readium and never creates a second reader for the same book.
 
@@ -159,6 +189,47 @@ Add bookmarks with an additive database migration from v7 to v8. Their presence
 counts as durable reading data in source-revision policy, including hide/reconnect
 cases. Preserve all v7 rows exactly. Do not claim full M3 completion; footnote
 cards, statistics/time-left, auto-scroll and custom key bindings remain future work.
+
+### 3.3 Embedded PDF contents
+
+Read only the outline embedded in the PDF. Do not infer chapters from page images,
+run OCR or parse a printed contents page. A file without an embedded outline gets
+an explicit empty state; page entry, the slider and saved bookmarks remain usable.
+
+The installed Readium3.4.0 artifacts expose PdfDocument.outline; its PDF parser
+converts those nodes into publication contents links. The installed Pdfium adapter
+converts zero-based bookmark indexes to one-based outline page numbers. This API
+inspection supports the design, but does not replace native fixture tests.
+
+Capture normalized contents during the existing metadata pass through
+NoCoverPdfFactory, before closing the publication. Persist a derived cache keyed
+by book ID, verified source SHA and parser/payload version. Never open a PDF through
+Readium's reading engine or render through Pdfium. Selecting an entry validates
+its physical page and navigates the active PdfSession using its legacy locator.
+Preserve hierarchy and group labels without a usable destination; keep valid
+children accessible. Invalid, external or out-of-range destinations cannot turn
+into a guessed/clamped page jump.
+
+Add the cache alongside bookmarks in the same additive v7→v8 migration. It is
+rebuildable metadata, not durable reading data, and does not by itself require a
+source-revision split. Missing cache, known-empty outline and extraction failure
+are distinct states. Bound normalized node count, depth, label length and encoded
+payload; report an over-limit result honestly rather than claiming no contents.
+These bounds do not prove the upstream native parser's peak memory is bounded;
+measure that path on the device before declaring the gate passed.
+
+Existing PDFs must work without re-import. When Contents requests a missing cache,
+schedule one metadata-only preparation on a verified snapshot; explicit rescan
+may also backfill it. Keep the current reader usable while it loads. This task
+shares serial metadata work with imports/folder enrichment and must not regenerate
+covers, change last-opened/progress/notes/preferences or create another reader.
+Use the existing run/source/book/revision guards; Stop, disconnect, changed bytes
+or session replacement must prevent stale publication to the current drawer.
+Known-empty and successful caches avoid repeated extraction of unchanged bytes.
+Failures remain retryable. A changed SHA invalidates the corresponding cache.
+
+Backup may omit this derived cache and rebuild it after source reconnection;
+bookmarks and annotations remain required durable backup records.
 
 ## 4. Offline backup/restore and export increment
 
@@ -257,5 +328,9 @@ SHA256 only to main-root publish/, untracked. Record measurements and limitation
 with AGENTS/current state and the execution ledger. Do not label an unmeasured
 performance improvement, unrun device gate or pending independent review as passed.
 
-Approval requested: this written design plus the companion phased task plan,
-with one implementer working sequentially and one independent review per increment.
+Approval recorded: the owner approved this written design and companion phased
+task plan on 2026-10-29, with one implementer working sequentially and one
+independent review per increment. No push is authorized.
+The owner approved the layout amendment on 2026-11-10 ("tôi đồng ý với bố cục này")
+and explicitly selected "Bổ sung mục lục PDF trong đợt này". The sequential delivery
+order and independent review requirements continue to apply.

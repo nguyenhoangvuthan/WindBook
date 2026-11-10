@@ -22,7 +22,7 @@ import kotlin.math.abs
 
 @Composable
 internal fun PdfNotesReader(bookId: String,session: PdfSession,reader: ReaderViewModel,display: EffectiveDisplay,
-    initialPage: Int,annotationId: String?,revealRequestId: String?) {
+    initialPage: Int,annotationId: String?,revealRequestId: String?, pageJump: PdfPageJump? = null, onPageJumpApplied: (Long,Boolean)->Unit = {_,_->}) {
     val notes=hiltViewModel<NotesViewModel>(key="pdf-notes:$bookId")
     val fitRequestId by reader.pdfFitRequestId.collectAsStateWithLifecycle()
     val records by notes.annotations.collectAsStateWithLifecycle()
@@ -58,6 +58,7 @@ internal fun PdfNotesReader(bookId: String,session: PdfSession,reader: ReaderVie
         reveal=PdfRevealRequest(revealRequestId ?: annotationId,anchor)
         active=listOf(annotationId)
     }
+    LaunchedEffect(pageJump?.id) {if(pageJump!=null) {selection=null;active=emptyList();reveal=null}}
     LaunchedEffect(saved) { selection=null;active=emptyList() }
     val marks=records.filter {it.bookId==bookId && it.fingerprint==fingerprint && it.anchor!=null}
     val clear={selection=null;active=emptyList();message=null}
@@ -72,7 +73,7 @@ internal fun PdfNotesReader(bookId: String,session: PdfSession,reader: ReaderVie
     }
     Box(Modifier.fillMaxSize()) {
         PdfReaderView(session.pages,display.layout,display.cropMargins,initialPage,reader::onPdfPageChanged,reader::toggleOverlay,
-            initialZoom=display.zoom,initialZoomX=display.zoomX,onZoomChanged=reader::setPdfZoom,reveal=reveal,fitRequestId=fitRequestId,
+            pageJump=pageJump,onPageJumpApplied=onPageJumpApplied,initialZoom=display.zoom,initialZoomX=display.zoomX,onZoomChanged=reader::setPdfZoom,reveal=reveal,fitRequestId=fitRequestId,
             annotations=PdfAnnotationUi(marks,selection,active,
                 onSelect={selection=it;message=null;if(it!=null) active=emptyList()},onExisting={active=it;if(it.isNotEmpty()) selection=null},
                 onNote={prepare(true)},onColor={color -> if(prepare(false)) notes.highlight(color)},

@@ -13,6 +13,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.CancellationException
 import org.readium.r2.navigator.Navigator
 import org.readium.r2.navigator.OverflowableNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
@@ -40,6 +43,8 @@ class ReaderHostFragment : Fragment() {
     private var pendingBind: (() -> Unit)? = null
     private var callbacks: Callbacks? = null
     private var locatorJob: Job? = null
+    private var restoringAnchor = false
+    private var appliedTypography: Pair<dev.kent.windbook.core.model.ReaderTypography,Boolean>? = null
 
     private val navigator: Navigator?
         get() = childFragmentManager.findFragmentByTag(NAVIGATOR_TAG) as? Navigator
@@ -65,13 +70,16 @@ class ReaderHostFragment : Fragment() {
         pendingBind = null
     }
 
-    fun bind(session: ReaderSession, initialLocatorJson: String?, callbacks: Callbacks, darkTheme: Boolean) {
+    fun bind(session: ReaderSession, initialLocatorJson: String?, callbacks: Callbacks, darkTheme: Boolean, typography: dev.kent.windbook.core.model.ReaderTypography = dev.kent.windbook.core.model.ReaderTypography()) {
         require(session.surface == NavigationSurface.PUBLICATION) { "ReaderHostFragment requires a publication session" }
         this.callbacks = callbacks
         val readium = session as ReadiumReaderSession
-        if (readium === boundSession) return
+        if (readium === boundSession) {
+            applyTypography(typography,darkTheme)
+            return
+        }
         if (view == null) {
-            pendingBind = { bind(session, initialLocatorJson, callbacks, darkTheme) }
+            pendingBind = { bind(session, initialLocatorJson, callbacks, darkTheme, typography) }
             return
         }
         boundSession = readium
@@ -80,13 +88,71 @@ class ReaderHostFragment : Fragment() {
         childFragmentManager.fragmentFactory = EpubNavigatorFactory(readium.publication)
             .createFragmentFactory(
                 initialLocator = initialLocator,
-                initialPreferences = initialEpubPreferences(darkTheme),
+                initialPreferences = typographyPreferences(typography,darkTheme),
+                configuration = EpubNavigatorFragment.Configuration(servedAssets = listOf("fonts/.*")).apply {
+                    addFontFamilyDeclaration(org.readium.r2.navigator.preferences.FontFamily("Literata")) {
+                        addFontFace { addSource("/fonts/literata.ttf") }
+                    }
+                },
             )
         childFragmentManager.commitNow {
             childFragmentManager.findFragmentByTag(NAVIGATOR_TAG)?.let { remove(it) }
             add(R.id.windbook_navigator_container, EpubNavigatorFragment::class.java, Bundle(), NAVIGATOR_TAG)
         }
-        attachListeners()
+        appliedTypography = typography to darkTheme
+        val restore=initialLocator?.takeIf {it.locations.otherLocations["windbookTextOffset"] is Number}
+        restoringAnchor=restore!=null
+        attachListeners(restore?.toJsonString())
+    }
+
+    fun applyTypography(value: dev.kent.windbook.core.model.ReaderTypography, darkTheme: Boolean) {
+        val next=value to darkTheme
+        if(appliedTypography==next) return
+        (navigator as? EpubNavigatorFragment)?.submitPreferences(typographyPreferences(value,darkTheme))
+        appliedTypography=next
+    }
+
+    /** A deliberate jump completes only when its resource and requested anchor are visible. */
+    suspend fun navigate(locatorJson: String): NavigationResult {
+        val current=navigator as? EpubNavigatorFragment ?: return NavigationResult.FAILED
+        val expected=boundSession ?: return NavigationResult.FAILED
+        val target=locatorJson.toLocatorOrNull() ?: return NavigationResult.FAILED
+        if(expected.publication.linkWithHref(target.href)==null) return NavigationResult.FAILED
+        return try {
+            val script=navigationVisibilityScript(target)
+            suspend fun arrived(): Boolean {
+                val coarse=current.currentLocator.value
+                if(coarse.href!=target.href) return false
+                val visible=script?.let {current.evaluateJavascript(it)=="true"}
+                return navigationTargetMatches(target,coarse,visible)
+            }
+            if(arrived()) return NavigationResult.UNCHANGED
+            if(!current.go(target,false)) return NavigationResult.FAILED
+            val scrollScript=navigationScrollScript(target)
+            kotlinx.coroutines.delay(100)
+            kotlinx.coroutines.withTimeoutOrNull(5000) {
+                while(!arrived()) {
+                    if(boundSession!==expected) return@withTimeoutOrNull NavigationResult.FAILED
+                    if(current.currentLocator.value.href==target.href && scrollScript!=null) current.evaluateJavascript(scrollScript)
+                    kotlinx.coroutines.delay(80)
+                }
+                reportLocation(current,current.currentLocator.value)
+                NavigationResult.COMPLETED
+            } ?: NavigationResult.FAILED
+        } catch(e: CancellationException) {throw e}
+        catch(_: Exception) {NavigationResult.FAILED}
+    }
+
+    private suspend fun reportLocation(current: Navigator,locator: org.readium.r2.shared.publication.Locator) {
+        if(restoringAnchor) return
+        val visible=try {kotlinx.coroutines.withTimeoutOrNull(700) {(current as? EpubNavigatorFragment)?.evaluateJavascript(visibleReadingLocatorScript)?.let { json ->
+            json.toLocatorOrNull()?.copy(href=locator.href)
+        }}}
+        catch(e: CancellationException) {throw e}
+        catch(_: Exception) {null}
+        if(current!==navigator || current.currentLocator.value!=locator) return
+        callbacks?.onLocatorChanged(semanticReadingLocator(locator,visible).toJsonString(),
+            readingProgression(locator.locations.position,boundSession?.positionCount ?: 0,locator.locations.totalProgression),locator.title)
     }
 
     /** Used for volume keys / page keys. */
@@ -99,7 +165,7 @@ class ReaderHostFragment : Fragment() {
     internal val epubTheme: Theme?
         get() = (navigator as? EpubNavigatorFragment)?.settings?.value?.theme
 
-    private fun attachListeners() {
+    private fun attachListeners(restore: String?) {
         val current = navigator ?: return
         (current as? OverflowableNavigator)?.apply {
             // Edge taps and arrow keys turn pages.
@@ -114,17 +180,19 @@ class ReaderHostFragment : Fragment() {
         locatorJob?.cancel()
         locatorJob = viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                current.currentLocator.collect { locator ->
-                    callbacks?.onLocatorChanged(
-                        locator.toJsonString(),
-                        readingProgression(
-                            position = locator.locations.position,
-                            positionCount = boundSession?.positionCount ?: 0,
-                            totalProgression = locator.locations.totalProgression,
-                        ),
-                        locator.title,
-                    )
+                val expected=boundSession
+                if(restore!=null && restoringAnchor) launch {
+                    kotlinx.coroutines.withTimeoutOrNull(8000) {
+                        current.currentLocator.first {it.href==restore.toLocatorOrNull()?.href}
+                        kotlinx.coroutines.delay(250)
+                        while(boundSession===expected && navigate(restore)==NavigationResult.FAILED) kotlinx.coroutines.delay(100)
+                    }
+                    if(boundSession===expected && current===navigator) {
+                        restoringAnchor=false
+                        reportLocation(current,current.currentLocator.value)
+                    }
                 }
+                current.currentLocator.collectLatest { locator -> reportLocation(current,locator) }
             }
         }
     }

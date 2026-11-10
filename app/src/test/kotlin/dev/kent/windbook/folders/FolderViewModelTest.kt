@@ -63,7 +63,7 @@ class FolderViewModelTest {
         } finally {
             store.clear()
             vm.viewModelScope.coroutineContext[Job]?.join()
-            db.close()
+            backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close()
         }
     }
     @Test fun grantedFolderStartsScanWithoutASecondScanClick() = runTest {
@@ -77,7 +77,7 @@ class FolderViewModelTest {
             grant(vm, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION).join()
             val id = requireNotNull(vm.state.value.resolvedFolderId)
             assertEquals("RUNNING", coordinator.observe(id).first().state)
-        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close() }
     }
 
     @Test fun typedExactDevicePathReusesItsHeldRootGrant() = runTest {
@@ -94,7 +94,7 @@ class FolderViewModelTest {
             vm.scan().join()
             assertEquals(id, vm.state.value.resolvedFolderId)
             assertEquals("RUNNING", scans.observe(id).first().state)
-        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close() }
     }
 
     @Test fun computerPathScanExplainsDeviceGrantRatherThanSilentlyIgnoringInput() = runTest {
@@ -117,7 +117,7 @@ class FolderViewModelTest {
             vm.scan().join()
             assertNull(vm.state.value.pickerRequest)
             assertTrue(repo.observeFolders().first().isEmpty())
-        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close() }
     }
 
     @Test fun typedPathPrepositionsPickerAndStaleResultCannotTargetNewRoot() = runTest {
@@ -139,7 +139,7 @@ class FolderViewModelTest {
             assertEquals(b, vm.state.value.resolvedFolderId)
             assertEquals(0, acquisitions)
             assertEquals(1, repo.observeFolders().first().size)
-        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close() }
     }
 
     @Test fun newFoldersUseSettingsDefaultsWhileSavedFoldersKeepOverrides() = runTest {
@@ -165,7 +165,7 @@ class FolderViewModelTest {
             vm.scan().join()
             grant(vm, Uri.parse("content://folders.test/tree/new"), Intent.FLAG_GRANT_READ_URI_PERMISSION).join()
             assertEquals(ScanOptions(setOf(BookFormat.EPUB), false), vm.state.value.options)
-        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close() }
     }
 
     @Test fun typedGrantUsesVisibleOptionsRatherThanHiddenSavedOptions() = runTest {
@@ -186,7 +186,7 @@ class FolderViewModelTest {
             assertEquals(ScanOptions(setOf(BookFormat.PDF), true), vm.state.value.options)
             assertEquals(ScanOptions(setOf(BookFormat.PDF), true), repo.observeFolders().first().single().options)
             assertEquals("RUNNING", scans.observe(id).first().state)
-        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close() }
     }
 
     @Test fun pickerCompletionUsesTheOptionsShownWhenScanWasRequested() = runTest {
@@ -205,7 +205,7 @@ class FolderViewModelTest {
             vm.onTreeGranted(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION, request.id).join()
             assertEquals(ScanOptions(setOf(BookFormat.PDF), false), repo.observeFolders().first().single().options)
             assertEquals(ScanOptions(setOf(BookFormat.PDF), false), vm.state.value.options)
-        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close() }
     }
 
     @Test fun scanOutlivesViewModelAndOptionChangesReplaceDurableRun() = runTest {
@@ -235,7 +235,7 @@ class FolderViewModelTest {
         } finally {
             store.clear()
             vm.viewModelScope.coroutineContext[Job]?.join()
-            db.close()
+            backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close()
         }
     }
 
@@ -283,7 +283,7 @@ class FolderViewModelTest {
             assertFalse(opened)
             vm.disconnect(a).join() // A stale rendered callback must not target the now-selected B.
             assertNull(db.folderDao().find(b)!!.disconnectedAt)
-        } finally { lateGate.complete(Unit); store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+        } finally { lateGate.complete(Unit); store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close() }
     }
 
     @Test fun rapidExtensionChangesSurviveSuspendedSaveAndQueuedDisconnectCannotTargetNewRoot() = runTest {
@@ -324,7 +324,7 @@ class FolderViewModelTest {
             grantRelease.complete(Unit)
             blocker2.await(); hold.join(); switch.join(); staleDisconnect.join()
             assertNull(db.folderDao().find(b)!!.disconnectedAt)
-        } finally { release.complete(Unit); grantRelease.complete(Unit); store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); db.close() }
+        } finally { release.complete(Unit); grantRelease.complete(Unit); store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close() }
     }
 
 }

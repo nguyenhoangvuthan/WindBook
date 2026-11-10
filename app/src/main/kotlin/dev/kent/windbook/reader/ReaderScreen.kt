@@ -53,6 +53,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
@@ -90,10 +92,6 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit, onReplaceReader: (String) ->
         creationCallback = { factory -> factory.create(bookId) },
     )
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val overlay by viewModel.overlayVisible.collectAsStateWithLifecycle()
-    val progression by viewModel.progression.collectAsStateWithLifecycle()
-    val chapterTitle by viewModel.chapterTitle.collectAsStateWithLifecycle()
-    val canMarkFinished by viewModel.canMarkFinished.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
     val reconnectPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -150,38 +148,7 @@ fun ReaderRoute(bookId: String, onBack: () -> Unit, onReplaceReader: (String) ->
             is ReaderUiState.Redirect -> {
                 LaunchedEffect(current.bookId) { onReplaceReader(current.bookId) }
             }
-            is ReaderUiState.Ready -> Box(Modifier.fillMaxSize()) {
-                val pdf = current.session as? PdfSession
-                val pdfDisplay by viewModel.pdfDisplay.collectAsStateWithLifecycle()
-                if (current.session.surface == NavigationSurface.PDF) {
-                    requireNotNull(pdf)
-                    pdfDisplay?.let { display ->
-                        val initialPage = remember(pdf) { viewModel.initialPdfPage() }
-                        dev.kent.windbook.reader.pdf.PdfNotesReader(
-                            bookId,pdf,viewModel,display,initialPage,annotationId,revealRequestId,
-                        )
-                    }
-                } else if (current.session.surface == NavigationSurface.PUBLICATION) {
-                    ReaderSurface(current, viewModel)
-                }
-                if (overlay && current.session.textEncoding != null) TextButton(
-                    onClick = { encodingPicker = true },
-                    modifier = Modifier.align(Alignment.CenterEnd),
-                ) { Text(stringResource(R.string.reader_text_encoding)) }
-                ReaderOverlay(
-                    visible = overlay,
-                    title = current.title,
-                    chapterTitle = chapterTitle,
-                    progression = progression,
-                    canMarkFinished = canMarkFinished,
-                    onMarkFinished = viewModel::markFinished,
-                    onBack = onBack,
-                    pdfDisplay = if (pdf != null) pdfDisplay else null,
-                    onPdfLayoutChange = viewModel::setPdfLayout,
-                    onCropMarginsChange = viewModel::setCropMargins,
-                    onFitPdfPage = viewModel::fitPdfPage,
-                )
-            }
+            is ReaderUiState.Ready -> ReaderReadyScreen(bookId,current,viewModel,onBack,annotationId,revealRequestId) {encodingPicker=true}
         }
     }
 }
@@ -200,9 +167,11 @@ internal fun ReaderViewport(
 }
 
 @Composable
-private fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewModel) {
+internal fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewModel, controls: ReaderControlsViewModel) {
     val dispatcher = LocalKeyEventDispatcher.current
     val darkTheme = isSystemInDarkTheme()
+    val typography by controls.typography.collectAsStateWithLifecycle()
+    val navigation by controls.request.collectAsStateWithLifecycle()
     val hostRef = remember { mutableStateOf<ReaderHostFragment?>(null) }
     val callbacks = remember(viewModel, state.session) {
         object : ReaderHostFragment.Callbacks {
@@ -215,7 +184,7 @@ private fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewModel
     AndroidFragment<ReaderHostFragment>(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(epubPageBackground(darkTheme)))
+            .background(Color(readerPageBackground(typography,darkTheme)))
             // Text never touches the screen edge or sits under a punch-hole camera (spec §3.6).
             .windowInsetsPadding(
                 WindowInsets.displayCutout.only(WindowInsetsSides.Vertical).union(WindowInsets(top = 16.dp, bottom = 16.dp)),
@@ -229,7 +198,18 @@ private fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewModel
             initialLocatorJson = viewModel.latestLocatorJson ?: state.initialLocatorJson,
             callbacks = callbacks,
             darkTheme = darkTheme,
+            typography = typography,
         )
+    }
+
+    LaunchedEffect(hostRef.value,typography,darkTheme) {
+        hostRef.value?.applyTypography(typography,darkTheme)
+    }
+
+    LaunchedEffect(hostRef.value,navigation?.id) {
+        val pending=navigation ?: return@LaunchedEffect
+        val fragment=hostRef.value ?: return@LaunchedEffect
+        controls.completed(pending.id,fragment.navigate(pending.locatorJson))
     }
 
     DisposableEffect(dispatcher) {
@@ -270,7 +250,23 @@ fun ReaderOverlay(
     onPdfLayoutChange: (PdfLayout) -> Unit = {},
     onCropMarginsChange: (Boolean) -> Unit = {},
     onFitPdfPage: () -> Unit = {},
+    onContents: () -> Unit = {},
+    onBookmark: () -> Unit = {},
+    onBookmarks: () -> Unit = {},
+    onSearch: () -> Unit = {},
+    onAppearance: () -> Unit = {},
+    onEncoding: (() -> Unit)? = null,
+    canBookmark: Boolean = true,
+    onSeek: ((Double) -> Unit)? = null,
+    canSeek: Boolean = true,
+    pdfPage: Int? = null,
+    pdfPageCount: Int? = null,
+    onPageEntry: () -> Unit = {},
+    canReturn: Boolean = false,
+    onReturn: () -> Unit = {},
+    seekFraction: Double = progression,
 ) {
+    var preview by remember { mutableStateOf<Double?>(null) }
     val bar = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = 0.97f)
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
         Box(Modifier.fillMaxSize()) {
@@ -291,12 +287,9 @@ fun ReaderOverlay(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f),
                 )
-                if (pdfDisplay != null) {
-                    ViewMenu(pdfDisplay, onPdfLayoutChange, onCropMarginsChange, onFitPdfPage)
-                } else {
-                    // Balances the back button so the title is truly centred.
-                    Spacer(Modifier.width(48.dp))
-                }
+                IconButton(onClick=onContents) {Icon(WindBookIcons.List,contentDescription=stringResource(R.string.reader_contents))}
+                ReaderMoreMenu(pdfDisplay,onPdfLayoutChange,onCropMarginsChange,onFitPdfPage,
+                    onBookmark,onBookmarks,onSearch,onAppearance,onEncoding,canBookmark)
             }
             Column(
                 Modifier
@@ -305,12 +298,16 @@ fun ReaderOverlay(
                     .background(bar)
                     .navigationBarsPadding(),
             ) {
-                ProgressLine(progression)
+                if(onSeek!=null) ReaderPositionSlider(seekFraction,canSeek,onPreview={preview=it},onSeek=onSeek) else ProgressLine(progression)
+                if(canReturn) TextButton(onClick=onReturn) {Text(stringResource(R.string.reader_return))}
                 Row(
                     Modifier.padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val percent = formatPercent(progression)
+                    if(pdfPage!=null && pdfPageCount!=null) TextButton(onClick=onPageEntry) {
+                        Text(stringResource(R.string.reader_page_count,preview?.let {dev.kent.windbook.core.model.seekPage(it,pdfPageCount)?.plus(1)} ?: pdfPage,pdfPageCount))
+                    }
+                    val percent = formatPercent(preview ?: progression)
                     Text(
                         text = chapterTitle?.let { "$it · $percent" } ?: percent,
                         style = MaterialTheme.typography.labelLarge,
@@ -329,51 +326,43 @@ fun ReaderOverlay(
 }
 
 @Composable
-private fun ViewMenu(
-    display: EffectiveDisplay,
-    onLayoutChange: (PdfLayout) -> Unit,
-    onCropChange: (Boolean) -> Unit,
-    onFitPage: () -> Unit,
-) {
-    var open by remember { mutableStateOf(false) }
+private fun ReaderMoreMenu(display: EffectiveDisplay?,onLayoutChange: (PdfLayout)->Unit,onCropChange: (Boolean)->Unit,
+    onFitPage: ()->Unit,onBookmark: ()->Unit,onBookmarks: ()->Unit,onSearch: ()->Unit,onAppearance: ()->Unit,
+    onEncoding: (() -> Unit)?,canBookmark: Boolean) {
+    var open by remember {mutableStateOf(false)}
+    var showView by remember {mutableStateOf(false)}
     Box {
-        IconButton(onClick = { open = true }) {
-            Icon(WindBookIcons.ViewMode, contentDescription = stringResource(R.string.cd_view_mode))
-        }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.fit_page)) },
-                onClick = { open = false; onFitPage() },
-            )
-            listOf(
-                PdfLayout.VERTICAL to R.string.layout_vertical,
-                PdfLayout.PAGED to R.string.layout_paged,
-            ).forEach { (layout, label) ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(label)) },
-                    leadingIcon = { RadioButton(selected = display.layout == layout, onClick = null) },
-                    onClick = {
-                        open = false
-                        if (display.layout != layout) onLayoutChange(layout)
-                    },
-                )
+        IconButton(onClick={open=true}) {Icon(WindBookIcons.MoreHoriz,stringResource(R.string.reader_more),modifier=Modifier.rotate(90f))}
+        DropdownMenu(expanded=open,onDismissRequest={open=false}) {
+            DropdownMenuItem(text={Text(stringResource(R.string.reader_bookmark_add))},enabled=canBookmark,onClick={open=false;onBookmark()})
+            DropdownMenuItem(text={Text(stringResource(R.string.reader_bookmarks))},onClick={open=false;onBookmarks()})
+            if(display==null) {
+                DropdownMenuItem(text={Text(stringResource(R.string.reader_search))},onClick={open=false;onSearch()})
+                DropdownMenuItem(text={Text(stringResource(R.string.reader_appearance))},onClick={open=false;onAppearance()})
+            } else {
+                val viewLabel=stringResource(R.string.cd_view_mode)
+                DropdownMenuItem(text={Text(viewLabel)},onClick={open=false;showView=true},modifier=Modifier.semantics {contentDescription=viewLabel})
             }
-            HorizontalDivider()
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.crop_margins)) },
-                leadingIcon = { Checkbox(checked = display.cropMargins, onCheckedChange = null) },
-                onClick = {
-                    open = false
-                    onCropChange(!display.cropMargins)
-                },
-                // TalkBack hears "Crop margins, checkbox, checked".
-                modifier = Modifier.semantics {
-                    role = Role.Checkbox
-                    toggleableState = ToggleableState(display.cropMargins)
-                },
-            )
+            if(onEncoding!=null) DropdownMenuItem(text={Text(stringResource(R.string.reader_text_encoding))},onClick={open=false;onEncoding()})
         }
     }
+    if(showView && display!=null) ReaderViewDialog(display,onLayoutChange,onCropChange,onFitPage) {showView=false}
+}
+
+@Composable
+private fun ReaderViewDialog(display: EffectiveDisplay,onLayoutChange: (PdfLayout)->Unit,onCropChange: (Boolean)->Unit,onFitPage: ()->Unit,onDismiss: ()->Unit) {
+    androidx.compose.material3.AlertDialog(onDismissRequest=onDismiss,title={Text(stringResource(R.string.cd_view_mode))},text={
+        Column {
+            DropdownMenuItem(text={Text(stringResource(R.string.fit_page))},onClick={onDismiss();onFitPage()})
+            listOf(PdfLayout.VERTICAL to R.string.layout_vertical,PdfLayout.PAGED to R.string.layout_paged).forEach {(layout,label)->
+                DropdownMenuItem(text={Text(stringResource(label))},leadingIcon={RadioButton(selected=display.layout==layout,onClick=null)},
+                    onClick={onDismiss();if(display.layout!=layout) onLayoutChange(layout)})
+            }
+            HorizontalDivider()
+            DropdownMenuItem(text={Text(stringResource(R.string.crop_margins))},leadingIcon={Checkbox(display.cropMargins,onCheckedChange=null)},
+                onClick={onDismiss();onCropChange(!display.cropMargins)},modifier=Modifier.semantics {role=Role.Checkbox;toggleableState=ToggleableState(display.cropMargins)})
+        }
+    },confirmButton={TextButton(onClick=onDismiss) {Text(stringResource(R.string.close))}})
 }
 
 @Composable

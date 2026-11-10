@@ -21,8 +21,8 @@ android {
         applicationId = "dev.kent.windbook"
         minSdk = 31
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.1.5"
+        versionCode = 8
+        versionName = "0.1.7"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -97,4 +97,22 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
     testImplementation(libs.sqlite.framework)
+}
+
+// Serve the existing licensed UI font through Readium's supported font declaration API.
+abstract class PrepareReaderFonts : DefaultTask() {
+    @get:InputFile abstract val font: org.gradle.api.file.RegularFileProperty
+    @get:OutputDirectory abstract val outputDir: org.gradle.api.file.DirectoryProperty
+    @TaskAction fun prepare() {
+        val target=outputDir.file("fonts/literata.ttf").get().asFile
+        target.parentFile.mkdirs()
+        font.get().asFile.copyTo(target,overwrite=true)
+    }
+}
+val prepareReaderFonts by tasks.registering(PrepareReaderFonts::class) {
+    font.set(layout.projectDirectory.file("src/main/res/font/literata.ttf"))
+    outputDir.set(layout.buildDirectory.dir("generated/readerAssets"))
+}
+androidComponents.onVariants { variant ->
+    variant.sources.assets?.addGeneratedSourceDirectory(prepareReaderFonts,PrepareReaderFonts::outputDir)
 }

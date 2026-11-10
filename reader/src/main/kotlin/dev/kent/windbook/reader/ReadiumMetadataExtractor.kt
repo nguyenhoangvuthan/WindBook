@@ -7,44 +7,57 @@ import dev.kent.windbook.core.model.ExtractedMetadata
 import dev.kent.windbook.core.model.MetadataExtractor
 import dev.kent.windbook.reader.pdf.PdfDocumentHandle
 import dev.kent.windbook.reader.pdf.renderedHeight
-import java.io.ByteArrayOutputStream
+import dev.kent.windbook.reader.metadata.CoverEncoder
+import dev.kent.windbook.reader.metadata.EpubMetadataFastPath
+import dev.kent.windbook.reader.metadata.FastEpubMetadata
 import java.io.File
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.readium.r2.shared.publication.services.cover
+import org.readium.r2.shared.publication.services.positions
+import dev.kent.windbook.reader.metadata.MetadataWorkCoordinator
+import dev.kent.windbook.reader.metadata.pdfContentsFromLinks
 
 private const val COVER_HEIGHT = 600
 
-class ReadiumMetadataExtractor(private val services: ReadiumServices) : MetadataExtractor {
+class ReadiumMetadataExtractor(private val services: ReadiumServices, private val work: MetadataWorkCoordinator = MetadataWorkCoordinator.shared) : MetadataExtractor {
 
     override suspend fun extract(file: File, format: BookFormat): Result<ExtractedMetadata> =
-        withContext(Dispatchers.IO) {
+        work.run { withContext(Dispatchers.IO) {
             when (format) {
                 BookFormat.EPUB, BookFormat.PDF -> Unit
                 BookFormat.MOBI, BookFormat.AZW3, BookFormat.FB2,
                 BookFormat.CBZ, BookFormat.CBR, BookFormat.TXT ->
                     return@withContext Result.failure(ReaderException("Unsupported format: $format"))
             }
+            if (format == BookFormat.EPUB) when (val fast = EpubMetadataFastPath().read(file)) {
+                is FastEpubMetadata.Success -> return@withContext Result.success(fast.metadata)
+                is FastEpubMetadata.Invalid -> return@withContext Result.failure(fast.error)
+                FastEpubMetadata.Unsupported -> Unit
+            }
             services.openPublication(file).mapCatching { publication ->
                 try {
                     ExtractedMetadata(
                         title = publication.metadata.title,
                         author = publication.metadata.authors.firstOrNull()?.name,
-                        coverWebp = if (format == BookFormat.PDF) pdfCoverWebp(file) else publication.cover()?.toWebp(),
+                        pdfContents = if (format == BookFormat.PDF) pdfContentsFromLinks(publication.tableOfContents, publication.metadata.numberOfPages ?: publication.positions().size, publication.readingOrder.firstOrNull()?.href.toString().substringBefore('#')) else null,
+                        coverWebp = if (format == BookFormat.PDF) pdfCoverWebp(file) else publication.cover()?.let { bitmap ->
+                            try { CoverEncoder.encode(bitmap) } finally { bitmap.recycle() }
+                        },
                     )
                 } finally {
                     publication.close()
                 }
             }
-        }
+        } }
 }
 
 /** Page 1 through the framework renderer; optional when no safe cover can be rendered. */
 internal suspend fun pdfCoverWebp(file: File): ByteArray? =
     try {
         pdfCoverBitmap(file)?.let { bitmap ->
-            try { bitmap.toWebp() } finally { bitmap.recycle() }
+            try { CoverEncoder.encode(bitmap) } finally { bitmap.recycle() }
         }
     } catch (e: CancellationException) {
         throw e
@@ -63,17 +76,3 @@ internal suspend fun pdfCoverBitmap(file: File): Bitmap? =
             doc.render(0, CropBox.FULL, width)
         }
     }
-
-private fun Bitmap.toWebp(maxHeight: Int = COVER_HEIGHT): ByteArray {
-    val scaled = if (maxOf(width, height) > maxHeight) {
-        val scale = maxHeight.toFloat() / maxOf(width, height)
-        Bitmap.createScaledBitmap(this, (width * scale).toInt().coerceAtLeast(1),
-            (height * scale).toInt().coerceAtLeast(1), true)
-    } else {
-        this
-    }
-    return ByteArrayOutputStream().use { out ->
-        scaled.compress(Bitmap.CompressFormat.WEBP_LOSSY, 80, out)
-        out.toByteArray()
-    }
-}

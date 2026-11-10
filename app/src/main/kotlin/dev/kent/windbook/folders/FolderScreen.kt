@@ -162,6 +162,13 @@ fun FolderScreen(state: FolderUiState, actions: FolderActions,
                 "INCOMPLETE", "INTERRUPTED" -> R.string.folder_incomplete
                 else -> R.string.folder_ready
             }))
+            if (state.progress.state == "RUNNING" && state.progress.preparingCovers) {
+                Text(if (state.progress.discoveryComplete) {
+                    stringResource(R.string.folder_cover_progress_known, state.progress.coversChecked, state.progress.coversDiscovered)
+                } else {
+                    pluralStringResource(R.plurals.folder_cover_checks, state.progress.coversChecked.toInt(), state.progress.coversChecked)
+                }, style = MaterialTheme.typography.bodySmall)
+            }
             if (state.progress.state == "RUNNING") Text(state.progress.currentPath,
                 style = MaterialTheme.typography.bodySmall)
             Row(Modifier.fillMaxWidth().toggleable(state.showHidden, role = Role.Checkbox, onValueChange = actions.showHidden), verticalAlignment = Alignment.CenterVertically) {

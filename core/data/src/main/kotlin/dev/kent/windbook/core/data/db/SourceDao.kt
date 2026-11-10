@@ -46,6 +46,20 @@ interface SourceDao {
     """)
     suspend fun folderCoverCandidate(runId: String, sourceId: String): FolderCoverRow?
 
+    @Query("""
+        SELECT s.*, b.format AS bookFormat, b.sha256 AS bookSha256,
+            b.cover_path AS coverPath, m.relative_path AS relativePath
+        FROM book_sources s JOIN books b ON b.id = s.book_id
+        JOIN folder_memberships m ON m.source_id = s.id
+        JOIN folders f ON f.id = m.folder_id
+        JOIN scan_runs r ON r.folder_id = f.id AND r.id = :runId
+        WHERE r.state = 'RUNNING' AND m.last_seen_run = r.id AND m.present = 1
+            AND f.disconnected_at IS NULL AND b.deleted_at IS NULL
+            AND s.kind = 'EXTERNAL' AND b.format IN ('EPUB', 'PDF')
+            AND s.id IN (:sourceIds)
+    """)
+    suspend fun folderCoverBatch(runId: String, sourceIds: List<String>): List<FolderCoverRow>
+
     @Query("SELECT EXISTS(SELECT 1 FROM books WHERE cover_path = :path)")
     suspend fun coverIsReferenced(path: String): Boolean
 

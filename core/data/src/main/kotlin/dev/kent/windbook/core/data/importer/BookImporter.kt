@@ -24,6 +24,7 @@ class BookImporter(
     private val clock: () -> Long = System::currentTimeMillis,
     private val newId: () -> String = { UUID.randomUUID().toString() },
     private val maxBytes: Long = 500L * 1024 * 1024,
+    private val contents: dev.kent.windbook.core.data.PdfContentsRepository? = null,
 ) {
     suspend fun import(source: ImportSource): ImportResult = withContext(Dispatchers.IO) {
         val copied = try {
@@ -57,6 +58,7 @@ class BookImporter(
             val id = existing?.id ?: newId()
             val bookFile = files.commit(copied.file, id, format)
             var coverPath: String? = null
+            var published = false
             try {
                 val meta = metadata.extract(bookFile, format).getOrElse {
                     bookFile.delete()
@@ -82,16 +84,22 @@ class BookImporter(
                     updatedAt = now,
                     deletedAt = null,
                 )
-                if (existing != null) {
+                val result = if (existing != null) {
                     // Re-import of a tombstoned book: revive the same row.
                     dao.updateOwned(entity)
                     ImportResult.Imported(id)
                 } else {
                     insertOrDuplicate(entity, bookFile, coverPath)
                 }
+                published = result is ImportResult.Imported
+                if (published) meta.pdfContents?.let { outline ->
+                    try { contents?.save(id,copied.sha256,outline) }
+                    catch (e: CancellationException) { throw e }
+                    catch (_: Exception) { /* Derived contents can be rebuilt without losing the imported book. */ }
+                }
+                result
             } catch (e: CancellationException) {
-                bookFile.delete()
-                files.delete(coverPath)
+                if (!published) { bookFile.delete(); files.delete(coverPath) }
                 throw e
             } catch (e: Exception) {
                 // Disk full while writing the cover, database errors…: never leave orphaned files.

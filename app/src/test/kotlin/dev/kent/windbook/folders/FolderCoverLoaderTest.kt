@@ -42,6 +42,7 @@ class FolderCoverLoaderTest {
     private var brokenSource: String? = null
     private var brokenMetadata: String? = null
     private var changedProvider: String? = null
+    private var noCovers = false
     private val stampReads = mutableMapOf<String, Int>()
     private var onExtract: suspend (SourceLease) -> Unit = {}
 
@@ -67,7 +68,7 @@ class FolderCoverLoaderTest {
         val metadata = SourceMetadata { lease, _ ->
             extracted++; onExtract(lease)
             if (lease.file.nameWithoutExtension == brokenMetadata) Result.failure(IOException("Invalid"))
-            else Result.success(ExtractedMetadata("Extracted " + lease.file.nameWithoutExtension, "Author", byteArrayOf(5, 6, 7)))
+            else Result.success(ExtractedMetadata("Extracted " + lease.file.nameWithoutExtension, "Author", if (noCovers) null else byteArrayOf(5, 6, 7)))
         }
         loader = FolderCoverLoader(books, access, metadata, files)
         folder = folders.save(tree, "Root", ScanOptions(setOf(BookFormat.EPUB, BookFormat.PDF, BookFormat.TXT)))
@@ -88,6 +89,114 @@ class FolderCoverLoaderTest {
         }
     }
     private suspend fun visible() = db.libraryDao().observeLibrary().first().map { it.book }
+
+    @Test fun firstCoverIsPublishedBeforeTheLastDirectoryFinishesDiscovery() = runTest {
+        add("early")
+        val discoveryPaused = CompletableDeferred<Unit>()
+        val releaseDiscovery = CompletableDeferred<Unit>()
+        val c = FolderScanCoordinator(folders, FolderScanner(TreeAccess { _, _ -> flow {
+            documents.forEach { emit(it) }
+            discoveryPaused.complete(Unit)
+            releaseDiscovery.await()
+        } }), backgroundScope, loader)
+        val run = c.start(folder)
+        try {
+            discoveryPaused.await()
+            val covered = withContext(Dispatchers.Default) {
+                withTimeoutOrNull(2_000) {
+                    db.libraryDao().observeLibrary().first { rows -> rows.any { it.book.coverPath != null } }
+                }
+            }
+            assertNotNull("The first cover must not wait for the final directory", covered)
+            assertEquals("RUNNING", db.folderDao().run(run)!!.state)
+        } finally { releaseDiscovery.complete(Unit) }
+    }
+
+    @Test fun moreThanTheQueueCapacityKeepsEveryRandomSourceIdAndUsesOneExtractor() = runTest {
+        repeat(140) { add("queued$it") }
+        var active = 0
+        var maximum = 0
+        onExtract = {
+            active++
+            maximum = maxOf(maximum, active)
+            try { yield() } finally { active-- }
+        }
+        assertEquals("COMPLETE", runScan(coordinator(backgroundScope)).state)
+        assertEquals(140, visible().count { it.coverPath?.let { path -> File(path).isFile } == true })
+        assertEquals(140, acquired)
+        assertEquals(140, extracted)
+        assertEquals(1, maximum)
+        leases.forEach { lease -> assertThrows(IllegalStateException::class.java) { lease.openStream() } }
+    }
+
+    @Test fun largeNoCoverLibraryDoesNotRepeatSuccessfulMetadataDuringTheFinalSweep() = runTest {
+        noCovers = true
+        repeat(140) { add("withoutCover$it") }
+        assertEquals("COMPLETE", runScan(coordinator(backgroundScope)).state)
+        assertEquals(140, acquired)
+        assertEquals(140, extracted)
+        assertTrue(visible().all { it.coverPath == null })
+    }
+
+    @Test fun largeUnknownStampLibraryUsesOneSnapshotPerUnchangedSource() = runTest {
+        repeat(140) { add("unknown$it", unknownStamp = true) }
+        assertEquals("COMPLETE", runScan(coordinator(backgroundScope)).state)
+        assertEquals(140, acquired)
+        assertEquals(140, extracted)
+        assertEquals(140, visible().count { it.coverPath != null })
+    }
+
+    @Test fun aLaterRowChangeInvalidatesTheDiskAttemptProof() = runTest {
+        noCovers = true
+        add("one"); add("two")
+        onExtract = { lease ->
+            if (lease.file.nameWithoutExtension == "two") {
+                val row = db.sourceDao().findDocument("cover.test", "one")!!
+                db.sourceDao().update(row.copy(mtime = 20, availability = "UNVERIFIED"))
+            }
+        }
+        assertEquals("COMPLETE", runScan(coordinator(backgroundScope)).state)
+        assertEquals(3, acquired)
+        assertEquals(3, extracted)
+        assertFalse(File(files.tempDir, "cover-attempts.db").exists())
+    }
+
+    @Test fun finalSweepRecoversACandidateInvalidatedDuringTheProgressiveAttempt() = runTest {
+        add("one")
+        onExtract = {
+            if (extracted == 1) {
+                val row = db.sourceDao().findDocument("cover.test", "one")!!
+                db.sourceDao().update(row.copy(mtime = 20, availability = "UNVERIFIED"))
+            }
+        }
+        assertEquals("COMPLETE", runScan(coordinator(backgroundScope)).state)
+        assertEquals(2, acquired)
+        assertEquals(2, extracted)
+        assertTrue(File(visible().single().coverPath!!).isFile)
+        assertEquals(1, files.coversDir.listFiles().orEmpty().size)
+    }
+
+    @Test fun stopJoinsABlockedProducerAndRejectsTheLateConsumerResult() = runTest {
+        repeat(200) { add("blocked$it") }
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        onExtract = { entered.complete(Unit); withContext(NonCancellable) { release.await() } }
+        val c = coordinator(backgroundScope)
+        val id = c.start(folder)
+        withContext(Dispatchers.Default) { withTimeout(10_000) { entered.await() } }
+        val stopping = async { c.stop(id) }
+        try {
+            withContext(Dispatchers.Default) {
+                withTimeout(10_000) { c.observe(folder).first { it.state == "INTERRUPTED" } }
+            }
+            assertTrue(visible().all { it.coverPath == null })
+        } finally { release.complete(Unit) }
+        stopping.await()
+        assertTrue(visible().all { it.coverPath == null })
+        assertEquals(1, acquired)
+        assertFalse(File(files.tempDir, "cover-attempts.db").exists())
+        leases.forEach { lease -> assertThrows(IllegalStateException::class.java) { lease.openStream() } }
+    }
 
     @Test fun scanSavesCoversBeforeAnyBookOpensAndReleasesEveryLease() = runTest {
         add("epub"); add("pdf", BookFormat.PDF); add("text", BookFormat.TXT)

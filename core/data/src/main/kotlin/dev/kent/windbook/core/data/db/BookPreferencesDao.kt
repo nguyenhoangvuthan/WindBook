@@ -3,6 +3,7 @@ package dev.kent.windbook.core.data.db
 import androidx.room3.Dao
 import androidx.room3.Query
 import androidx.room3.Upsert
+import androidx.room3.Transaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -12,6 +13,11 @@ interface BookPreferencesDao {
 
     @Query("SELECT json FROM book_preferences WHERE book_id = :bookId")
     suspend fun json(bookId: String): String?
+
+    @Transaction
+    suspend fun transform(bookId: String, now: Long, change: (String?) -> String) {
+        upsert(BookPreferencesEntity(bookId,change(json(bookId)),now))
+    }
 
     @Upsert
     suspend fun upsert(entity: BookPreferencesEntity)

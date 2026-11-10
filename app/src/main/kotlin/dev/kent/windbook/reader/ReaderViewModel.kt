@@ -290,16 +290,19 @@ class ReaderViewModel @AssistedInject constructor(
         _progression.value = progression
         _chapterTitle.value = chapterTitle
         locatorUpdates.tryEmit(LocatorUpdate(locatorJson, progression, activeEncoding, openGeneration))
+        locationObserver?.invoke(locatorJson,progression,chapterTitle)
     }
+
+    internal fun readingSource(): BookSource? = activeSource
+    internal var locationObserver: ((String,Double,String?) -> Unit)? = null
 
     fun toggleOverlay() = _overlayVisible.update { !it }
 
     /** One combined preference write; the request also resets an already-paged local transform. */
     fun fitPdfPage() {
         val pdf = session as? PdfSession ?: return
-        val next = currentPrefs.copy(pdfLayout = PdfLayout.PAGED, cropMargins = false)
         viewModelScope.launch {
-            displayPrefs.set(bookId, next)
+            displayPrefs.update(bookId) {it.copy(pdfLayout=PdfLayout.PAGED,cropMargins=false)}
             if (session === pdf) {
                 _pdfFitRequestId.update { it + 1L }
                 _overlayVisible.value = false
@@ -314,8 +317,7 @@ class ReaderViewModel @AssistedInject constructor(
     fun setPdfZoom(zoom: Float, zoomX: Float) = updatePrefs { it.copy(zoom = zoom, zoomX = zoomX) }
 
     private fun updatePrefs(change: (BookDisplayPrefs) -> BookDisplayPrefs) {
-        val next = change(currentPrefs)
-        viewModelScope.launch { displayPrefs.set(bookId, next) }
+        viewModelScope.launch { displayPrefs.update(bookId,change) }
     }
 
     /** PDF pages are 0-based; progress uses page / pageCount so the last page reaches 100 %. */

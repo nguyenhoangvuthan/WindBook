@@ -13,6 +13,22 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class FolderScreenTest {
     @get:Rule val compose = createComposeRule()
+    @Test fun coverProgressDoesNotInventATotalDuringDiscovery() {
+        compose.setContent { FolderScreen(FolderUiState(progress =
+            dev.kent.windbook.core.data.folders.ScanProgress("run", "RUNNING", preparingCovers = true,
+                coversChecked = 3, coversDiscovered = 8)), FolderActions()) }
+        compose.onNodeWithTag("folder-list").performScrollToNode(hasText("3 covers checked"))
+        compose.onNodeWithText("3 covers checked").assertIsDisplayed()
+        compose.onNodeWithText("Covers checked: 3 / 8").assertDoesNotExist()
+    }
+
+    @Test fun coverProgressShowsTheKnownTotalAfterDiscoveryCloses() {
+        compose.setContent { FolderScreen(FolderUiState(progress =
+            dev.kent.windbook.core.data.folders.ScanProgress("run", "RUNNING", preparingCovers = true,
+                coversChecked = 3, coversDiscovered = 8, discoveryComplete = true)), FolderActions()) }
+        compose.onNodeWithTag("folder-list").performScrollToNode(hasText("Covers checked: 3 / 8"))
+        compose.onNodeWithText("Covers checked: 3 / 8").assertIsDisplayed()
+    }
     @Test fun scanRequiresGrantAndExtensionWhileDefaultsIncludeRecursion() {
         compose.setContent { FolderScreen(FolderUiState(), FolderActions()) }
         compose.onNodeWithTag("folder-list").performScrollToNode(hasText("Scan folder"))

@@ -25,18 +25,54 @@ class FolderCoverLoader(
     private val metadata: SourceMetadata,
     private val files: BookFileStore,
 ) : FolderBookEnricher {
-    override suspend fun enrich(runId: String) = withContext(Dispatchers.IO) {
-        var after = ""
-        while (true) {
+    private var recentRun: String? = null
+    private var attempts: CoverAttemptIndex? = null
+
+    private fun beginRun(runId: String) {
+        if (recentRun == runId) return
+        attempts?.close()
+        attempts = CoverAttemptIndex.open(File(files.tempDir, "cover-attempts.db"))
+        recentRun = runId
+    }
+
+    override suspend fun enrichBatch(runId: String, sourceIds: List<String>) = withContext(Dispatchers.IO) {
+        require(sourceIds.size <= 100)
+        beginRun(runId)
+        for (candidate in books.folderCoverCandidates(runId, sourceIds)) {
             currentCoroutineContext().ensureActive()
-            val batch = books.folderCoverCandidates(runId, after)
-            if (batch.isEmpty()) break
-            for (candidate in batch) {
-                currentCoroutineContext().ensureActive()
-                prepare(candidate)
-            }
-            after = batch.last().source.id
+            prepareRemembered(candidate)
         }
+    }
+
+    override suspend fun enrich(runId: String) = withContext(Dispatchers.IO) {
+        beginRun(runId)
+        try {
+            var after = ""
+            while (true) {
+                currentCoroutineContext().ensureActive()
+                val batch = books.folderCoverCandidates(runId, after)
+                if (batch.isEmpty()) break
+                for (candidate in batch) {
+                    currentCoroutineContext().ensureActive()
+                    prepareRemembered(candidate)
+                }
+                after = batch.last().source.id
+            }
+        } finally { cleanup(runId) }
+    }
+
+    override suspend fun cleanup(runId: String) = withContext(Dispatchers.IO) {
+        if (recentRun == runId) {
+            val old = attempts
+            attempts = null
+            recentRun = null
+            old?.close()
+        }
+    }
+
+    private suspend fun prepareRemembered(candidate: FolderCoverCandidate) {
+        if (attempts?.matches(candidate) == true && candidate.coverPath?.let { File(it).isFile } != false) return
+        prepare(candidate)
     }
 
     private suspend fun prepare(candidate: FolderCoverCandidate) {
@@ -73,6 +109,7 @@ class FolderCoverLoader(
                 val published = books.commitFolderMetadata(candidate, sha, info, staged?.path)
                 accepted = published.accepted
                 superseded = published.supersededCoverPath
+                published.committedCandidate?.let { attempts?.remember(it) }
             }
         } catch (cancelled: CancellationException) {
             throw cancelled

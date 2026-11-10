@@ -15,8 +15,10 @@ class DisplayPreferencesRepository(
     fun observe(bookId: String): Flow<BookDisplayPrefs> = dao.observeJson(bookId).map(BookPreferencesCodec::decode)
 
     suspend fun set(bookId: String, prefs: BookDisplayPrefs) {
-        val json = BookPreferencesCodec.encode(dao.json(bookId), prefs)
-        dao.upsert(BookPreferencesEntity(bookId, json, clock()))
+        dao.transform(bookId, clock()) { BookPreferencesCodec.encode(it, prefs) }
+    }
+    suspend fun update(bookId: String, change: (BookDisplayPrefs) -> BookDisplayPrefs) {
+        dao.transform(bookId,clock()) { previous -> BookPreferencesCodec.encode(previous, change(BookPreferencesCodec.decode(previous))) }
     }
 }
 

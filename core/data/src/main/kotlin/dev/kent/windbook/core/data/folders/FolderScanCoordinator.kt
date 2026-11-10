@@ -9,10 +9,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -29,7 +32,12 @@ data class ScanProgress(
     val directoryErrors: Long = 0,
     val currentPath: String = "",
     val preparingCovers: Boolean = false,
+    val coversChecked: Long = 0,
+    val coversDiscovered: Long = 0,
+    val discoveryComplete: Boolean = false,
 )
+
+private data class CoverProgress(val runId: String, val checked: Long = 0, val discovered: Long = 0, val discoveryComplete: Boolean = false)
 
 /** Bound as one app singleton; scans remain owned by the app when a screen closes. */
 class FolderScanCoordinator(
@@ -39,6 +47,7 @@ class FolderScanCoordinator(
     private val enricher: FolderBookEnricher = FolderBookEnricher { },
 ) {
     private val coverRun = MutableStateFlow<String?>(null)
+    private val coverProgress = MutableStateFlow<CoverProgress?>(null)
     private val controls = Mutex()
     private var active: Pair<String, Job>? = null
 
@@ -56,32 +65,61 @@ class FolderScanCoordinator(
                 var errors = 0L
                 var path = ""
                 var complete = false
-                suspend fun flush() {
+                var deliveredFirst = false
+                coverProgress.value = CoverProgress(run.id)
+                suspend fun flush(queue: Channel<String>? = null) {
                     currentCoroutineContext().ensureActive()
-                    if (repository.writeBatch(run.id, batch, examined, unreadable, errors, path) == null)
-                        throw CancellationException("Scan token expired")
+                    val committed = repository.writeCommittedBatch(run.id, batch, examined, unreadable, errors, path)
+                        ?: throw CancellationException("Scan token expired")
                     batch.clear()
+                    if (queue != null) {
+                        coverProgress.update { it?.copy(discovered = it.discovered + committed.coverSourceIds.size) }
+                        for (id in committed.coverSourceIds) queue.send(id)
+                    }
                 }
                 try {
-                    scanner.scan(folder.treeUri, root, repository.options(folder)).collect { event ->
-                        currentCoroutineContext().ensureActive()
-                        when (event) {
-                            is ScanEvent.Found -> {
-                                batch.add(event)
-                                path = event.relativePath
-                                if (batch.size == 100) flush()
+                    coroutineScope {
+                        // One consumer and a bounded identifier queue; no parallel snapshot/extractor.
+                        val queue = Channel<String>(64)
+                        val worker = launch {
+                            for (id in queue) {
+                                currentCoroutineContext().ensureActive()
+                                coverRun.value = run.id
+                                val ids = buildList {
+                                    add(id)
+                                    while (size < 16) add(queue.tryReceive().getOrNull() ?: break)
+                                }
+                                enricher.enrichBatch(run.id, ids)
+                                coverProgress.update { it?.copy(checked = it.checked + ids.size) }
                             }
-                            is ScanEvent.Examined -> examined = event.count
-                            is ScanEvent.Unreadable -> unreadable++
-                            is ScanEvent.DirectoryFailed -> errors++
-                            is ScanEvent.Finished -> complete = event.complete
                         }
-                        // Bound progress latency even for trees containing no selected files.
-                        if (event is ScanEvent.Examined && examined % 100 == 0L) flush()
+                        try {
+                            scanner.scan(folder.treeUri, root, repository.options(folder)).collect { event ->
+                                currentCoroutineContext().ensureActive()
+                                when (event) {
+                                    is ScanEvent.Found -> {
+                                        batch.add(event)
+                                        path = event.relativePath
+                                        if (!deliveredFirst || batch.size == 100) {
+                                            flush(queue)
+                                            deliveredFirst = true
+                                        }
+                                    }
+                                    is ScanEvent.Examined -> examined = event.count
+                                    is ScanEvent.Unreadable -> unreadable++
+                                    is ScanEvent.DirectoryFailed -> errors++
+                                    is ScanEvent.Finished -> complete = event.complete
+                                }
+                                if (event is ScanEvent.Examined && examined % 100 == 0L) flush(queue)
+                            }
+                            flush(queue)
+                            coverProgress.update { it?.copy(discoveryComplete = true) }
+                        } finally { queue.close() }
+                        worker.join()
                     }
-                    flush()
                     currentCoroutineContext().ensureActive()
                     coverRun.value = run.id
+                    // Discovery is now closed; a full keyset sweep safely catches changed/late rows.
                     enricher.enrich(run.id)
                     currentCoroutineContext().ensureActive()
                     coverRun.value = null
@@ -95,7 +133,11 @@ class FolderScanCoordinator(
                     repository.finishScan(run.id, "INCOMPLETE")
                 } finally {
                     if (coverRun.value == run.id) coverRun.value = null
-                    withContext(NonCancellable) { repository.finishScan(run.id, "INTERRUPTED") }
+                    if (coverProgress.value?.runId == run.id) coverProgress.value = null
+                    withContext(NonCancellable) {
+                        try { enricher.cleanup(run.id) }
+                        finally { repository.finishScan(run.id, "INTERRUPTED") }
+                    }
                 }
             }
             run.id
@@ -120,8 +162,13 @@ class FolderScanCoordinator(
         active = null
     }
 
-    fun observe(folderId: String): Flow<ScanProgress> = combine(repository.observeRun(folderId), coverRun) { run, covering ->
-        run?.progress()?.copy(preparingCovers = run.state == "RUNNING" && run.id == covering) ?: ScanProgress("", "IDLE")
+    fun observe(folderId: String): Flow<ScanProgress> = combine(repository.observeRun(folderId), coverRun, coverProgress) { run, covering, covers ->
+        run?.progress()?.copy(
+            preparingCovers = run.state == "RUNNING" && run.id == covering,
+            coversChecked = covers?.takeIf { it.runId == run.id }?.checked ?: 0,
+            coversDiscovered = covers?.takeIf { it.runId == run.id }?.discovered ?: 0,
+            discoveryComplete = covers?.takeIf { it.runId == run.id }?.discoveryComplete ?: false,
+        ) ?: ScanProgress("", "IDLE")
     }
 }
 

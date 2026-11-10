@@ -1,7 +1,10 @@
 # Cover speed and daily reading priorities: phased implementation plan
 
 Date: 2026-10-29
-Status: proposed; written design/plan approval pending. No implementation complete.
+Status: approved by the owner on 2026-10-29 ("Tôi đã duyệt xong").
+Execution starts on cover-speed; no increment is complete yet.
+Amended: 2026-11-10 for the owner-approved toolbar, left contents drawer, position
+slider, retained PDF double-tap zoom and explicitly requested embedded PDF contents.
 Design: `../specs/2026-10-29-reading-priorities-design.md`.
 
 ## Execution contract
@@ -167,6 +170,10 @@ Update AGENTS8/9 and roadmap in the same commits as the changes.
 
 ## B. Reading controls branch
 
+The November10 decisions extend this increment; they do not reorder it ahead of
+the cover-speed delivery gate. Apply sections3.2–3.3 of the amended design. The
+approval is already recorded; do not ask again about the same layout or PDF zoom.
+
 ### B1. Atomic reading preference model and persistence
 
 Add core/model/.../ReaderTypography.kt with nullable per-field overrides,
@@ -211,32 +218,123 @@ BookmarkRepository.kt. Register migration/entities in WindBookDatabase.kt and
 export schema8. Fields include id, book_id, fingerprint, locator_json,
 progression, label, text_encoding, created_at, updated_at, deleted_at.
 Bookmarks count as durable data in BookSourcesRepository/SourceRevisionPolicy.
+In the same migration add db/PdfContentsEntity.kt and PdfContentsDao.kt for the
+derived cache used by B4a: book_id, fingerprint, payload_version, status and
+contents_json, with a book foreign key. Cache identity includes book/revision and
+SHA; it must not assume SHA is globally unique. It does not count as durable data.
 
 RED tests: exact preservation of all v7 tables, duplicate-toggle idempotency,
 CRUD/tombstones, PDF locator unchanged, TXT encoding-separated anchors,
 source-revision split when only bookmarks exist, stale-session rejection,
 hidden/restored book references and invalid locators. Do not use page percentage
 as a substitute for an EPUB semantic locator.
+Verify cache absence on migration, identity isolation between revisions, and that
+a contents-only cache does not change the durable-data revision policy.
 
-### B4. Contents, search, jumps and return
+### B4. Toolbar, left contents drawer, seek, search and return
 
 New core/model/.../ReaderNavigation.kt for immutable TOC/search/jump records and
 bounded jump history; reader/.../ReaderNavigationController.kt adapts existing
-publication/navigator APIs. Add app/.../reader/ReaderNavigationSheet.kt and
-ReaderSearchViewModel.kt. Connect through ReaderHostFragment and ReaderScreen.
+publication/navigator APIs. Add app/.../reader/ReaderContentsDrawer.kt,
+ReaderPositionSlider.kt, ReaderPageJumpDialog.kt and ReaderSearchViewModel.kt.
+Connect through ReaderHostFragment, ReaderViewModel and ReaderScreen.
 PDF page jump goes through PdfSession and existing PDF locator/page callbacks;
-never open PDFs via Readium.
+ReaderEngine must never open PDFs via Readium. B4a provides cached PDF contents
+from a separate metadata-only preparation task.
 
-Proposed owned interface: contents():List<ContentsEntry>,
-search(query):Flow<SearchBatch>, goTo(locatorJson):Boolean. Keep streaming search
+ReaderOverlay gets Back/title/Contents/overflow in that order. Overflow exposes
+bookmark creation/list plus EPUB/TXT Search/Aa or PDF View. Keep existing encoding
+and Mark finished actions reachable. The left drawer owns its scrim and Back
+handling; only the toolbar button opens it, avoiding a new edge/double-tap gesture.
+Close overflow before opening another surface. After a valid contents jump close
+the drawer and return focus to the reader; preserve an invalid entry's current
+page and explain why it cannot navigate.
+
+Use a draft slider value scoped to the session. onValueChange changes only the
+preview; onValueChangeFinished submits one validated target. PDF pageIndex is
+round(fraction * (pageCount - 1)), with explicit zero/one-page and nonfinite guards.
+Do not replace saved PDF progression with this UI fraction. EPUB/TXT use stable
+publication positions/locators rather than guessed page counts. Disable seeking
+until targets exist, retain encoding/revision identity and discard stale drafts
+on book/layout change. Accessibility adjustments use the same commit boundary.
+
+Proposed owned interface: contents:StateFlow<ContentsState>,
+search(query):Flow<SearchBatch>, suspend goTo(locatorJson):NavigationResult.
+ContentsState distinguishes preparation, ready, empty, unavailable and failure.
+NavigationResult distinguishes completed, unchanged, stale and failed requests.
+Keep streaming search
 bounded/paged; do not collect the entire book/library into memory. History has10
 origins, pushes only successful deliberate jumps, and retains full locators.
+One completed slider gesture is one origin. Failed/same-location jumps and history
+returns add none; resolve asynchronous navigator completion before saving history.
 
-RED tests: nested/empty TOC; newest query cancels older work; bounded result pages;
-Vietnamese query/snippet handling; stale results after book close; invalid
+RED tests in ReaderNavigationTest, ReaderContentsDrawerTest, ReaderOverlayTest,
+ReaderPositionSliderTest and ReaderPageJumpDialogTest: nested/empty TOC; drawer
+opens from the button and Back closes it first; no background page turn through
+the scrim; per-format menu entries and localized accessibility labels; slider
+drag produces no jump/progress save until release, cancel has no effect, rapid
+drags/session replacement cannot navigate stale targets, first/last/single-page
+PDF mapping, invalid/empty page input, no render for every preview; history records
+one origin per successful gesture. Also cover newest query cancelling older work;
+bounded result pages; Vietnamese query/snippet handling; stale results after book close; invalid
 destinations leave the current page intact; PDF page bounds; same TXT encoding;
 back history capacity and page-turn exclusion. Device tests prove exact passage
 after TOC/search/bookmark jumps and Back, including typography changes and API31 PDF.
+Add actual API31/API36 device gates for the left drawer/slider, PDF physical page
+labels, center-tap overlay, double-tap zoom in paged/vertical modes, annotation
+handle drags, system Back, rotation and EN/VI at130/200% font size. Measure PDF
+navigation on a large synthetic document; dragging must not queue native renders.
+
+### B4a. PDF contents capture, cache and existing-library backfill
+
+Reuse the installed Readium3.4.0 adapter; no dependency change. Inspection of the
+installed AARs confirms PdfDocument.outline, PdfParser conversion to contents
+links and Pdfium's zero→one-based page conversion. Evidence is retained under
+.superpowers/checks/reading-controls-layout/. Prove actual destinations with a
+synthetic PDF outline fixture before wiring production navigation.
+
+Files: core/model/.../MetadataExtractor.kt (optional typed contents result), new
+PdfContents.kt; core/data/.../PdfContentsRepository.kt, importer/BookImporter.kt,
+folders/FolderRepository.kt and BookSourcesRepository.kt; reader/.../
+ReadiumMetadataExtractor.kt, source/SourceMetadata.kt and new metadata/
+PdfContentsExtractor.kt and MetadataWorkCoordinator.kt; app/.../reader/
+ReaderViewModel.kt, folders/FolderCoverLoader.kt and di/AppModule.kt. Wire a shared
+coordinator into import, source enrichment and backfill so metadata/cover extraction
+remains serial; the current SourceMetadata constructs its own extractor and must
+receive the shared coordinator too. Acquire the coordinator once per operation,
+avoiding nested acquisition by the common extractor. Reuse the B3 cache schema.
+
+Owned result separates Ready(entries), Empty, Unavailable/TooLarge and Failure;
+absence means not prepared. Each entry contains a stable tree ID, parent/order,
+label and optional validated one-based page, not an arbitrary external URL.
+Keep grouping nodes and valid descendants when a parent lacks a destination.
+Proposed normalization limits:10000 nodes,32 levels,1024 characters per label and
+1MiB encoded cache. Exceeding a bound yields an explicit unavailable result,
+not a truncated tree presented as complete. Iterate WindBook normalization with
+bounds; native parsing still needs device memory/time verification.
+
+Capture contents from the existing publication before metadata extraction closes
+it; persist only against the same verified book/SHA as the metadata commit.
+For pre-existing PDFs with covers, Contents can enqueue metadata-only backfill
+through the same serialized coordinator; rescan can request missing caches too.
+This path uses NoCoverPdfFactory and does not call pdfCoverWebp, perform another
+cover pass, reopen the reader or change reading data. Deduplicate in-flight work,
+retain known-empty results, close leases/publications on failure/cancellation,
+and reject late results after Stop/disconnect/source or session change.
+
+RED tests in PdfContentsTest, PdfContentsRepositoryTest and existing importer/
+source/loader suites: nested Unicode labels, first/last pages, grouping nodes,
+invalid/out-of-range/external destinations, empty versus not-prepared/failure,
+normalization limits, exact immutable-SHA cache identity, changed-source rejection,
+one preparation for repeated opens, existing-cover backfill without cover render,
+serial extraction during scans, retry, cancellation and resource cleanup. Preserve
+all book IDs, source guards, notes/progress/preferences and legacy PDF locators.
+
+Add reader/src/androidTest/.../PdfContentsDeviceTest.kt using synthetic PDFs with
+nested/no/invalid outline destinations. On API31/36, verify exact framework page
+after selecting first/nested/last entries, cache reuse after restart, existing PDF
+backfill, and unchanged native-render counts during metadata preparation. Capture
+sampled PSS/timings; retain the large-scan PDF safety and cover-speed regression gates.
 
 ### B5. Review and deliver
 
@@ -341,14 +439,11 @@ Proposed0.1.9/code10 APK/checksum in publish/. Update AGENTS/roadmap/checklists 
 actual results and owner phone-test status. Future scan notes, sync, additional
 formats and full-M2/M3/M4 features remain outside this plan.
 
-## Handoff and approval
+## Approval and execution checkpoint
 
-Owner direction and the cover-delay clarification are recorded. Only diagnostic
-source/document reads have run in this session. No new code/tests/APK or speed
-improvement exists yet; no test suite or device gate was run.
-
-Approve the companion written design, this phased plan and sequential execution
-with independent review per increment. This is the explicit repository gate;
-routine implementation choices within approved constraints do not need repeated
-permission. A materially changed scope/dependency, destructive integration or any
-push remains a separate decision.
+The owner approved the written design, this plan and sequential execution with
+independent review per increment on 2026-10-29 ("Tôi đã duyệt xong").
+Cover-speed environment/harness work has started; baseline measurement,
+production changes and release gates are tracked in the ignored execution ledger.
+Routine implementation choices within approved constraints need no repeated
+permission. Material scope/dependency changes and any push remain separate decisions.

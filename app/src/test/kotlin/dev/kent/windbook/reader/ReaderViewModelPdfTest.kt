@@ -94,9 +94,11 @@ class ReaderViewModelPdfTest {
         dao.upsert(BookPreferencesEntity("a", """{"pdfLayout":"VERTICAL","cropMargins":true,"pdfZoom":2,"pdfZoomX":0.5,"future":"keep"}""", 1))
         val writes = mutableListOf<BookPreferencesEntity>()
         prefs = DisplayPreferencesRepository(object : dev.kent.windbook.core.data.db.BookPreferencesDao by dao {
-            override suspend fun upsert(entity: BookPreferencesEntity) {
-                writes.add(entity)
-                dao.upsert(entity)
+            override suspend fun transform(bookId: String,now: Long,change: (String?) -> String) {
+                // Observe the atomic write boundary; Room delegates its internal upsert directly.
+                dao.transform(bookId,now) {previous ->
+                    change(previous).also {writes.add(BookPreferencesEntity(bookId,it,now))}
+                }
             }
         })
         val model = vm(PageSize(400f, 600f))

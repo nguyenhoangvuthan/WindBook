@@ -77,6 +77,8 @@ import kotlinx.coroutines.launch
 const val PDF_VERTICAL_TAG = "pdf-vertical"
 const val PDF_PAGED_TAG = "pdf-paged"
 
+data class PdfPageJump(val id: Long,val page: Int)
+
 private const val DOUBLE_TAP_ZOOM = 2.5f
 private val PagedSurround = Color(0xFF141210)
 
@@ -99,8 +101,10 @@ fun PdfReaderView(
     annotations: PdfAnnotationUi? = null,
     reveal: PdfRevealRequest? = null,
     fitRequestId: Long = 0L,
+    pageJump: PdfPageJump? = null,
+    onPageJumpApplied: (Long,Boolean) -> Unit = {_,_->},
 ) {
-    var currentPage by rememberSaveable(source, reveal?.requestId) { mutableIntStateOf((reveal?.anchor?.page ?: initialPage).coerceIn(0, source.pageCount - 1)) }
+    var currentPage by rememberSaveable(source) { mutableIntStateOf(initialPage.coerceIn(0, source.pageCount - 1)) }
     var revealing by remember(source,reveal?.requestId) { mutableStateOf(reveal!=null) }
     var plan by remember(source, cropMargins) { mutableStateOf<CropPlan?>(null) }
     val pageCrops = remember(source, cropMargins) { mutableStateMapOf<Int, CropBox>() }
@@ -122,13 +126,14 @@ fun PdfReaderView(
         if(reveal!=null && page!=reveal.anchor.page) revealing=false
         onPageChanged(page)
     }
+    val startPage=if(revealing && reveal!=null) reveal.anchor.page else currentPage
     key(reveal?.requestId) { when (layout) {
         PdfLayout.VERTICAL -> VerticalPages(
-            source, currentPage, cropFor, resolveCrop, report, onCenterTap, modifier,
+            source, startPage, cropFor, resolveCrop, report, onCenterTap, modifier,
             if(revealing) 1f else initialZoom, if(revealing) 0f else initialZoomX,
-            { z,x -> if(!revealing) onZoomChanged(z,x) }, annotations, reveal?.anchor?.takeIf { revealing },
+            { z,x -> if(!revealing) onZoomChanged(z,x) }, annotations, reveal?.anchor?.takeIf { revealing }, pageJump,onPageJumpApplied,
         )
-        PdfLayout.PAGED -> PagedPages(source, currentPage, cropFor, resolveCrop, report, onCenterTap, modifier,annotations,fitRequestId)
+        PdfLayout.PAGED -> PagedPages(source, startPage, cropFor, resolveCrop, report, onCenterTap, modifier,annotations,fitRequestId,pageJump,onPageJumpApplied)
     } }
 }
 
@@ -146,9 +151,17 @@ private fun VerticalPages(
     onZoomChanged: (Float, Float) -> Unit,
     annotations: PdfAnnotationUi?,
     revealAnchor: dev.kent.windbook.core.model.PdfTextAnchor?,
+    pageJump: PdfPageJump?,onPageJumpApplied: (Long,Boolean)->Unit,
 ) {
     val gesturesLocked by rememberUpdatedState(annotations?.locked==true)
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = startPage)
+    LaunchedEffect(pageJump?.id) {
+        val jump=pageJump ?: return@LaunchedEffect
+        if(jump.page !in 0 until source.pageCount) {onPageJumpApplied(jump.id,false);return@LaunchedEffect}
+        listState.scrollToItem(jump.page)
+        onPageChanged(jump.page)
+        onPageJumpApplied(jump.id,true)
+    }
     val hScroll = rememberScrollState()
     val scope = rememberCoroutineScope()
     // Read once: later saves come back through the same parameters and must not reset a gesture.
@@ -339,6 +352,7 @@ private fun PagedPages(
     modifier: Modifier,
     annotations: PdfAnnotationUi?,
     fitRequestId: Long,
+    pageJump: PdfPageJump?,onPageJumpApplied: (Long,Boolean)->Unit,
 ) {
     val gesturesLocked by rememberUpdatedState(annotations?.locked==true)
     val pager = rememberPagerState(initialPage = startPage) { source.pageCount }
@@ -346,6 +360,14 @@ private fun PagedPages(
     var zoom by remember { mutableFloatStateOf(1f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
     val density = LocalDensity.current
+
+    LaunchedEffect(pageJump?.id) {
+        val jump=pageJump ?: return@LaunchedEffect
+        if(jump.page !in 0 until source.pageCount) {onPageJumpApplied(jump.id,false);return@LaunchedEffect}
+        pager.scrollToPage(jump.page)
+        onPageChanged(jump.page)
+        onPageJumpApplied(jump.id,true)
+    }
 
     LaunchedEffect(fitRequestId) {
         zoom = 1f

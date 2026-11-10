@@ -73,7 +73,7 @@ class BookSourcesRepository(
             is BookSource.Owned -> db.sourceDao().forBook(bookId).firstOrNull { it.localPath == source.path }
         }
         val match = books.findBySha(sha)?.takeIf { it.id != bookId }
-        val hasData = db.annotationDao().hasAnnotations(bookId) || db.sourceDao().hasTextProgress(bookId) || books.progress(bookId) != null || db.bookPreferencesDao().json(bookId) != null ||
+        val hasData = db.bookmarkDao().hasBookmarks(bookId) || db.annotationDao().hasAnnotations(bookId) || db.sourceDao().hasTextProgress(bookId) || books.progress(bookId) != null || db.bookPreferencesDao().json(bookId) != null ||
             book.lastOpenedAt != null || book.status != "TO_READ"
         val proposed = SourceRevisionPolicy.decide(book.sha256, sha, match != null, hasData, match?.deletedAt != null)
         // A background cover must not tombstone an ID already captured by a pending reader.
@@ -117,6 +117,16 @@ class BookSourcesRepository(
         return db.sourceDao().folderCoverCandidates(runId, afterSourceId, limit).map { it.candidate(runId) }
     }
 
+    suspend fun folderCoverCandidate(runId: String, sourceId: String): dev.kent.windbook.core.data.folders.FolderCoverCandidate? =
+        db.sourceDao().folderCoverCandidate(runId, sourceId)?.candidate(runId)
+
+    suspend fun folderCoverCandidates(runId: String, sourceIds: List<String>): List<dev.kent.windbook.core.data.folders.FolderCoverCandidate> {
+        require(sourceIds.size <= 100)
+        if (sourceIds.isEmpty()) return emptyList()
+        val rows = db.sourceDao().folderCoverBatch(runId, sourceIds).associateBy { it.source.id }
+        return sourceIds.distinct().mapNotNull { rows[it]?.candidate(runId) }
+    }
+
     /** Stop/disconnect/revision changes and publication share the same database transaction. */
     suspend fun commitFolderMetadata(candidate: dev.kent.windbook.core.data.folders.FolderCoverCandidate,
         sha256: String, metadata: ExtractedMetadata, coverPath: String?): dev.kent.windbook.core.data.folders.FolderMetadataCommit = db.withWriteTransaction {
@@ -134,8 +144,10 @@ class BookSourcesRepository(
         val book = db.libraryDao().findById(target) ?: return@withWriteTransaction dev.kent.windbook.core.data.folders.FolderMetadataCommit(false)
         db.libraryDao().update(book.copy(title = metadata.title?.takeIf { it.isNotBlank() } ?: book.title,
             author = metadata.author ?: book.author, coverPath = coverPath ?: book.coverPath, updatedAt = clock()))
+        metadata.pdfContents?.let { PdfContentsRepository(db).saveLocked(target,sha256,it) }
         dev.kent.windbook.core.data.folders.FolderMetadataCommit(true,
-            book.coverPath?.takeIf { coverPath != null && it != coverPath })
+            book.coverPath?.takeIf { coverPath != null && it != coverPath },
+            db.sourceDao().folderCoverCandidate(candidate.runId, candidate.source.id)?.candidate(candidate.runId))
     }
 
     /** Include hidden/revision rows: their images remain durable reading data. */
@@ -145,6 +157,8 @@ class BookSourcesRepository(
         val book = db.libraryDao().findIncludingHidden(bookId) ?: return@withWriteTransaction
         db.libraryDao().update(book.copy(title = metadata.title?.takeIf { it.isNotBlank() } ?: book.title,
             author = metadata.author ?: book.author, coverPath = coverPath ?: book.coverPath, updatedAt = clock()))
+        book.sha256?.let {sha -> metadata.pdfContents?.let { PdfContentsRepository(db).saveLocked(bookId,sha,it) }}
+        Unit
     }
 
     suspend fun hideExternalBook(bookId: String) = db.libraryDao().hideExternal(bookId, clock())

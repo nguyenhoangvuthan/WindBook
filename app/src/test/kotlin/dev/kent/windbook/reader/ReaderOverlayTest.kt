@@ -99,6 +99,7 @@ class ReaderOverlayTest {
                 onPdfLayoutChange = { layouts += it },
             )
         }
+        compose.onNodeWithContentDescription("More reading options").performClick()
         compose.onNodeWithContentDescription("View").performClick()
         compose.onNodeWithText("Page by page").performClick()
         assertEquals(listOf(PdfLayout.PAGED), layouts)
@@ -114,6 +115,7 @@ class ReaderOverlayTest {
                 onCropMarginsChange = { crops += it },
             )
         }
+        compose.onNodeWithContentDescription("More reading options").performClick()
         compose.onNodeWithContentDescription("View").performClick()
         compose.onNodeWithText("Crop margins").assertIsOn().performClick()
         assertEquals(listOf(false), crops)
@@ -127,6 +129,7 @@ class ReaderOverlayTest {
                 pdfDisplay = EffectiveDisplay(PdfLayout.VERTICAL, cropMargins = true),
             )
         }
+        compose.onNodeWithContentDescription("More reading options").performClick()
         compose.onNodeWithContentDescription("View").performClick()
         compose.onNodeWithText("Vertical scroll").assertIsDisplayed()
         compose.onNodeWithText("Page by page").assertIsDisplayed()
@@ -140,7 +143,8 @@ class ReaderOverlayTest {
                 pdfDisplay = EffectiveDisplay(PdfLayout.PAGED, false), onFitPdfPage = { fits++ })
         }
         repeat(2) {
-            compose.onNodeWithContentDescription("View").performClick()
+            compose.onNodeWithContentDescription("More reading options").performClick()
+        compose.onNodeWithContentDescription("View").performClick()
             compose.onNodeWithText("Fit page").performClick()
         }
         assertEquals(2, fits)

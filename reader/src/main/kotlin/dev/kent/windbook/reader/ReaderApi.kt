@@ -10,6 +10,7 @@ enum class NavigationSurface { PUBLICATION, PDF, IMAGES }
 
 interface ReaderSession : AutoCloseable {
     val surface: NavigationSurface get() = NavigationSurface.PUBLICATION
+    suspend fun fingerprint(): String? = null
     val format: BookFormat
     val textEncoding: dev.kent.windbook.reader.formats.TextEncoding? get() = null
 }

@@ -236,6 +236,18 @@ class PdfReaderViewTest {
         settle(); assertEquals(4,pages.last())
     }
 
+    @Test fun pageJumpAfterNoteRevealSurvivesClearingTheRevealAndRequest() {
+        var reveal by mutableStateOf<PdfRevealRequest?>(PdfRevealRequest("note",dev.kent.windbook.core.model.PdfTextAnchor(page=4,width=400f,height=600f,rects=listOf(dev.kent.windbook.core.model.PdfTextRect(.1f,.1f,.2f,.2f)),quote="Synthetic")))
+        var jump by mutableStateOf<PdfPageJump?>(null)
+        compose.setContent {CompositionLocalProvider(LocalKeyEventDispatcher provides dispatcher) {
+            PdfReaderView(book,PdfLayout.PAGED,false,0,{pages+=it},{},reveal=reveal,pageJump=jump,
+                onPageJumpApplied={_,success->assertTrue(success);reveal=null;jump=null})}}
+        compose.waitForIdle()
+        compose.runOnIdle {jump=PdfPageJump(1,12)}
+        compose.waitForIdle()
+        assertEquals(12,pages.last())
+    }
+
     @Test fun verticalStartsAtTheSavedPage() {
         show(layout = PdfLayout.VERTICAL, initialPage = 7)
         assertEquals(7, pages.last())

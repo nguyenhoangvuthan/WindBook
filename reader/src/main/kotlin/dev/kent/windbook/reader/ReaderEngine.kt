@@ -75,6 +75,7 @@ internal class ReadiumReaderSession(
     private val preparation: dev.kent.windbook.reader.source.SessionLease? = null,
     override val textEncoding: dev.kent.windbook.reader.formats.TextEncoding? = null,
 ) : ReaderSession {
+    override suspend fun fingerprint(): String? = source?.fingerprint()
     private val closed = java.util.concurrent.atomic.AtomicBoolean()
     override fun close() {
         if (closed.compareAndSet(false, true)) closeReaderResources {

@@ -24,10 +24,23 @@ Next-priority direction (2026-10-29): owner requested fixing slow scan/update co
 appearance first, followed by typography/core navigation, offline backup/export,
 and EPUB notes. Written scope is proposed in
 `../specs/2026-10-29-reading-priorities-design.md`, with phased plan
-`2026-10-29-reading-priorities.md`; written approval is pending. These are focused
-subsets of M2/M3/local-M7/M4, not completed milestones. No implementation or new
-performance result is claimed. Cloud sync, scan notes and paused formats remain
+`2026-10-29-reading-priorities.md`; both approved on October29 ("Tôi đã duyệt xong"). These are focused
+subsets of M2/M3/local-M7/M4, not completed milestones. Cover-speed and core reading controls are implemented and delivered cumulatively in0.1.7;
+benchmark and validation limits are recorded in their testing checklists. Cloud sync, scan notes and paused formats remain
 deferred.
+
+Reading-controls amendment (2026-11-10): owner approved Back/title/Contents/overflow,
+a left contents drawer, bottom position slider and PDF current/total page entry,
+with PDF double-tap retaining zoom. The owner explicitly added embedded PDF
+contents via the existing metadata adapter. EPUB/TXT search remains in scope;
+PDF full-text search remains deferred. Updated reading-priorities design3.2–3.3
+and planB3–B4a record the cache/backfill and verification contracts. Implemented in0.1.7: toolbar/left drawer/slider, PDF page entry, revision-bound bookmarks,
+EPUB/TXT bounded search and appearance, embedded PDF outline import/backfill.
+CI473 JVM and independent review pass; API31/36 checks are recorded in
+`docs/testing/reading-controls-checklist.md`. This is a focused M2/M3 subset.
+The retained cover-speed change reduces first-cover median1218→454ms and fresh scan
+7752→6804ms on240 synthetic EPUBs in five paired emulator trials; no phone or
+owner-library speed claim. Offline backup/export and EPUB notes remain next.
 
 Folder source increment: Tasks 1–7 implemented and independently reviewed; Task 8 integration/device evidence is recorded in the folder checklist; independent whole-branch review and the consolidated fix-wave rereview are complete (Approved at `b4b702c`). EPUB/PDF/TXT source reading is available; TXT is independently reviewed at `98425b3`. On 2026-10-24 the owner paused FB2/CBZ/CBR/MOBI/AZW3 and prioritized keeping the status bar visible during fullscreen reading. Remaining format tasks in `2026-10-21-ebook-format-readers.md` are deferred, not complete.
 

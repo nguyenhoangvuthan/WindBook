@@ -51,6 +51,8 @@ import dev.kent.windbook.ui.components.uppercaseForUi
 @Composable
 fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel(), onFolders: () -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val typography by viewModel.readingTypography.collectAsStateWithLifecycle()
+    var readingDefaults by rememberSaveable {mutableStateOf(false)}
     LifecycleStartEffect(viewModel) {
         viewModel.refreshLanguage()
         onStopOrDispose { }
@@ -58,13 +60,15 @@ fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel(), onFolders: () 
     SettingsScreen(state, onLanguageChange = viewModel::setLanguage, onFolders = onFolders,
         onScanRecursiveChange = { viewModel.setScanRecursive(it) },
         onScanExtensionToggle = { viewModel.toggleScanExtension(it) },
-        onScanExtensionsChange = { viewModel.setScanExtensions(it) })
+        onScanExtensionsChange = { viewModel.setScanExtensions(it) },onReadingDefaults={readingDefaults=true})
+    if(readingDefaults) dev.kent.windbook.reader.ReaderTypographySheet(typography,typography,{readingDefaults=false},
+        {value,_->viewModel.setReadingTypography(value)},globalOnly=true)
 }
 
 @Composable
 fun SettingsScreen(state: SettingsUiState, onLanguageChange: (AppLanguage) -> Unit,
     onFolders: () -> Unit = {}, onScanRecursiveChange: (Boolean) -> Unit = {},
-    onScanExtensionToggle: (BookFormat) -> Unit = {}, onScanExtensionsChange: (Set<BookFormat>) -> Unit = {}) {
+    onScanExtensionToggle: (BookFormat) -> Unit = {}, onScanExtensionsChange: (Set<BookFormat>) -> Unit = {}, onReadingDefaults: (() -> Unit)? = null) {
     var showLicences by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     Column(
@@ -96,6 +100,10 @@ fun SettingsScreen(state: SettingsUiState, onLanguageChange: (AppLanguage) -> Un
                     RadioButton(selected = language == state.language, onClick = null)
                 }
             }
+        }
+
+        if(onReadingDefaults!=null) SettingsGroup(stringResource(R.string.reader_defaults)) {
+            TextButton(onClick=onReadingDefaults,modifier=Modifier.padding(horizontal=16.dp).heightIn(min=48.dp)) {Text(stringResource(R.string.reader_appearance))}
         }
 
         SettingsGroup(stringResource(R.string.settings_folder_scanning)) {

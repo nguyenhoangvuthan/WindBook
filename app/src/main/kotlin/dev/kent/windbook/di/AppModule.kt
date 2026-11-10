@@ -61,7 +61,25 @@ object AppModule {
 
     @Provides @Singleton
     fun importer(db: WindBookDatabase, files: BookFileStore, readium: ReadiumServices): BookImporter =
-        BookImporter(db.libraryDao(), files, ReadiumMetadataExtractor(readium))
+        BookImporter(db.libraryDao(), files, ReadiumMetadataExtractor(readium), contents = dev.kent.windbook.core.data.PdfContentsRepository(db))
+
+    @Provides @Singleton
+    fun navigationAccess(): dev.kent.windbook.reader.ReaderNavigationAccess = dev.kent.windbook.reader.DefaultReaderNavigationAccess
+
+    @Provides @Singleton
+    fun bookmarks(db: WindBookDatabase) = dev.kent.windbook.core.data.BookmarkRepository(db)
+
+    @Provides @Singleton
+    fun pdfContents(db: WindBookDatabase) = dev.kent.windbook.core.data.PdfContentsRepository(db)
+
+    @Provides @Singleton
+    fun pdfContentsExtractor(readium: ReadiumServices) = dev.kent.windbook.reader.metadata.PdfContentsExtractor(readium)
+
+    @Provides @Singleton
+    fun bookTypography(db: WindBookDatabase) = dev.kent.windbook.core.data.BookTypographyRepository(db.bookPreferencesDao())
+
+    @Provides @Singleton
+    fun readerPreferences(@ApplicationContext context: Context) = dev.kent.windbook.core.data.ReaderPreferencesRepository(context.libraryDataStore)
 
     @Provides @Singleton
     fun libraryRepository(db: WindBookDatabase, files: BookFileStore): LibraryRepository =

@@ -19,6 +19,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -83,6 +84,20 @@ class FolderViewModel @Inject constructor(
         select(id, folder.displayLocation, summary.options, folder.disconnectedAt == null)
     }
 
+    /**
+     * Opening the folder manager without a target shows the folder that is being scanned (for example one just added
+     * from the Library's Add books action), otherwise the most recently scanned connected folder.
+     * A folder picked or typed in the meantime always wins.
+     */
+    fun selectLatest(): Job = rootCommand(null) {
+        val folders = repository.observeFolders().first()
+        val target = folders.firstOrNull { scans.observe(it.id).first().state == "RUNNING" }
+            ?: folders.filter { it.connected }.maxByOrNull { it.lastScanAt ?: 0L }
+            ?: return@rootCommand
+        val folder = db.folderDao().find(target.id) ?: return@rootCommand
+        select(target.id, folder.displayLocation, target.options, folder.disconnectedAt == null)
+    }
+
     fun requestFolder(folderId: String? = state.value.resolvedFolderId): Job {
         val optionsAtClick = state.value.options.availableFormats().takeIf { defaultsReady.isCompleted || editedOptions }
         return rootCommand(folderId) {
@@ -105,7 +120,8 @@ class FolderViewModel @Inject constructor(
         mutable.update { if (it.pickerRequest?.id == requestId) it.copy(pickerRequest = null) else it }
     }
 
-    fun onTreeGranted(uri: Uri, flags: Int, requestId: Long) = command {
+    // The grant is already held by Android; saving it and starting the scan must finish even if the user leaves the screen.
+    fun onTreeGranted(uri: Uri, flags: Int, requestId: Long) = command(survivesScreenExit = true) {
         val request = state.value.pickerRequest?.takeIf {
             it.id == requestId && it.selectionVersion == selectionVersion
         } ?: return@command
@@ -225,7 +241,8 @@ class FolderViewModel @Inject constructor(
         }
     }
 
-    private fun command(action: suspend () -> Unit) = viewModelScope.launch {
+    private fun command(survivesScreenExit: Boolean = false, action: suspend () -> Unit) =
+        viewModelScope.launch(if (survivesScreenExit) NonCancellable else kotlin.coroutines.EmptyCoroutineContext) {
         commands.withLock {
             mutable.update { it.copy(busy = true, message = null) }
             try { action() }

@@ -111,6 +111,42 @@ class FolderViewModelTest {
         } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close() }
     }
 
+    @Test fun managerEntrySelectsTheFolderWhoseScanIsRunning() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = WindBookDatabase.inMemory(context, AndroidSQLiteDriver())
+        val repo = FolderRepository(db, { emptySet() }, {}, { _, _ -> })
+        val idle = repo.save("content://folders.test/tree/a", "A idle", ScanOptions())
+        val busy = repo.save("content://folders.test/tree/b", "B busy", ScanOptions())
+        val coordinator = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow { awaitCancellation() } }), backgroundScope)
+        val vm = FolderViewModel(repo, coordinator, db, context, RepositoryFolderObservations(repo, coordinator), unusedOpener, preferences(backgroundScope))
+        val store = ViewModelStore().also { it.put("folder", vm) }
+        try {
+            coordinator.start(busy)
+            vm.selectLatest().join()
+            assertNotEquals(idle, vm.state.value.resolvedFolderId)
+            assertEquals(busy, vm.state.value.resolvedFolderId)
+            assertEquals("B busy", vm.state.value.selectedLocation)
+        } finally { store.clear(); vm.viewModelScope.coroutineContext[Job]?.join(); backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close() }
+    }
+
+    @Test fun leavingRightAfterTheGrantStillStartsTheBackgroundScan() = runTest {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val db = WindBookDatabase.inMemory(context, AndroidSQLiteDriver())
+        val repo = FolderRepository(db, { emptySet() }, {}, { _, _ -> })
+        val coordinator = FolderScanCoordinator(repo, FolderScanner(TreeAccess { _, _ -> flow { awaitCancellation() } }), backgroundScope)
+        val vm = FolderViewModel(repo, coordinator, db, context, RepositoryFolderObservations(repo, coordinator), unusedOpener, preferences(backgroundScope))
+        val store = ViewModelStore().also { it.put("folder", vm) }
+        try {
+            repo.observeFolders().first() // open the database before the screen is torn down
+            vm.requestFolder().join()
+            val grant = vm.onTreeGranted(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION, requireNotNull(vm.state.value.pickerRequest).id)
+            store.clear() // the user backs out of the Folder screen while the grant is being processed
+            grant.join()
+            val saved = repo.observeFolders().first().single()
+            assertEquals("RUNNING", coordinator.observe(saved.id).first().state)
+        } finally { vm.viewModelScope.coroutineContext[Job]?.join(); backgroundScope.coroutineContext[Job]?.cancelAndJoin(); db.close() }
+    }
+
     @Test fun typedExactDevicePathReusesItsHeldRootGrant() = runTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val db = WindBookDatabase.inMemory(context, AndroidSQLiteDriver())

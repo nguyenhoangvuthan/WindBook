@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -186,31 +187,42 @@ internal fun PdfTextPageOverlay(source: PdfPageSource,page: Int,crop: CropBox,si
             Popup(popupPositionProvider=positionProvider,onDismissRequest=ui.onClear,
                 properties=androidx.compose.ui.window.PopupProperties(dismissOnClickOutside=false)) {
                 Surface(shape=MaterialTheme.shapes.small,shadowElevation=6.dp,color=MaterialTheme.colorScheme.surfaceContainerHigh) {
-                    var colors by remember(anchor,ui.activeIds) { mutableStateOf(false) }
-                    Column(Modifier.padding(horizontal=6.dp,vertical=4.dp)) {
-                        if(active.size>1) active.forEach { record ->
-                            Text(record.body ?: record.quote.take(30),modifier=Modifier.clickable {ui.onExisting(listOf(record.id))}.padding(4.dp))
-                        } else {
-                            Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                                Text(stringResource(R.string.notes_color),fontSize=18.sp,modifier=Modifier.clickable(enabled=!ui.saving) {colors=!colors})
-                                Text(stringResource(R.string.notes_note),fontSize=18.sp,modifier=Modifier.clickable(enabled=!ui.saving,onClick=ui.onNote))
-                            }
-                            ui.onAi?.let {action -> androidx.compose.material3.TextButton(onClick=action,enabled=!ui.saving) {Text(stringResource(R.string.ai_translate))} }
-                            if(colors) Row(horizontalArrangement=Arrangement.spacedBy(6.dp),modifier=Modifier.padding(top=6.dp)) {
-                                AnnotationColor.entries.forEach { color ->
-                                    val label=stringResource(color.labelRes())
-                                    Box(Modifier.size(24.dp).background(color.toComposeColor(),CircleShape)
-                                        .clickable(enabled=!ui.saving) {ui.onColor(color)}.semantics {contentDescription=label; this.selected=color==(active.singleOrNull()?.color ?: AnnotationColor.GOLD)})
-                                }
-                            }
-                            active.singleOrNull()?.let { record ->
-                                Text(stringResource(R.string.notes_delete),modifier=Modifier.clickable(enabled=!ui.saving) {ui.onDelete(record.id)}.padding(top=4.dp))
-                            }
-                            if(ui.failed) Text(stringResource(R.string.notes_failed),color=MaterialTheme.colorScheme.error)
-                        }
-                    }
+                    PdfSelectionActions(active,ui)
                 }
             }
+        }
+    }
+}
+
+/**
+ * The action bar shown over a text selection or a tapped highlight. Every action is the same kind of button on one
+ * left-aligned wrapping bar, so labels share one inset and row height instead of mixing bare text with buttons.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun PdfSelectionActions(active: List<PdfTextAnnotation>,ui: PdfAnnotationUi) {
+    var colors by remember(active,ui.activeIds) { mutableStateOf(false) }
+    val padding=PaddingValues(horizontal=10.dp)
+    Column(Modifier.padding(horizontal=4.dp,vertical=2.dp)) {
+        if(active.size>1) active.forEach { record ->
+            TextButton(onClick={ui.onExisting(listOf(record.id))},contentPadding=padding) {Text(record.body ?: record.quote.take(30))}
+        } else {
+            FlowRow(verticalArrangement=Arrangement.Center) {
+                TextButton(onClick={colors=!colors},enabled=!ui.saving,contentPadding=padding) {Text(stringResource(R.string.notes_color))}
+                TextButton(onClick=ui.onNote,enabled=!ui.saving,contentPadding=padding) {Text(stringResource(R.string.notes_note))}
+                ui.onAi?.let {action -> TextButton(onClick=action,enabled=!ui.saving,contentPadding=padding) {Text(stringResource(R.string.ai_translate))} }
+                active.singleOrNull()?.let {record ->
+                    TextButton(onClick={ui.onDelete(record.id)},enabled=!ui.saving,contentPadding=padding) {Text(stringResource(R.string.notes_delete))}
+                }
+            }
+            if(colors) Row(horizontalArrangement=Arrangement.spacedBy(10.dp),modifier=Modifier.padding(horizontal=10.dp,vertical=6.dp)) {
+                AnnotationColor.entries.forEach { color ->
+                    val label=stringResource(color.labelRes())
+                    Box(Modifier.size(28.dp).background(color.toComposeColor(),CircleShape)
+                        .clickable(enabled=!ui.saving) {ui.onColor(color)}.semantics {contentDescription=label; this.selected=color==(active.singleOrNull()?.color ?: AnnotationColor.GOLD)})
+                }
+            }
+            if(ui.failed) Text(stringResource(R.string.notes_failed),color=MaterialTheme.colorScheme.error,modifier=Modifier.padding(horizontal=10.dp))
         }
     }
 }

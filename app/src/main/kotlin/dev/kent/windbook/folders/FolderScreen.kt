@@ -37,10 +37,12 @@ fun FolderRoute(folderId: String?, onOpenBook: (String) -> Unit, onBack: () -> U
     var pickerRequested by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(folderId, pickNewFolder) {
         if (folderId != null) viewModel.selectFolder(folderId)
-        else if (pickNewFolder && !pickerRequested) {
-            pickerRequested = true
-            viewModel.requestFolder(null)
-        }
+        else if (pickNewFolder) {
+            if (!pickerRequested) {
+                pickerRequested = true
+                viewModel.requestFolder(null)
+            }
+        } else viewModel.selectLatest()
     }
     var activePickerId by rememberSaveable { mutableStateOf<Long?>(null) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->

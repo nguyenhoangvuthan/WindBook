@@ -79,8 +79,8 @@ class FolderScreenTest {
         compose.onNodeWithTag("folder-list").performScrollToNode(hasText("Sort: Title (A–Z)"))
         compose.onNodeWithText("Sort: Title (A–Z)").performClick()
         compose.onNodeWithText("Title (Z–A)").assertIsDisplayed()
-        compose.onNodeWithText("Added to WindBook (newest first)").assertIsDisplayed()
-        compose.onNodeWithText("Added to WindBook (oldest first)").performClick()
+        compose.onNodeWithText("Added to Updraft (newest first)").assertIsDisplayed()
+        compose.onNodeWithText("Added to Updraft (oldest first)").performClick()
         assertEquals(FolderSort.ADDED_OLDEST, selected)
     }
 

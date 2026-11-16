@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name" translatable="false">WindBook</string>
+    <string name="app_name" translatable="false">Updraft</string>
     <string name="add_books">Add books</string>
     <string name="empty_library">Your library is empty. Add EPUB or PDF files to start reading.</string>
     <string name="continue_reading">Continue reading</string>
@@ -11,7 +11,7 @@
     <string name="mark_finished">Mark as finished</string>
     <string name="delete_book">Delete…</string>
     <string name="delete_title">Delete \"%1$s\"?</string>
-    <string name="delete_body">The book file, its reading position and cover are removed from WindBook. The original file on your phone is untouched.</string>
+    <string name="delete_body">The book file, its reading position and cover are removed from Updraft. The original file on your phone is untouched.</string>
     <string name="delete">Delete</string>
     <string name="cancel">Cancel</string>
     <string name="imported_count">%1$d book(s) added</string>
@@ -70,7 +70,7 @@
     <string name="settings_about">About</string>
     <string name="version">Version %1$s</string>
     <string name="licences">Open-source licences</string>
-    <string name="licences_body">Literata typeface: SIL Open Font License 1.1\nReadium Kotlin Toolkit: BSD 3-Clause\nAndroidX, Hilt, Coil, Kotlin: Apache License 2.0\nLucide Book Open icon: ISC License\n© 2026 Lucide Icons and Contributors</string>
+    <string name="licences_body">Literata typeface: SIL Open Font License 1.1\nReadium Kotlin Toolkit: BSD 3-Clause\nAndroidX, Hilt, Coil, Kotlin: Apache License 2.0</string>
     <string name="close">Close</string>
     <string name="cd_view_mode">View</string>
     <string name="layout_vertical">Vertical scroll</string>
@@ -137,8 +137,8 @@
     <string name="folder_sort">Sort: %1$s</string>
     <string name="folder_sort_title_asc">Title (A–Z)</string>
     <string name="folder_sort_title_desc">Title (Z–A)</string>
-    <string name="folder_sort_added_newest">Added to WindBook (newest first)</string>
-    <string name="folder_sort_added_oldest">Added to WindBook (oldest first)</string>
+    <string name="folder_sort_added_newest">Added to Updraft (newest first)</string>
+    <string name="folder_sort_added_oldest">Added to Updraft (oldest first)</string>
     <string name="notes_search">Search notes and quotes</string>
     <string name="notes_page">Page %1$d</string>
     <string name="notes_highlight">Highlight</string>

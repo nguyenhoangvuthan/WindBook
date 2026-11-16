@@ -10,7 +10,7 @@
     <string name="mark_finished">Đánh dấu đã đọc xong</string>
     <string name="delete_book">Xoá…</string>
     <string name="delete_title">Xoá \"%1$s\"?</string>
-    <string name="delete_body">Tệp sách, vị trí đang đọc và ảnh bìa sẽ bị xoá khỏi WindBook. Tệp gốc trên điện thoại của bạn không bị ảnh hưởng.</string>
+    <string name="delete_body">Tệp sách, vị trí đang đọc và ảnh bìa sẽ bị xoá khỏi Updraft. Tệp gốc trên điện thoại của bạn không bị ảnh hưởng.</string>
     <string name="delete">Xoá</string>
     <string name="cancel">Huỷ</string>
     <string name="imported_count">Đã thêm %1$d cuốn sách</string>
@@ -131,8 +131,8 @@
     <string name="folder_sort">Sắp xếp: %1$s</string>
     <string name="folder_sort_title_asc">Tên sách (A–Z)</string>
     <string name="folder_sort_title_desc">Tên sách (Z–A)</string>
-    <string name="folder_sort_added_newest">Thêm vào WindBook (mới nhất trước)</string>
-    <string name="folder_sort_added_oldest">Thêm vào WindBook (cũ nhất trước)</string>
+    <string name="folder_sort_added_newest">Thêm vào Updraft (mới nhất trước)</string>
+    <string name="folder_sort_added_oldest">Thêm vào Updraft (cũ nhất trước)</string>
     <string name="notes_search">Tìm ghi chú và đoạn trích</string>
     <string name="notes_page">Trang %1$d</string>
     <string name="notes_highlight">Tô sáng</string>
@@ -158,7 +158,7 @@
     <string name="notes_no_text">Không có văn bản chọn được tại đây.</string>
     <string name="notes_start_handle">Đầu vùng chọn</string>
     <string name="notes_end_handle">Cuối vùng chọn</string>
-    <string name="licences_body">Phông chữ Literata: SIL Open Font License 1.1\nReadium Kotlin Toolkit: BSD 3-Clause\nAndroidX, Hilt, Coil, Kotlin: Apache License 2.0\nBiểu tượng Lucide Book Open: giấy phép ISC\n© 2026 Lucide Icons and Contributors</string>
+    <string name="licences_body">Phông chữ Literata: SIL Open Font License 1.1\nReadium Kotlin Toolkit: BSD 3-Clause\nAndroidX, Hilt, Coil, Kotlin: Apache License 2.0</string>
     <string name="folder_preparing_covers">Đang lấy ảnh bìa…</string>
     <plurals name="folder_cover_checks">
         <item quantity="other">Đã kiểm tra %1$d bìa</item>

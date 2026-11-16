@@ -11,8 +11,8 @@ import org.robolectric.annotation.Config
 @Config(application = android.app.Application::class)
 class SmokeTest {
     @Test
-    fun appNameIsWindBook() {
+    fun appNameIsUpdraft() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        assertEquals("WindBook", context.getString(R.string.app_name))
+        assertEquals("Updraft", context.getString(R.string.app_name))
     }
 }

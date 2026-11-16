@@ -1,5 +1,7 @@
 package dev.kent.windbook.notes
 
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -22,8 +24,10 @@ fun NotesRoute(onOpen: (String,String)->Unit) {
     val viewModel=hiltViewModel<NotesViewModel>()
     val records by viewModel.annotations.collectAsStateWithLifecycle()
     val failed by viewModel.failed.collectAsStateWithLifecycle()
+    var vocabulary by rememberSaveable {mutableStateOf(false)}
     var deleting by rememberSaveable { mutableStateOf<String?>(null) }
-    NotesScreen(records,onOpen={ onOpen(it.bookId,it.id) },onEdit={viewModel.edit(it)},onDelete={deleting=it.id})
+    NotesScreen(records,onOpen={ onOpen(it.bookId,it.id) },onEdit={viewModel.edit(it)},onDelete={deleting=it.id},onVocabulary={vocabulary=true},extraContent={dev.kent.windbook.learning.SavedLearningAnswers(viewModel,it.id)})
+    if(vocabulary) dev.kent.windbook.learning.VocabularyDialog(viewModel,onClose={vocabulary=false},onOpen={book,id->vocabulary=false;onOpen(book,id)})
     if(failed) Snackbar { Text(stringResource(R.string.notes_failed)) }
     AnnotationEditor(viewModel)
     DeleteAnnotationDialog(deleting,onCancel={deleting=null},onConfirm={id -> deleting=null;viewModel.delete(id)})
@@ -31,10 +35,12 @@ fun NotesRoute(onOpen: (String,String)->Unit) {
 
 @Composable
 fun NotesScreen(annotations: List<PdfTextAnnotation> = emptyList(), onOpen: (PdfTextAnnotation)->Unit = {},
-    onEdit: (PdfTextAnnotation)->Unit = {},onDelete: (PdfTextAnnotation)->Unit = {}) {
+    onEdit: (PdfTextAnnotation)->Unit = {},onDelete: (PdfTextAnnotation)->Unit = {},
+    onVocabulary:(()->Unit)?=null,extraContent:@Composable (PdfTextAnnotation)->Unit = {}) {
     var query by rememberSaveable { mutableStateOf("") }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).windowInsetsPadding(TabScreenInsets)) {
         ScreenTitle(stringResource(R.string.tab_notes))
+        onVocabulary?.let {TextButton(onClick=it) {Text(stringResource(R.string.ai_vocabulary))}}
         OutlinedTextField(value=query,onValueChange={query=it},label={Text(stringResource(R.string.notes_search))},
             singleLine=true,modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp))
         val visible=annotations.filter { query.isBlank() || it.quote.contains(query,true) || it.body.orEmpty().contains(query,true) }
@@ -48,11 +54,12 @@ fun NotesScreen(annotations: List<PdfTextAnnotation> = emptyList(), onOpen: (Pdf
                         Box(Modifier.fillMaxWidth().height(3.dp).background(annotation.color.toComposeColor()))
                         Text(annotation.quote,style=MaterialTheme.typography.bodyLarge,modifier=Modifier.padding(vertical=8.dp))
                         Text(annotation.body ?: stringResource(R.string.notes_highlight),style=MaterialTheme.typography.bodyMedium)
-                        if(annotation.anchor==null) Text(stringResource(R.string.notes_unavailable))
+                        extraContent(annotation)
+                        if(!annotation.canReveal) Text(stringResource(R.string.notes_unavailable))
                         Row {
                             TextButton(onClick={onEdit(annotation)}) { Text(stringResource(R.string.notes_edit)) }
                             TextButton(onClick={onDelete(annotation)}) { Text(stringResource(R.string.notes_delete)) }
-                            TextButton(onClick={onOpen(annotation)},enabled=annotation.anchor!=null) { Text(stringResource(R.string.notes_open)) }
+                            TextButton(onClick={onOpen(annotation)},enabled=annotation.canReveal) { Text(stringResource(R.string.notes_open)) }
                         }
                     }
                 }
@@ -62,7 +69,7 @@ fun NotesScreen(annotations: List<PdfTextAnnotation> = emptyList(), onOpen: (Pdf
 }
 
 @Composable
-fun AnnotationEditor(viewModel: NotesViewModel) {
+fun AnnotationEditor(viewModel: NotesViewModel,onClosed:()->Unit = {}) {
     val draft by viewModel.editor.collectAsStateWithLifecycle()
     val visible by viewModel.editorVisible.collectAsStateWithLifecycle()
     val failed by viewModel.failed.collectAsStateWithLifecycle()
@@ -70,19 +77,20 @@ fun AnnotationEditor(viewModel: NotesViewModel) {
     var discard by rememberSaveable { mutableStateOf(false) }
     val value=draft ?: return
     if(!visible) return
-    val cancel={ if(!saving) { if(value.body!=value.originalBody) discard=true else viewModel.cancel() } }
+    val cancel={ if(!saving) { if(value.body!=value.originalBody) discard=true else {viewModel.cancel();onClosed()} } }
     AlertDialog(onDismissRequest=cancel,title={Text(stringResource(R.string.notes_note))},text={
-        Column {
+        Column(Modifier.heightIn(max=480.dp).verticalScroll(rememberScrollState())) {
             Text(value.quote,maxLines=8,style=MaterialTheme.typography.bodyMedium)
             OutlinedTextField(value=value.body,onValueChange=viewModel::changeBody,label={Text(stringResource(R.string.notes_body))},
                 enabled=!saving,minLines=3,maxLines=8,modifier=Modifier.fillMaxWidth())
+            Column {AnnotationColor.entries.forEach {color -> TextButton(onClick={viewModel.changeColor(color)},enabled=!saving) {Text(stringResource(color.labelRes()),color=color.toComposeColor())}}}
             if(failed) Text(stringResource(R.string.notes_failed),color=MaterialTheme.colorScheme.error)
         }
-    },confirmButton={TextButton(onClick=viewModel::save,enabled=!saving && value.body.isNotBlank()) {Text(stringResource(R.string.notes_save))}},
+    },confirmButton={TextButton(onClick=viewModel::save,enabled=!saving && (value.body.isNotBlank() || value.epubAnchor!=null || value.id!=null)) {Text(stringResource(R.string.notes_save))}},
         dismissButton={TextButton(onClick=cancel,enabled=!saving) {Text(stringResource(R.string.notes_cancel))}})
     if(discard) AlertDialog(onDismissRequest={discard=false},title={Text(stringResource(R.string.notes_discard))},
         text={Text(stringResource(R.string.notes_discard_confirm))},
-        confirmButton={TextButton(onClick={discard=false;viewModel.cancel()}) {Text(stringResource(R.string.notes_discard))}},
+        confirmButton={TextButton(onClick={discard=false;viewModel.cancel();onClosed()}) {Text(stringResource(R.string.notes_discard))}},
         dismissButton={TextButton(onClick={discard=false}) {Text(stringResource(R.string.notes_cancel))}})
 }
 

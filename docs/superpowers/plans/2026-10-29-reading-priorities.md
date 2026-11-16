@@ -1,5 +1,7 @@
 # Cover speed and daily reading priorities: phased implementation plan
 
+> Order amendment2026-11-16: the owner selected option B. Advance the already-approved EPUB selection/highlights/notes before backup/export, then trial single-book AI for EPUB/text PDF. See [the AI draft](../specs/2026-11-16-single-book-ai-design.md). Existing EPUB scope approval stands; AI details/network exception and the revised implementation plan remain pending review. Defer only D3 backup/export integration gates until backup/export exists. The historical order and AI exclusion below are superseded only by this scoped direction; no desktop book transmission is authorized by B alone.
+
 Date: 2026-10-29
 Status: approved by the owner on 2026-10-29 ("Tôi đã duyệt xong").
 Execution starts on cover-speed; no increment is complete yet.

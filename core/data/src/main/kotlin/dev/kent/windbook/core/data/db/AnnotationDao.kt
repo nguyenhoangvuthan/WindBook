@@ -14,6 +14,7 @@ data class AnnotationEntity(
     val body: String?,
     @ColumnInfo(name="created_at") val createdAt: Long,
     @ColumnInfo(name="updated_at") val updatedAt: Long,
+    @ColumnInfo(defaultValue="'PDF_TEXT'") val kind: String = "PDF_TEXT",
 )
 data class AnnotationRow(@Embedded val annotation: AnnotationEntity, @ColumnInfo(name="book_title") val bookTitle: String)
 

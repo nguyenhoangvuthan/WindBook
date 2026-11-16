@@ -45,4 +45,25 @@ class NotesViewModelTest {
         assertNull(vm.editor.value)
         assertFalse(db.annotationDao().hasAnnotations("b"))
     }
+    @Test fun epubDraftSavesOnceAndRemainsEditable()=runTest {
+        db.libraryDao().insert(BookEntity("e","Book",null,"EPUB",null,1,"sha",null,null,"TO_READ",1,null,1,null))
+        val a=EpubTextAnchor(href="c.xhtml",locatorJson="""{"href":"c.xhtml","type":"application/xhtml+xml","text":{"highlight":"Quote"}}""",quote="Quote")
+        vm.beginEpub("e","sha",a); vm.changeBody("EPUB note")
+        vm.save();vm.save();vm.saving.first {!it}
+        val saved=dev.kent.windbook.core.data.AnnotationRepository(db).observe("e").first().single()
+        assertEquals(a,saved.epubAnchor)
+        vm.edit(saved);assertEquals(a,vm.editor.value!!.epubAnchor)
+        vm.changeBody("Edited");vm.save();vm.saving.first {!it}
+        assertEquals("Edited",dev.kent.windbook.core.data.AnnotationRepository(db).find(saved.id)!!.body)
+    }
+
+    @Test fun existingEpubHighlightColorCanChangeWithoutBody()=runTest {
+        db.libraryDao().insert(BookEntity("e","Book",null,"EPUB",null,1,"sha",null,null,"TO_READ",1,null,1,null))
+        val a=EpubTextAnchor(href="c.xhtml",locatorJson="""{"href":"c.xhtml","type":"application/xhtml+xml","text":{"highlight":"Quote"}}""",quote="Quote")
+        val repo=dev.kent.windbook.core.data.AnnotationRepository(db)
+        val id=repo.saveEpub("e","sha",a,AnnotationColor.GOLD,null)
+        vm.edit(repo.find(id)!!);vm.changeColor(AnnotationColor.BLUE);vm.save();vm.saving.first {!it}
+        assertEquals(AnnotationColor.BLUE,repo.find(id)!!.color);assertNull(repo.find(id)!!.body)
+    }
+
 }

@@ -23,6 +23,9 @@ import kotlin.math.abs
 @Composable
 internal fun PdfNotesReader(bookId: String,session: PdfSession,reader: ReaderViewModel,display: EffectiveDisplay,
     initialPage: Int,annotationId: String?,revealRequestId: String?, pageJump: PdfPageJump? = null, onPageJumpApplied: (Long,Boolean)->Unit = {_,_->}) {
+    val learning=hiltViewModel<dev.kent.windbook.learning.LearningViewModel>(key="learning:$bookId")
+    val learningState by learning.state.collectAsStateWithLifecycle()
+    DisposableEffect(session) {onDispose {learning.detach()}}
     val notes=hiltViewModel<NotesViewModel>(key="pdf-notes:$bookId")
     val fitRequestId by reader.pdfFitRequestId.collectAsStateWithLifecycle()
     val records by notes.annotations.collectAsStateWithLifecycle()
@@ -43,6 +46,7 @@ internal fun PdfNotesReader(bookId: String,session: PdfSession,reader: ReaderVie
         catch(_: Exception) { null }
         verified=true
     }
+    LaunchedEffect(session,verified) {if(verified) learning.attach(session,fingerprint)}
     LaunchedEffect(session,verified,annotationId,revealRequestId) {
         if(!verified || annotationId==null) return@LaunchedEffect
         val note=notes.find(annotationId)
@@ -76,12 +80,19 @@ internal fun PdfNotesReader(bookId: String,session: PdfSession,reader: ReaderVie
             pageJump=pageJump,onPageJumpApplied=onPageJumpApplied,initialZoom=display.zoom,initialZoomX=display.zoomX,onZoomChanged=reader::setPdfZoom,reveal=reveal,fitRequestId=fitRequestId,
             annotations=PdfAnnotationUi(marks,selection,active,
                 onSelect={selection=it;message=null;if(it!=null) active=emptyList()},onExisting={active=it;if(it.isNotEmpty()) selection=null},
-                onNote={prepare(true)},onColor={color -> if(prepare(false)) notes.highlight(color)},
+                onAi={
+                    val existing=marks.singleOrNull {it.id in active}
+                    val anchor=existing?.anchor ?: selection?.anchor
+                    val sha=fingerprint
+                    if(anchor==null || sha==null) message=R.string.notes_unavailable
+                    else learning.open(dev.kent.windbook.learning.LearningTarget(bookId,sha,pdf=anchor,annotationId=existing?.id),session)
+                },onNote={prepare(true)},onColor={color -> if(prepare(false)) notes.highlight(color)},
                 onDelete={deleting=it},onClear=clear,
                 onNoText={unavailable -> message=if(unavailable) R.string.notes_text_unavailable else R.string.notes_no_text},
-                saving=saving,editorVisible=editorVisible,failed=failed))
+                saving=saving,editorVisible=editorVisible || learningState.target!=null,failed=failed))
         message?.let { Snackbar(modifier=Modifier.align(Alignment.BottomCenter),action={TextButton(onClick={message=null}) {Text(stringResource(R.string.notes_cancel))}}) {Text(stringResource(it))} }
     }
+    dev.kent.windbook.learning.LearningCard(learning,onClose=clear)
     AnnotationEditor(notes)
     DeleteAnnotationDialog(deleting,onCancel={deleting=null},onConfirm={id->deleting=null;notes.delete(id)})
 }

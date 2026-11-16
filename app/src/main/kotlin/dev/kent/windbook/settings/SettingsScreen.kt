@@ -52,6 +52,7 @@ import dev.kent.windbook.ui.components.uppercaseForUi
 fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel(), onFolders: () -> Unit = {}) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val typography by viewModel.readingTypography.collectAsStateWithLifecycle()
+    var aiSettings by rememberSaveable {mutableStateOf(false)}
     var readingDefaults by rememberSaveable {mutableStateOf(false)}
     LifecycleStartEffect(viewModel) {
         viewModel.refreshLanguage()
@@ -60,7 +61,8 @@ fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel(), onFolders: () 
     SettingsScreen(state, onLanguageChange = viewModel::setLanguage, onFolders = onFolders,
         onScanRecursiveChange = { viewModel.setScanRecursive(it) },
         onScanExtensionToggle = { viewModel.toggleScanExtension(it) },
-        onScanExtensionsChange = { viewModel.setScanExtensions(it) },onReadingDefaults={readingDefaults=true})
+        onScanExtensionsChange = { viewModel.setScanExtensions(it) },onReadingDefaults={readingDefaults=true},onAiSettings={aiSettings=true})
+    if(aiSettings) dev.kent.windbook.learning.AiSettingsDialog {aiSettings=false}
     if(readingDefaults) dev.kent.windbook.reader.ReaderTypographySheet(typography,typography,{readingDefaults=false},
         {value,_->viewModel.setReadingTypography(value)},globalOnly=true)
 }
@@ -68,7 +70,7 @@ fun SettingsRoute(viewModel: SettingsViewModel = hiltViewModel(), onFolders: () 
 @Composable
 fun SettingsScreen(state: SettingsUiState, onLanguageChange: (AppLanguage) -> Unit,
     onFolders: () -> Unit = {}, onScanRecursiveChange: (Boolean) -> Unit = {},
-    onScanExtensionToggle: (BookFormat) -> Unit = {}, onScanExtensionsChange: (Set<BookFormat>) -> Unit = {}, onReadingDefaults: (() -> Unit)? = null) {
+    onScanExtensionToggle: (BookFormat) -> Unit = {}, onScanExtensionsChange: (Set<BookFormat>) -> Unit = {}, onReadingDefaults: (() -> Unit)? = null, onAiSettings: (() -> Unit)? = null) {
     var showLicences by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     Column(
@@ -115,6 +117,10 @@ fun SettingsScreen(state: SettingsUiState, onLanguageChange: (AppLanguage) -> Un
                     modifier = Modifier.fillMaxWidth().clickable(role = Role.Button, onClick = onFolders)
                         .heightIn(min = 48.dp).padding(vertical = 12.dp))
             }
+        }
+
+        if(onAiSettings!=null) SettingsGroup(stringResource(R.string.ai_settings)) {
+            TextButton(onClick=onAiSettings,modifier=Modifier.padding(horizontal=16.dp).heightIn(min=48.dp)) {Text(stringResource(R.string.ai_settings))}
         }
 
         SettingsGroup(stringResource(R.string.settings_storage)) {

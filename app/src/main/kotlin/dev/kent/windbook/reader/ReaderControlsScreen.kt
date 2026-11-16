@@ -80,7 +80,7 @@ internal fun ReaderReadyScreen(bookId: String,current: ReaderUiState.Ready,reade
                 val initial=remember(pdf) {reader.initialPdfPage()}
                 PdfNotesReader(bookId,pdf,reader,prefs,initial,annotationId,revealRequestId,
                     pageJump=request?.let {PdfPageJump(it.id,pdf.pageOf(it.locatorJson))},onPageJumpApplied=controls::completed)
-            } else ReaderSurface(current,reader,controls)
+            } else ReaderSurface(current,reader,controls,bookId,annotationId,revealRequestId)
             val page=if(pdf!=null) pdf.pageOf(visibleLocator)+1 else null
             val sliderFraction=if(pdf!=null && pdf.pageCount>1) (page!!-1).toDouble()/(pdf.pageCount-1) else if(pdf!=null) 0.0 else LocatorCodec.seekFraction(visibleLocator,current.session.positionCount,progression)
             key(current.session,display?.layout) {

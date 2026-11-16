@@ -46,7 +46,7 @@ class ReaderControlsMigrationTest {
             assertNull(db.pdfContentsDao().find("b","sha",1))
         } finally { db.close() }
         AndroidSQLiteDriver().open(path).use { c ->
-            c.prepare("PRAGMA user_version").use { assertTrue(it.step());assertEquals(8L,it.getLong(0)) }
+            c.prepare("PRAGMA user_version").use { assertTrue(it.step());assertEquals(10L,it.getLong(0)) }
             c.prepare("PRAGMA foreign_key_check").use { assertFalse(it.step()) }
         }
     }

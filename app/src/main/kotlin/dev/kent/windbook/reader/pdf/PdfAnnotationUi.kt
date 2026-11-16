@@ -44,7 +44,7 @@ data class PdfAnnotationUi(
     val onSelect: (PdfTextSelection?)->Unit, val onExisting: (List<String>)->Unit,
     val onNote: ()->Unit, val onColor: (AnnotationColor)->Unit, val onDelete: (String)->Unit,
     val onClear: ()->Unit, val onNoText: (Boolean)->Unit, val saving: Boolean=false,
-    val editorVisible: Boolean=false, val failed: Boolean=false,
+    val editorVisible: Boolean=false, val failed: Boolean=false, val onAi: (()->Unit)?=null,
 ) { val locked: Boolean get() = selection!=null || activeIds.isNotEmpty() || editorVisible }
 
 /** Shares the page container's transform with the bitmap and tiles; every gesture is page-local. */
@@ -195,6 +195,7 @@ internal fun PdfTextPageOverlay(source: PdfPageSource,page: Int,crop: CropBox,si
                                 Text(stringResource(R.string.notes_color),fontSize=18.sp,modifier=Modifier.clickable(enabled=!ui.saving) {colors=!colors})
                                 Text(stringResource(R.string.notes_note),fontSize=18.sp,modifier=Modifier.clickable(enabled=!ui.saving,onClick=ui.onNote))
                             }
+                            ui.onAi?.let {action -> androidx.compose.material3.TextButton(onClick=action,enabled=!ui.saving) {Text(stringResource(R.string.ai_translate))} }
                             if(colors) Row(horizontalArrangement=Arrangement.spacedBy(6.dp),modifier=Modifier.padding(top=6.dp)) {
                                 AnnotationColor.entries.forEach { color ->
                                     val label=stringResource(color.labelRes())

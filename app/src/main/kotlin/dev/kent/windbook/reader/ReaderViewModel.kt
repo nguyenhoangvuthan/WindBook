@@ -334,9 +334,9 @@ class ReaderViewModel @AssistedInject constructor(
 
     /** Where a (re-)created PDF view starts: the newest position, else the saved one. */
     /** Verify the actual pinned PDF bytes before attaching or revealing a durable anchor. */
-    suspend fun annotationFingerprint(expected: PdfSession): String? {
+    suspend fun annotationFingerprint(expected: ReaderSession): String? {
         if(session!==expected || _state.value !is ReaderUiState.Ready) return null
-        val fingerprint=expected.annotationFingerprint() ?: return null
+        val fingerprint=(if(expected is PdfSession) expected.annotationFingerprint() else expected.fingerprint()) ?: return null
         val book=library.book(bookId) ?: return null
         return fingerprint.takeIf { session===expected && book.sha256==it }
     }

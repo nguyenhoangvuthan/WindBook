@@ -49,7 +49,7 @@ class AnnotationMigrationTest {
         val reopened=WindBookDatabase.open(context,path,AndroidSQLiteDriver())
         try { assertEquals("Saved",AnnotationRepository(reopened).find(id)!!.body) } finally { reopened.close() }
         AndroidSQLiteDriver().open(path).use { c ->
-            c.prepare("PRAGMA user_version").use { assertTrue(it.step()); assertEquals(8L,it.getLong(0)) }
+            c.prepare("PRAGMA user_version").use { assertTrue(it.step()); assertEquals(10L,it.getLong(0)) }
             c.prepare("PRAGMA foreign_key_check").use { assertFalse(it.step()) }
         }
     }

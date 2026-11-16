@@ -13,11 +13,13 @@ import kotlinx.coroutines.launch
 
 data class AnnotationDraft(val bookId: String, val fingerprint: String, val anchor: PdfTextAnchor?, val id: String? = null,
     val color: AnnotationColor = AnnotationColor.GOLD, val body: String = "", val originalBody: String = body,
-    val quote: String = anchor?.quote.orEmpty())
+    val quote: String = anchor?.quote.orEmpty(), val epubAnchor: EpubTextAnchor? = null)
 
 /** Owns drafts independently of the page composition, so rotation and failed writes retain input. */
 @HiltViewModel
 class NotesViewModel @Inject constructor(db: WindBookDatabase): ViewModel() {
+    val learning=dev.kent.windbook.core.data.learning.LearningRepository(db)
+    val vocabulary=learning.vocabulary().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),emptyList())
     private val repository=AnnotationRepository(db)
     val annotations=repository.observe().stateIn(viewModelScope,SharingStarted.WhileSubscribed(5_000),emptyList())
     private val _editor=MutableStateFlow<AnnotationDraft?>(null)
@@ -38,14 +40,26 @@ class NotesViewModel @Inject constructor(db: WindBookDatabase): ViewModel() {
         _editor.value=AnnotationDraft(bookId,fingerprint,anchor)
         _failed.value=false; _editorVisible.value=showEditor
     }
+    fun beginEpub(bookId: String,fingerprint: String,anchor: EpubTextAnchor,showEditor: Boolean=true) {
+        if(_saving.value) return
+        _editor.value=AnnotationDraft(bookId,fingerprint,null,quote=anchor.quote,epubAnchor=anchor)
+        _failed.value=false; _editorVisible.value=showEditor
+    }
     fun edit(annotation: PdfTextAnnotation,showEditor: Boolean=true) {
         if(_saving.value) return
         _editor.value=AnnotationDraft(annotation.bookId,annotation.fingerprint,annotation.anchor,annotation.id,annotation.color,
-            annotation.body.orEmpty(),quote=annotation.quote)
+            annotation.body.orEmpty(),quote=annotation.quote,epubAnchor=annotation.epubAnchor)
         _failed.value=false; _editorVisible.value=showEditor
     }
+    fun saveWord(answerId:String,word:dev.kent.windbook.core.data.learning.LearningWord) {viewModelScope.launch {
+        try {learning.addWord(answerId,word.term,word.meaning)} catch(e:CancellationException){throw e} catch(_:Exception){_failed.value=true}
+    }}
+    fun deleteWord(id:String) {viewModelScope.launch {
+        try {learning.deleteWord(id)} catch(e:CancellationException){throw e} catch(_:Exception){_failed.value=true}
+    }}
+    fun changeColor(color:AnnotationColor) {if(!_saving.value) _editor.update {it?.copy(color=color)}}
     fun changeBody(body: String) { if(!_saving.value) _editor.update { it?.copy(body=body.take(65_536)) } }
-    fun save() { if(_editor.value?.body?.isNotBlank()==true) persist(_editor.value!!.color,allowHighlight=false) }
+    fun save() { val draft=_editor.value ?: return; persist(draft.color,allowHighlight=draft.epubAnchor!=null || draft.id!=null) }
     fun highlight(color: AnnotationColor) = persist(color,allowHighlight=true)
     private fun persist(color: AnnotationColor,allowHighlight: Boolean) {
         val draft=_editor.value ?: return
@@ -55,7 +69,8 @@ class NotesViewModel @Inject constructor(db: WindBookDatabase): ViewModel() {
         _saving.value=true; _failed.value=false
         viewModelScope.launch {
             try {
-                if(draft.id==null) repository.save(draft.bookId,draft.fingerprint,requireNotNull(draft.anchor),color,body)
+                if(draft.id==null && draft.epubAnchor!=null) repository.saveEpub(draft.bookId,draft.fingerprint,draft.epubAnchor,color,body)
+                else if(draft.id==null) repository.save(draft.bookId,draft.fingerprint,requireNotNull(draft.anchor),color,body)
                 else repository.update(draft.id,color,body)
                 _editor.value=null; _editorVisible.value=false; _saved.value++
             } catch(e: CancellationException) { throw e }

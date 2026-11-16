@@ -167,17 +167,24 @@ internal fun ReaderViewport(
 }
 
 @Composable
-internal fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewModel, controls: ReaderControlsViewModel) {
+internal fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewModel, controls: ReaderControlsViewModel, bookId: String = "", annotationId: String? = null, revealRequestId: String? = null) {
     val dispatcher = LocalKeyEventDispatcher.current
     val darkTheme = isSystemInDarkTheme()
     val typography by controls.typography.collectAsStateWithLifecycle()
     val navigation by controls.request.collectAsStateWithLifecycle()
     val hostRef = remember { mutableStateOf<ReaderHostFragment?>(null) }
+    var selection by remember(state.session) {mutableStateOf<dev.kent.windbook.core.model.EpubTextAnchor?>(null)}
+    var selectedAi by remember(state.session) {mutableStateOf(false)}
+    var activeNote by remember(state.session) {mutableStateOf<String?>(null)}
+    val noteLabel=stringResource(R.string.notes_note)
+    val aiLabel=stringResource(R.string.ai_translate)
     val callbacks = remember(viewModel, state.session) {
         object : ReaderHostFragment.Callbacks {
             override fun onLocatorChanged(locatorJson: String, progression: Double, chapterTitle: String?) =
                 viewModel.onLocatorChanged(locatorJson, progression, chapterTitle, expectedSession = state.session)
             override fun onCenterTap() = viewModel.toggleOverlay()
+            override fun onTextSelected(anchor: dev.kent.windbook.core.model.EpubTextAnchor,ai: Boolean) {selection=anchor;selectedAi=ai;activeNote=null}
+            override fun onDecorationActivated(id: String) {activeNote=id;selection=null}
         }
     }
 
@@ -192,6 +199,8 @@ internal fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewMode
         arguments = ReaderHostFragment.arguments(state.session.surface),
     ) { fragment ->
         hostRef.value = fragment
+        fragment.noteActionLabel=noteLabel
+        fragment.aiActionLabel=aiLabel
         // A re-created fragment (rotation) must open where the reader is now, not where the book was opened.
         fragment.bind(
             session = state.session,
@@ -202,7 +211,12 @@ internal fun ReaderSurface(state: ReaderUiState.Ready, viewModel: ReaderViewMode
         )
     }
 
+    if(state.session.format==dev.kent.windbook.core.model.BookFormat.EPUB) dev.kent.windbook.reader.epub.EpubNotesReader(
+        bookId,state.session,viewModel,hostRef.value,selection,selectedAi,activeNote,annotationId,revealRequestId,
+        clear={selection=null;activeNote=null;hostRef.value?.clearSelection()})
+
     LaunchedEffect(hostRef.value,typography,darkTheme) {
+        selection=null
         hostRef.value?.applyTypography(typography,darkTheme)
     }
 

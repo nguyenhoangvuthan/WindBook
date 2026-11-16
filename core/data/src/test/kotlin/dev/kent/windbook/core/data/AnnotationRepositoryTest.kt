@@ -69,4 +69,18 @@ class AnnotationRepositoryTest {
         val changed=sources.verify("b",source,"changed") as Verification.Changed
         assertTrue(repo.observe(changed.newBookId).first().isEmpty())
     }
+    @Test fun epubAnchorRoundTripsAndRejectsStaleOrInconsistentLocators() = runTest {
+        db.libraryDao().insert(BookEntity("e","Synthetic",null,"EPUB",null,1,"sha",null,null,"TO_READ",1,null,1,null))
+        val a=EpubTextAnchor(href="chapter.xhtml",locatorJson="""{"href":"chapter.xhtml","type":"application/xhtml+xml","text":{"highlight":"A sentence"}}""",quote="A sentence")
+        val id=repo.saveEpub("e","sha",a,AnnotationColor.GREEN,"note")
+        assertEquals(a,repo.find(id)!!.epubAnchor)
+        assertNull(repo.find(id)!!.anchor)
+        assertEquals("EPUB_TEXT",repo.find(id)!!.kind)
+        assertTrue(runCatching {repo.saveEpub("e","stale",a,AnnotationColor.GOLD,null)}.isFailure)
+        assertTrue(runCatching {repo.saveEpub("e","sha",a.copy(quote="other"),AnnotationColor.GOLD,null)}.isFailure)
+        db.annotationDao().upsert(db.annotationDao().find(id)!!.copy(kind="FUTURE"))
+        assertFalse(repo.find(id)!!.canReveal)
+        assertEquals("note",repo.find(id)!!.body)
+    }
+
 }

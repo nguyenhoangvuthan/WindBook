@@ -1,5 +1,8 @@
 # WindBook Roadmap (plan index)
 
+Current priority amendment (2026-11-16): owner selected B — EPUB selection/highlights/notes → single-book AI trial for EPUB/text PDF → backup/export. The [AI specification](../specs/2026-11-16-single-book-ai-design.md) is a draft for review; the prior blanket AI exclusion is lifted only for this scoped design. Library-wide AI and related books remain deferred. Existing EPUB scope approval stands; the optional desktop upload experiment remains unanswered. Historical ordering below records earlier decisions.
+
+
 Spec: `docs/superpowers/specs/2026-10-13-windbook-design.md`
 
 The spec covers eight milestones. Each milestone is shippable on its own (signed APK the owner daily-drives) and gets its **own detailed implementation plan**. That plan is written when the milestone starts, because it builds on the real interfaces the previous milestone produced. Planning all eight in detail now would mean inventing signatures that M1 will change.
@@ -70,3 +73,10 @@ remove80.84MB redundant reads but do not demonstrate lower wall time (3515ms ver
 3634ms medians).417JVM/lint0errors9baseline,14source device tests, actual API36
 geometry/note/rescan gates and independent review pass. APK exported to main-root
 publish/; integrated into main at `90b6742` under the owner's 2026-10-27 request to push all completed work to `origin/main`. Feature worktrees and local tags are retained. See `docs/testing/cover-import-pdf-fit-checklist.md`.
+
+Single-book trial implementation (2026-11-16,0.1.9 candidate): EPUB notes and scoped
+Gemini learning implemented on `single-book-ai` with additive DB10, no new Gradle
+dependency; CI502/lint baseline13, API36 native55/API31 compatible52 and independent
+fix review pass. Actual EPUB online generation, durable answer/vocabulary,
+rotation and offline restart verified. See `docs/testing/single-book-ai-checklist.md`
+for remaining UI/manual checks and retrieval limits. Backup/export is next.

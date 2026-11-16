@@ -36,10 +36,15 @@ class ReaderHostFragment : Fragment() {
 
     interface Callbacks {
         fun onLocatorChanged(locatorJson: String, progression: Double, chapterTitle: String?)
+        fun onTextSelected(anchor: dev.kent.windbook.core.model.EpubTextAnchor, ai: Boolean) {}
+        fun onDecorationActivated(id: String) {}
         fun onCenterTap()
     }
 
+    var noteActionLabel: String = ""
+    var aiActionLabel: String = ""
     private var boundSession: ReadiumReaderSession? = null
+    private var annotationRecords=emptyList<dev.kent.windbook.core.model.PdfTextAnnotation>()
     private var pendingBind: (() -> Unit)? = null
     private var callbacks: Callbacks? = null
     private var locatorJob: Job? = null
@@ -53,6 +58,11 @@ class ReaderHostFragment : Fragment() {
         val surface = NavigationSurface.valueOf(requireArguments().getString(ARG_SURFACE, NavigationSurface.PUBLICATION.name))
         require(surface == NavigationSurface.PUBLICATION) { "ReaderHostFragment requires a publication surface" }
         childFragmentManager.fragmentFactory = EpubNavigatorFragment.createDummyFactory()
+        childFragmentManager.registerFragmentLifecycleCallbacks(object: androidx.fragment.app.FragmentManager.FragmentLifecycleCallbacks() {
+            override fun onFragmentViewCreated(manager: androidx.fragment.app.FragmentManager,fragment: Fragment,view: View,state: Bundle?) {
+                blockPublicationNetwork(view)
+            }
+        },true)
         super.onCreate(savedInstanceState)
         // A restored (dummy) navigator throws if it reaches onResume, so drop it now;
         // bind() adds a fresh one at the right locator.
@@ -90,6 +100,12 @@ class ReaderHostFragment : Fragment() {
                 initialLocator = initialLocator,
                 initialPreferences = typographyPreferences(typography,darkTheme),
                 configuration = EpubNavigatorFragment.Configuration(servedAssets = listOf("fonts/.*")).apply {
+                    registerJavascriptInterface("WindBookNotes") {object {
+                        @android.webkit.JavascriptInterface fun activate(id:String) {
+                            view?.post {if(boundSession===readium && annotationRecords.any {"wb"+it.id.replace(Regex("[^a-zA-Z0-9]"),"")==id}) callbacks?.onDecorationActivated(annotationRecords.first {"wb"+it.id.replace(Regex("[^a-zA-Z0-9]"),"")==id}.id)}
+                        }
+                    }}
+                    if(session.format==dev.kent.windbook.core.model.BookFormat.EPUB && ReaderNavigationController(session).reflowable) selectionActionModeCallback=selectionActions(readium)
                     addFontFamilyDeclaration(org.readium.r2.navigator.preferences.FontFamily("Literata")) {
                         addFontFace { addSource("/fonts/literata.ttf") }
                     }
@@ -108,6 +124,7 @@ class ReaderHostFragment : Fragment() {
     fun applyTypography(value: dev.kent.windbook.core.model.ReaderTypography, darkTheme: Boolean) {
         val next=value to darkTheme
         if(appliedTypography==next) return
+        clearSelection()
         (navigator as? EpubNavigatorFragment)?.submitPreferences(typographyPreferences(value,darkTheme))
         appliedTypography=next
     }
@@ -167,6 +184,12 @@ class ReaderHostFragment : Fragment() {
 
     private fun attachListeners(restore: String?) {
         val current = navigator ?: return
+        (current as? org.readium.r2.navigator.DecorableNavigator)?.addDecorationListener("windbook-notes",object: org.readium.r2.navigator.DecorableNavigator.Listener {
+            override fun onDecorationActivated(event: org.readium.r2.navigator.DecorableNavigator.OnActivatedEvent): Boolean {
+                if(current!==navigator) return false
+                callbacks?.onDecorationActivated(event.decoration.id);return true
+            }
+        })
         (current as? OverflowableNavigator)?.apply {
             // Edge taps and arrow keys turn pages.
             addInputListener(DirectionalNavigationAdapter(this))
@@ -192,8 +215,64 @@ class ReaderHostFragment : Fragment() {
                         reportLocation(current,current.currentLocator.value)
                     }
                 }
-                current.currentLocator.collectLatest { locator -> reportLocation(current,locator) }
+                var href: String?=null
+                current.currentLocator.collectLatest { locator ->
+                    if(href!=null && href!=locator.href.toString()) clearSelection()
+                    href=locator.href.toString();applyAnnotations(annotationRecords);reportLocation(current,locator)
+                }
             }
+        }
+    }
+
+    private fun blockPublicationNetwork(view: View) {
+        if(view is android.webkit.WebView) {
+            view.settings.blockNetworkLoads=true
+            view.settings.allowFileAccess=false
+            view.settings.allowContentAccess=false
+        }
+        if(view is ViewGroup) for(i in 0 until view.childCount) blockPublicationNetwork(view.getChildAt(i))
+    }
+
+    fun clearSelection() { (navigator as? org.readium.r2.navigator.SelectableNavigator)?.clearSelection() }
+
+    suspend fun captureSelection(): dev.kent.windbook.core.model.EpubTextAnchor? {
+        val expected=boundSession ?: return null
+        if(expected.format!=dev.kent.windbook.core.model.BookFormat.EPUB || !ReaderNavigationController(expected).reflowable) return null
+        val current=navigator as? EpubNavigatorFragment ?: return null
+        val selection=current.currentSelection() ?: return null
+        val captured=current.evaluateJavascript(epubSelectionScript)
+        if(expected!==boundSession || current!==navigator || current.currentLocator.value.href!=selection.locator.href) return null
+        return epubSelectionAnchor(selection.locator,captured)
+    }
+    private fun selectionActions(expected: ReadiumReaderSession)=object: android.view.ActionMode.Callback {
+        override fun onCreateActionMode(mode: android.view.ActionMode,menu: android.view.Menu): Boolean {
+            menu.clear()
+            menu.add(0,1,0,noteActionLabel).setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_ALWAYS)
+            menu.add(0,2,1,aiActionLabel).setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_IF_ROOM)
+            return true
+        }
+        override fun onPrepareActionMode(mode: android.view.ActionMode,menu: android.view.Menu)=false
+        override fun onActionItemClicked(mode: android.view.ActionMode,item: android.view.MenuItem): Boolean {
+            if(item.itemId !in 1..2) return false
+            viewLifecycleOwner.lifecycleScope.launch {
+                val anchor=captureSelection()
+                if(anchor!=null && boundSession===expected) callbacks?.onTextSelected(anchor,item.itemId==2)
+                mode.finish()
+            }
+            return true
+        }
+        override fun onDestroyActionMode(mode: android.view.ActionMode) {}
+    }
+    suspend fun applyAnnotations(records: List<dev.kent.windbook.core.model.PdfTextAnnotation>) {
+        annotationRecords=records
+        val current=navigator as? EpubNavigatorFragment ?: return
+        if(current.evaluateJavascript(setupExactHighlightsScript)!="true") return
+        val colors=listOf("#E7B63D","#78B77B","#70A8D9","#E891B1","#B28BD4")
+        val active=records.mapNotNull {a -> a.epubAnchor?.locatorJson?.toLocatorOrNull()?.takeIf {it.href==current.currentLocator.value.href}?.let {a to it}}
+        val styles=active.joinToString("\n") {(a,_) -> "::highlight(wb${a.id.replace(Regex("[^a-zA-Z0-9]"),"")}){background-color:${colors[a.color.ordinal]}80;}"}
+        current.evaluateJavascript("(function(){let style=document.getElementById('wb-note-colors');if(!style){style=document.createElement('style');style.id='wb-note-colors';document.head.append(style);}style.textContent=${org.json.JSONObject.quote(styles)};return true;})()")
+        active.forEach {(a,locator) ->
+            exactHighlightScript(locator,"wb"+a.id.replace(Regex("[^a-zA-Z0-9]"),""),colors[a.color.ordinal])?.let {current.evaluateJavascript(it)}
         }
     }
 

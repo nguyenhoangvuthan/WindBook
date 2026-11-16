@@ -28,8 +28,33 @@ class AnnotationRepository(private val db: WindBookDatabase, private val clock: 
     }
     suspend fun delete(id: String) = db.annotationDao().delete(id)
     private fun cleanBody(body: String?): String? = body?.trim()?.also { require(it.isNotEmpty() && it.length<=65_536) }
-    private fun AnnotationEntity.toModel(title: String="") = PdfTextAnnotation(id,bookId,fingerprint,decode(anchorJson),quote,
-        runCatching { AnnotationColor.valueOf(color) }.getOrDefault(AnnotationColor.GOLD),body,createdAt,updatedAt,title)
+    private fun AnnotationEntity.toModel(title: String="") = PdfTextAnnotation(id,bookId,fingerprint,
+        if(kind=="PDF_TEXT") decode(anchorJson) else null,quote,
+        runCatching { AnnotationColor.valueOf(color) }.getOrDefault(AnnotationColor.GOLD),body,createdAt,updatedAt,title,
+        kind,if(kind=="EPUB_TEXT") decodeEpub(anchorJson)?.takeIf {it.quote==quote} else null)
+
+    suspend fun saveEpub(bookId: String, fingerprint: String, anchor: EpubTextAnchor, color: AnnotationColor, body: String?): String = db.withWriteTransaction {
+        require(anchor.isValid() && validLocator(anchor))
+        val book=requireNotNull(db.libraryDao().findById(bookId))
+        require(book.format=="EPUB" && fingerprint.isNotBlank() && book.sha256==fingerprint)
+        val now=clock(); val id=UUID.randomUUID().toString()
+        val json=JSONObject().apply {put("version",anchor.version);put("href",anchor.href);put("locator",anchor.locatorJson)
+            put("quote",anchor.quote);put("before",anchor.before);put("after",anchor.after)}.toString()
+        db.annotationDao().upsert(AnnotationEntity(id,bookId,fingerprint,json,anchor.quote,color.name,cleanBody(body),now,now,"EPUB_TEXT"))
+        id
+    }
+    private fun validLocator(a: EpubTextAnchor): Boolean = try {
+        val loc=JSONObject(a.locatorJson); val text=loc.getJSONObject("text")
+        loc.getString("href")==a.href && text.getString("highlight")==a.quote &&
+            text.optString("before")==a.before && text.optString("after")==a.after &&
+            loc.optString("type") in setOf("application/xhtml+xml","text/html")
+    } catch(_: Exception) {false}
+    private fun decodeEpub(json: String): EpubTextAnchor? = try {
+        if(json.length>65_536) null else JSONObject(json).let {r ->
+            EpubTextAnchor(r.getInt("version"),r.getString("href"),r.getString("locator"),r.getString("quote"),r.optString("before"),r.optString("after"))
+                .takeIf {it.isValid() && validLocator(it)}
+        }
+    } catch(_: Exception) {null}
 
     private fun encode(anchor: PdfTextAnchor): String = JSONObject().apply {
         put("version",anchor.version); put("page",anchor.page); put("width",anchor.width); put("height",anchor.height); put("quote",anchor.quote)

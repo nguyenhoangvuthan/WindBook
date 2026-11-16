@@ -43,6 +43,18 @@ class PdfDocumentHandle private constructor(
 
     fun pageSize(page: Int): PageSize = sizes[page] ?: fallback
 
+    suspend fun pageText(page: Int): String? {
+        if(Build.VERSION.SDK_INT<35) return null
+        require(page in 0 until pageCount)
+        return withContext(thread) {
+            renderer.openPage(page).use {native ->
+                val parts=native.textContents
+                require(parts.sumOf {it.text.length.toLong()}<=2_097_152)
+                parts.joinToString("\n") {it.text}
+            }
+        }
+    }
+
     suspend fun selectText(page: Int, start: PdfPoint, end: PdfPoint): PdfTextSelection? {
         if (Build.VERSION.SDK_INT < 35) return null
         require(page in 0 until pageCount)

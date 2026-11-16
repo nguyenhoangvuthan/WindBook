@@ -22,7 +22,8 @@ data class PdfTextAnnotation(
     val id: String, val bookId: String, val fingerprint: String, val anchor: PdfTextAnchor?,
     val quote: String, val color: AnnotationColor, val body: String?, val createdAt: Long, val updatedAt: Long,
     val bookTitle: String = "",
-)
+    val kind: String = "PDF_TEXT", val epubAnchor: EpubTextAnchor? = null,
+) { val canReveal: Boolean get() = anchor != null || epubAnchor != null }
 
 /** Display dimensions include the rounded displayed height and current zoom, independent of bitmap size. */
 class PdfPageGeometry(val size: PageSize, val crop: CropBox, val width: Float, val height: Float) {

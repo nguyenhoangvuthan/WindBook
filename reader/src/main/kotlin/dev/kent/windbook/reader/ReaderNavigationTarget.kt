@@ -20,7 +20,7 @@ internal fun navigationTargetMatches(target: Locator,current: Locator,elementVis
 }
 
 /** Validates the quote and its context before translating its normalized offset to a DOM Range. */
-private fun targetScript(target: Locator,scroll: Boolean): String? {
+private fun targetScript(target: Locator,scroll: Boolean,rangeOperation:String?=null): String? {
     val selector=target.locations.otherLocations["cssSelector"] as? String
     val fragment=target.locations.fragments.firstOrNull()?.let(android.net.Uri::decode)
     val quote=target.text.highlight.orEmpty()
@@ -65,6 +65,7 @@ private fun targetScript(target: Locator,scroll: Boolean): String? {
             if(!first||!last)return false;
             range=document.createRange();range.setStart(first.node,start-first.start);range.setEnd(last.node,end-last.start);
           }
+          ${rangeOperation.orEmpty()}
           const rects=Array.from(range.getClientRects());
           const visible=()=>rects.some(r=>r.width>0&&r.height>0&&r.left<innerWidth&&r.right>0&&r.top<innerHeight&&r.bottom>0);
           if(${scroll}&&!visible()){
@@ -103,4 +104,40 @@ internal val visibleReadingLocatorScript="""
       loc.text={before:text.slice(Math.max(0,offset-48),offset),highlight:text.slice(offset,offset+96),after:text.slice(offset+96,offset+176)};
       return loc;
     }catch(e){return null;}})()
+""".trimIndent()
+
+/** Exact DOM ranges for highlights use the same validated resolver as source revisit. */
+internal fun exactHighlightScript(target:Locator,id:String,color:String):String? = targetScript(target,false,
+    "window.wbNoteRanges[${JSONObject.quote(id)}]=range;window.wbNoteColors[${JSONObject.quote(id)}]=${JSONObject.quote(color)};if(CSS.highlights && window.Highlight)CSS.highlights.set(${JSONObject.quote(id)},new Highlight(range));else window.wbDrawNotes();return true;")
+
+internal val setupExactHighlightsScript="""
+(function(){
+ if(window.wbNoteRanges && window.CSS && CSS.highlights)Object.keys(window.wbNoteRanges).forEach(id=>CSS.highlights.delete(id));
+ document.querySelectorAll('[data-wb-note-overlay]').forEach(e=>e.remove());
+ window.wbNoteRanges={};window.wbNoteColors={};
+ window.wbDrawNotes=function(){
+  document.querySelectorAll('[data-wb-note-overlay]').forEach(e=>e.remove());
+  for(const [id,range] of Object.entries(window.wbNoteRanges||{}))for(const r of range.getClientRects()){
+   if(!r.width||!r.height)continue;
+   const mark=document.createElement('div');mark.setAttribute('data-wb-note-overlay',id);
+   mark.style.cssText='position:fixed;pointer-events:none;z-index:2147483000;background:'+window.wbNoteColors[id]+'60;left:'+r.left+'px;top:'+r.top+'px;width:'+r.width+'px;height:'+r.height+'px;';
+   document.documentElement.append(mark);
+  }
+ };
+
+ if(!window.wbNoteClick){
+  window.wbNoteClick=true;
+  const redraw=()=>{if(!CSS.highlights||!window.Highlight)requestAnimationFrame(()=>window.wbDrawNotes());};
+  window.addEventListener('scroll',redraw,true);window.addEventListener('resize',redraw);
+  if(window.ResizeObserver)new ResizeObserver(redraw).observe(document.body);
+  document.addEventListener('click',function(event){
+   for(const [id,range] of Object.entries(window.wbNoteRanges||{})){
+    if(Array.from(range.getClientRects()).some(r=>event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom)){
+     event.preventDefault();event.stopImmediatePropagation();WindBookNotes.activate(id);return;
+    }
+   }
+  },true);
+ }
+ return true;
+})()
 """.trimIndent()

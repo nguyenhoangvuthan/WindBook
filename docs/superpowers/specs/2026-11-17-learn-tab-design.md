@@ -1,7 +1,7 @@
 # Learn tab — English study from the owner's own books
 
 Date: 2026-11-17
-Status: **draft, awaiting owner approval.** Nothing in this document is implemented.
+Status: approved by the owner on 2026-11-17 (phases 0–3). Nothing in this document is implemented yet.
 Baseline: 0.1.11 (Updraft rename, 3D icon, PDF crop default), database v10.
 
 ## 1. Intent

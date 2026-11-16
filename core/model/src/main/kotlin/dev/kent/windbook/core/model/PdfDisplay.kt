@@ -32,12 +32,12 @@ data class EffectiveDisplay(
 @Suppress("UNUSED_PARAMETER")
 fun defaultPdfLayout(firstPages: List<PageSize>): PdfLayout = PdfLayout.PAGED
 
-/** Margins are cropped by default except page by page; saved values are clamped to what the view supports. */
+/** Margins are cropped by default in every layout; an explicit per-book choice wins and saved values are clamped. */
 fun BookDisplayPrefs.resolve(firstPages: List<PageSize>): EffectiveDisplay {
     val layout = pdfLayout ?: defaultPdfLayout(firstPages)
     return EffectiveDisplay(
         layout = layout,
-        cropMargins = cropMargins ?: (layout != PdfLayout.PAGED),
+        cropMargins = cropMargins ?: true,
         zoom = (zoom?.takeIf { it.isFinite() } ?: 1f).coerceIn(1f, MAX_PDF_ZOOM),
         zoomX = (zoomX?.takeIf { it.isFinite() } ?: 0f).coerceIn(0f, 1f),
     )

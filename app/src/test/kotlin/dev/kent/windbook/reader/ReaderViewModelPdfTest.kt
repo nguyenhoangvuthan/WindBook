@@ -131,24 +131,24 @@ class ReaderViewModelPdfTest {
         assertEquals(BookDisplayPrefs(PdfLayout.PAGED, false, 2f, .5f), prefs.observe("a").first())
     }
 
-    @Test fun portraitPdfDefaultsToPagedWithoutCrop() = runTest {
+    @Test fun portraitPdfDefaultsToPagedWithCrop() = runTest {
         val display = vm(PageSize(400f, 600f)).pdfDisplay.filterNotNull().first()
-        assertEquals(EffectiveDisplay(PdfLayout.PAGED, false), display)
+        assertEquals(EffectiveDisplay(PdfLayout.PAGED, true), display)
     }
 
-    @Test fun slidesDefaultToPagedWithoutCrop() = runTest {
+    @Test fun slidesDefaultToPagedWithCrop() = runTest {
         val display = vm(PageSize(720f, 540f)).pdfDisplay.filterNotNull().first()
-        assertEquals(EffectiveDisplay(PdfLayout.PAGED, false), display)
+        assertEquals(EffectiveDisplay(PdfLayout.PAGED, true), display)
     }
 
     @Test fun choosingPagedIsSavedForTheBook() = runTest {
         val model = vm(PageSize(400f, 600f))
-        assertEquals(EffectiveDisplay(PdfLayout.PAGED, false), model.pdfDisplay.filterNotNull().first())
+        assertEquals(EffectiveDisplay(PdfLayout.PAGED, true), model.pdfDisplay.filterNotNull().first())
         model.setPdfLayout(PdfLayout.PAGED)
         // The effective layout is unchanged; verify the explicit persisted choice.
         val saved = prefs.observe("a").first { it.pdfLayout == PdfLayout.PAGED }
         assertEquals(BookDisplayPrefs(PdfLayout.PAGED, null), saved)
-        assertEquals(EffectiveDisplay(PdfLayout.PAGED, false), vm(PageSize(400f, 600f)).pdfDisplay.filterNotNull().first())
+        assertEquals(EffectiveDisplay(PdfLayout.PAGED, true), vm(PageSize(400f, 600f)).pdfDisplay.filterNotNull().first())
     }
 
     @Test fun pageChangeSavesLocatorAndProgress() = runTest {

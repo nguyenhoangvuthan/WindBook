@@ -17,10 +17,13 @@ class PdfDisplayTest {
 
     @Test fun unknownPageSizesDefaultToPageByPage() = assertEquals(PdfLayout.PAGED, defaultPdfLayout(emptyList()))
 
-    @Test fun cropDefaultsFollowTheLayout() {
-        assertEquals(EffectiveDisplay(PdfLayout.PAGED, false), BookDisplayPrefs().resolve(listOf(portrait)))
-        assertEquals(EffectiveDisplay(PdfLayout.PAGED, false), BookDisplayPrefs().resolve(listOf(slide)))
-        assertEquals(EffectiveDisplay(PdfLayout.PAGED, false), BookDisplayPrefs(pdfLayout = PdfLayout.PAGED).resolve(listOf(portrait)))
+    @Test fun marginsAreCroppedByDefaultInEveryLayout() {
+        assertEquals(EffectiveDisplay(PdfLayout.PAGED, true), BookDisplayPrefs().resolve(listOf(portrait)))
+        assertEquals(EffectiveDisplay(PdfLayout.PAGED, true), BookDisplayPrefs().resolve(listOf(slide)))
+        assertEquals(EffectiveDisplay(PdfLayout.PAGED, true), BookDisplayPrefs(pdfLayout = PdfLayout.PAGED).resolve(listOf(portrait)))
+        assertEquals(EffectiveDisplay(PdfLayout.VERTICAL, true), BookDisplayPrefs(pdfLayout = PdfLayout.VERTICAL).resolve(listOf(portrait)))
+        // Fit page and the View menu store an explicit false, which must keep winning.
+        assertEquals(EffectiveDisplay(PdfLayout.PAGED, false), BookDisplayPrefs(PdfLayout.PAGED, cropMargins = false).resolve(listOf(portrait)))
     }
 
     @Test fun explicitChoicesWin() =
@@ -31,7 +34,7 @@ class PdfDisplayTest {
 
     @Test fun savedZoomAndHorizontalPositionAreKept() =
         assertEquals(
-            EffectiveDisplay(PdfLayout.PAGED, false, zoom = 2.5f, zoomX = 0.4f),
+            EffectiveDisplay(PdfLayout.PAGED, true, zoom = 2.5f, zoomX = 0.4f),
             BookDisplayPrefs(zoom = 2.5f, zoomX = 0.4f).resolve(listOf(portrait)),
         )
 
@@ -43,7 +46,7 @@ class PdfDisplayTest {
 
     @Test fun outOfRangeSavedValuesAreClamped() =
         assertEquals(
-            EffectiveDisplay(PdfLayout.PAGED, false, zoom = MAX_PDF_ZOOM, zoomX = 0f),
+            EffectiveDisplay(PdfLayout.PAGED, true, zoom = MAX_PDF_ZOOM, zoomX = 0f),
             BookDisplayPrefs(zoom = 9f, zoomX = -1f).resolve(listOf(portrait)),
         )
 

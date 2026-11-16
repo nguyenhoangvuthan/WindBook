@@ -80,3 +80,8 @@ dependency; CI502/lint baseline13, API36 native55/API31 compatible52 and indepen
 fix review pass. Actual EPUB online generation, durable answer/vocabulary,
 rotation and offline restart verified. See `docs/testing/single-book-ai-checklist.md`
 for remaining UI/manual checks and retrieval limits. Backup/export is next.
+
+Main integration (2026-11-16): owner requested "push to main". Fast-forward from
+`b17c541` through `620fc6a` includes all cumulative work through0.1.9. Application
+content is identical to the verified trial commit; existing CI/device/review
+evidence and open manual checks remain applicable. The push scope is main only.

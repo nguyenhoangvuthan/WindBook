@@ -71,3 +71,11 @@ verified: app-private82-byte encrypted file, no plaintext key; after correcting 
 entry/save timing the decrypted key fingerprint matched the desktop key and a real
 Android request returned200. Temporary diagnostics were removed before delivery. Do not count those infrastructure
 failures as behavioral RED evidence.
+
+## Main integration
+
+On2026-11-16 the owner authorized "push to main". Main fast-forwarded from
+b17c541 through620fc6a without changing tested application content. Existing green
+checks apply; manual follow-ups above remain open. Main-only remote equality
+verification is recorded in ignored evidence `main-push.txt`; APK/key/private
+trial evidence are excluded from git.

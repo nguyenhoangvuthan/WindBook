@@ -26,16 +26,16 @@ class MinimalLibraryTest {
     }
     @Test fun cancellingAddChoiceDoesNotDispatchEitherPicker() {
         var files=0;var folders=0
-        compose.setContent {LibraryScreen(LibraryUiState(),actions({files++},{folders++}))}
-        compose.onNodeWithText("Add books").performClick()
+        // The dialog is reached from the + button of a library that already has books.
+        compose.setContent {LibraryScreen(LibraryUiState(items=listOf(book),isLibraryEmpty=false),actions({files++},{folders++}))}
+        compose.onNodeWithContentDescription("Add books").performClick()
         compose.onNodeWithText("Cancel").performClick()
         assertEquals(0,files);assertEquals(0,folders)
         compose.onNodeWithText("Choose folder").assertDoesNotExist()
     }
-    @Test fun emptyLibraryUsesTheSameFileAndFolderChoice() {
+    @Test fun emptyLibraryOffersTheFileChoiceDirectly() {
         var files=0
         compose.setContent {LibraryScreen(LibraryUiState(),actions(files={files++}))}
-        compose.onNodeWithText("Add books").performClick()
         compose.onNodeWithText("Choose files").performClick()
         assertEquals(1,files)
     }

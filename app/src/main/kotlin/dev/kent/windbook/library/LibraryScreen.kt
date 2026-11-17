@@ -190,8 +190,11 @@ fun LibraryScreen(
             EmptyState(
                 title = stringResource(R.string.tab_library),
                 body = stringResource(R.string.empty_library),
-                actionLabel = stringResource(R.string.add_books),
-                onAction = { adding = true },
+                // Both choices are offered right here; the Add books dialog is only for a library that already has books.
+                actionLabel = stringResource(R.string.add_books_files),
+                onAction = actions.onImportClick,
+                secondaryActionLabel = stringResource(R.string.add_books_folder),
+                onSecondaryAction = actions.onFoldersClick,
                 modifier = Modifier.padding(padding),
             )
         } else {

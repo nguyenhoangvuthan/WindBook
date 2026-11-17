@@ -70,17 +70,22 @@ class LibraryScreenTest {
             isLibraryEmpty = items.isEmpty(),
         )
 
-    @Test fun emptyLibraryShowsAddBooks() {
-        compose.setContent { LibraryScreen(LibraryUiState(isLibraryEmpty = true), actions) }
-        compose.onNodeWithText("Add books").assertIsDisplayed().performClick()
-        compose.onNodeWithText("Choose files").performClick()
+    @Test fun emptyLibraryOffersFilesAndFolderDirectly() {
+        var folders = 0
+        compose.setContent { LibraryScreen(LibraryUiState(isLibraryEmpty = true), actions.copy(onFoldersClick = { folders++ })) }
+        compose.onNodeWithText("Choose files").assertIsDisplayed().performClick()
         assertEquals(1, importClicks)
+        compose.onNodeWithText("Choose folder").assertIsDisplayed().performClick()
+        assertEquals(1, folders)
+        // No intermediate dialog on the way.
+        compose.onNodeWithText("Add books").assertDoesNotExist()
     }
 
     @Config(qualifiers = "vi")
-    @Test fun emptyLibraryShowsVietnameseAddBooks() {
+    @Test fun emptyLibraryOffersVietnameseFileAndFolderChoices() {
         compose.setContent { LibraryScreen(LibraryUiState(isLibraryEmpty = true), actions) }
-        compose.onNodeWithText("Thêm sách").assertIsDisplayed()
+        compose.onNodeWithText("Chọn tệp sách").assertIsDisplayed()
+        compose.onNodeWithText("Chọn thư mục").assertIsDisplayed()
     }
 
     @Test fun headerShowsTotalBookCount() {

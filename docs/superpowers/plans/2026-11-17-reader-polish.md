@@ -14,13 +14,13 @@
 
 | # | Task | Status |
 |---|---|---|
-| 0 | Branch `reader-polish` from main | todo |
-| 1 | Warm placeholder cover tints | todo |
-| 2 | Library header alignment | todo |
-| 3 | Reader footer: gutter + chapter title | todo |
-| 4 | Aa button in top bar | todo |
-| 5 | Reading appearance sheet redesign | todo |
-| 6 | CI + emulator evidence + docs | todo |
+| 0 | Branch `reader-polish` from main | done |
+| 1 | Warm placeholder cover tints | done |
+| 2 | Library header alignment | done |
+| 3 | Reader footer: gutter + chapter title | done |
+| 4 | Aa button in top bar | done |
+| 5 | Reading appearance sheet redesign | done |
+| 6 | CI + emulator evidence + docs | done |
 
 ## Global Constraints
 

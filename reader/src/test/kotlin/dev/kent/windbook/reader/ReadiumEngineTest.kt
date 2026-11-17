@@ -46,6 +46,20 @@ class ReadiumEngineTest {
         session.close()
     }
 
+    @Test fun openedEpubServesChaptersWithTheLayoutStyleAndKeepsTheBookText() = runTest {
+        val session = ReaderEngine(services).open(TestBooks.epub(tmp.root), BookFormat.EPUB).getOrThrow() as ReadiumReaderSession
+        val resource = session.publication.get(org.readium.r2.shared.util.Url("OEBPS/c1.xhtml")!!)!!
+        val html = String(resource.read().getOrNull()!!, Charsets.UTF_8)
+        assertTrue(html.contains("id=\"wb-layout\""))
+        assertTrue(html.contains("<p>Hello WindBook.</p>"))
+        // The navigation document is HTML too; the package file is not and must stay untouched.
+        val nav = session.publication.get(org.readium.r2.shared.util.Url("OEBPS/nav.xhtml")!!)!!
+        assertTrue(String(nav.read().getOrNull()!!, Charsets.UTF_8).contains("wb-layout"))
+        val opf = session.publication.get(org.readium.r2.shared.util.Url("OEBPS/content.opf")!!)!!
+        assertTrue(!String(opf.read().getOrNull()!!, Charsets.UTF_8).contains("wb-layout"))
+        session.close()
+    }
+
     @Test fun engineFailsForMissingFile() = runTest {
         assertTrue(ReaderEngine(services).open(tmp.root.resolve("missing.epub"), BookFormat.EPUB).isFailure)
     }

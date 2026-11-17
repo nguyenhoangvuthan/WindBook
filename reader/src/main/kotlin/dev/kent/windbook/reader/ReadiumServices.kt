@@ -13,6 +13,7 @@ import org.readium.r2.shared.util.getOrElse
 import org.readium.r2.shared.util.http.HttpClient
 import org.readium.r2.shared.util.pdf.PdfDocumentFactory
 import org.readium.r2.shared.util.toUrl
+import org.readium.r2.shared.util.resource.TransformingContainer
 import org.readium.r2.streamer.PublicationOpener
 import org.readium.r2.streamer.parser.DefaultPublicationParser
 
@@ -60,7 +61,11 @@ class ReadiumServices(
 
     private suspend fun openAsset(asset: Asset): Result<Publication> {
         return try {
-            val publication = publicationOpener.open(asset, allowUserInteraction = false)
+            val publication = publicationOpener.open(
+                asset,
+                allowUserInteraction = false,
+                onCreatePublication = { container = TransformingContainer(container, ::wrapHtmlWithLayoutCss) },
+            )
                 .getOrElse {
                     asset.close()
                     return Result.failure(ReaderException(it.message))

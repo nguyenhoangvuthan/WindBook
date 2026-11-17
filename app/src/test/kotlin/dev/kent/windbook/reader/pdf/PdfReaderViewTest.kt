@@ -300,6 +300,32 @@ class PdfReaderViewTest {
         assertEquals(1, taps)
     }
 
+    @Test fun pagedDoubleTapOnTheRightEdgeTurnsTwoPagesWithoutZoom() {
+        show(layout = PdfLayout.PAGED)
+        compose.onNodeWithTag(PDF_PAGED_TAG).performTouchInput { doubleClick(centerRight.copy(x = width * 0.9f)) }
+        settle()
+        assertEquals("pages=$pages zooms=$zooms", 2, pages.last())
+        assertTrue("no zoom was reported", zooms.none { it.first > 1f })
+    }
+
+    @Test fun pagedEdgeTapTurnsWithoutWaitingForTheDoubleTapTimeout() {
+        show(layout = PdfLayout.PAGED)
+        compose.onNodeWithTag(PDF_PAGED_TAG).performTouchInput { click(centerRight.copy(x = width * 0.9f)) }
+        compose.mainClock.advanceTimeBy(60)
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(500) // let the page animation settle
+        assertEquals(1, pages.last())
+    }
+
+    @Test fun pagedMiddleDoubleTapStillZoomsAndDoesNotToggleTheMenu() {
+        show(layout = PdfLayout.PAGED, initialPage = 4)
+        val baseWidth = book.widths.last { it.first == 4 }.second
+        compose.onNodeWithTag(PDF_PAGED_TAG).performTouchInput { doubleClick(center) }
+        settle()
+        assertTrue(book.widths.last { it.first == 4 }.second > baseWidth)
+        assertEquals(0, taps)
+    }
+
     @Test fun switchingLayoutKeepsThePage() {
         var layout by mutableStateOf(PdfLayout.VERTICAL)
         compose.setContent {

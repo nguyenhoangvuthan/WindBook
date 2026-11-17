@@ -51,7 +51,7 @@ data class PdfAnnotationUi(
 /** Shares the page container's transform with the bitmap and tiles; every gesture is page-local. */
 @Composable
 internal fun PdfTextPageOverlay(source: PdfPageSource,page: Int,crop: CropBox,size: PageSize,ui: PdfAnnotationUi,
-    onPageTap: (Offset)->Unit,onPageDoubleTap: (Offset)->Unit,motionSnapshot: ()->Any?) {
+    onPageTap: (Offset)->Unit,onPageDoubleTap: ((Offset)->Unit)?,motionSnapshot: ()->Any?) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val geometry=remember(size,crop,constraints.maxWidth,constraints.maxHeight) {
             PdfPageGeometry(size,crop,constraints.maxWidth.toFloat(),constraints.maxHeight.toFloat())
@@ -105,7 +105,8 @@ internal fun PdfTextPageOverlay(source: PdfPageSource,page: Int,crop: CropBox,si
                         else if(currentUi.locked) { queue.invalidate(); selecting=false; currentUi.onClear() }
                         else onPageTap(tap)
                     },
-                    onDoubleTap={ tap -> queue.invalidate();selecting=false;if(!currentUi.locked) onPageDoubleTap(tap) },
+                    // Null (paged mode) registers no double-tap handler, so single taps are never delayed for it.
+                    onDoubleTap=onPageDoubleTap?.let { handler -> { tap: Offset -> queue.invalidate();selecting=false;if(!currentUi.locked) handler(tap) } },
                 )
             }) {
             Canvas(Modifier.fillMaxSize().clipToBounds()) {

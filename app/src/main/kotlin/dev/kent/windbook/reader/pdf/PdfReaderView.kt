@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
 import dev.kent.windbook.R
 import dev.kent.windbook.core.model.CropBox
@@ -68,6 +69,8 @@ import dev.kent.windbook.input.LocalKeyEventDispatcher
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -360,6 +363,24 @@ private fun PagedPages(
     var zoom by remember { mutableFloatStateOf(1f) }
     var pan by remember { mutableStateOf(Offset.Zero) }
     val density = LocalDensity.current
+    val tapClassifier = remember { PageTapClassifier(slopPx = with(density) { 24.dp.toPx() }) }
+    val waitJob = remember { mutableStateOf<Job?>(null) }
+    // Where the most recent edge-tap turn is heading; resynchronised whenever the pager is at rest.
+    var turnTarget by remember { mutableIntStateOf(startPage) }
+    LaunchedEffect(pager) {
+        snapshotFlow { pager.isScrollInProgress }.filter { !it }.collect { turnTarget = pager.currentPage }
+    }
+    // While an edge-tap turn animates, the pager would absorb the next touch as "stop scrolling" and a quick
+    // second tap would be lost; swiping is therefore paused for the ~300 ms of the turn.
+    var turning by remember { mutableStateOf(false) }
+    fun turnTo(page: Int) {
+        turnTarget = page
+        turning = true
+        scope.launch {
+            try { pager.animateScrollToPage(page) } finally { if (turnTarget == page) turning = false }
+        }
+    }
+    val doubleTapTimeoutMs = LocalViewConfiguration.current.doubleTapTimeoutMillis
 
     LaunchedEffect(pageJump?.id) {
         val jump=pageJump ?: return@LaunchedEffect
@@ -395,7 +416,7 @@ private fun PagedPages(
 
         HorizontalPager(
             state = pager,
-            userScrollEnabled = zoom == 1f && !gesturesLocked,
+            userScrollEnabled = zoom == 1f && !gesturesLocked && !turning,
             beyondViewportPageCount = 1,
             key = { it },
             modifier = Modifier.fillMaxSize().testTag(PDF_PAGED_TAG),
@@ -444,11 +465,33 @@ private fun PagedPages(
                     else {zoom=DOUBLE_TAP_ZOOM;pan=(Offset(viewportW/2f,viewportH/2f)-tap)*(DOUBLE_TAP_ZOOM-1f)}
                 }
             }
+            val runTapAction: (TapAction, Offset) -> Unit = { action, tap ->
+                when(action) {
+                    // Relative to where the last turn is heading, so a second quick tap mid-animation turns another page.
+                    TapAction.PREVIOUS_PAGE -> turnTo((turnTarget-1).coerceAtLeast(0))
+                    TapAction.NEXT_PAGE -> turnTo((turnTarget+1).coerceAtMost(source.pageCount-1))
+                    TapAction.TOGGLE_MENU -> onCenterTap()
+                    TapAction.ZOOM_TOGGLE -> zoomAt(tap)
+                }
+            }
+            // Edge quarters turn immediately; only the middle half can become a double tap (zoom).
+            val tapAt: (Offset)->Unit = { tap ->
+                if(!gesturesLocked) {
+                    waitJob.value?.cancel()
+                    val action = tapClassifier.onTap(tap.x, tap.y, viewportW.toFloat())
+                    if(action == null) {
+                        waitJob.value = scope.launch {
+                            delay(doubleTapTimeoutMs)
+                            tapClassifier.flushPending()?.let { runTapAction(it, tap) }
+                        }
+                    } else runTapAction(action, tap)
+                }
+            }
             Box(
                 Modifier
                     .fillMaxSize()
                     .pointerInput(page,gesturesLocked) {
-                        detectTapGestures(onTap=turnAt,onDoubleTap=zoomAt)
+                        detectTapGestures(onTap=tapAt)
                     }
                     .then(if (zoom > 1f && !gesturesLocked) Modifier.pointerInput(Unit) { detectDragGestures { _, drag -> pan += drag } } else Modifier),
                 contentAlignment = Alignment.Center,
@@ -470,7 +513,7 @@ private fun PagedPages(
                     annotations?.let { ui ->
                         fun viewportPoint(tap: Offset)=Offset((viewportW-fitW)/2f+fitW/2f+(tap.x-fitW/2f)*zoom+pan.x,
                             (viewportH-fitH)/2f+fitH/2f+(tap.y-fitH/2f)*zoom+pan.y)
-                        PdfTextPageOverlay(source,page,crop,measured,ui,{turnAt(viewportPoint(it))},{zoomAt(viewportPoint(it))},motionSnapshot=remember(pager) {
+                        PdfTextPageOverlay(source,page,crop,measured,ui,{tapAt(viewportPoint(it))},null,motionSnapshot=remember(pager) {
                             { Triple(pager.currentPage to pager.currentPageOffsetFraction,zoom,pan) }
                         })
                     }

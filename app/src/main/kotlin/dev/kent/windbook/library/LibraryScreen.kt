@@ -43,9 +43,11 @@ import dev.kent.windbook.core.data.importer.ImportError
 import dev.kent.windbook.core.model.LibraryLayout
 import dev.kent.windbook.core.model.LibrarySort
 import dev.kent.windbook.core.model.ReadingStatus
+import dev.kent.windbook.core.model.BookFormat
 import dev.kent.windbook.core.model.StatusFilter
 import dev.kent.windbook.library.components.BookCell
 import dev.kent.windbook.library.components.ContinueReadingCard
+import dev.kent.windbook.library.components.FormatFilterRow
 import dev.kent.windbook.library.components.FilterRow
 import dev.kent.windbook.library.components.LibraryHeader
 import dev.kent.windbook.ui.components.EmptyState
@@ -63,6 +65,7 @@ data class LibraryActions(
     val onDelete: (String) -> Unit,
     val onFoldersClick: () -> Unit = {},
     val onFolderManagerClick: () -> Unit = onFoldersClick,
+    val onFormatToggle: (BookFormat) -> Unit = {},
 )
 
 private val IMPORT_MIME_TYPES = arrayOf("application/epub+zip", "application/pdf", "application/octet-stream")
@@ -109,6 +112,7 @@ fun LibraryRoute(onOpenBook: (String) -> Unit, onFoldersClick: () -> Unit = {}, 
             onImportClick = { picker.launch(IMPORT_MIME_TYPES) },
             onQueryChange = viewModel::onQueryChange,
             onFilterChange = viewModel::onFilterChange,
+            onFormatToggle = viewModel::onFormatToggle,
             onSortChange = viewModel::onSortChange,
             onLayoutChange = viewModel::onLayoutChange,
             onSetStatus = viewModel::setStatus,
@@ -225,7 +229,10 @@ private fun LibraryContent(state: LibraryUiState, actions: LibraryActions, modif
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item(span = { GridItemSpan(maxLineSpan) }) {
-            FilterRow(state.filter, actions.onFilterChange)
+            androidx.compose.foundation.layout.Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                FilterRow(state.filter, actions.onFilterChange)
+                FormatFilterRow(state.availableFormats, state.formats, actions.onFormatToggle)
+            }
         }
         state.continueReading?.takeIf { state.query.isBlank() }?.let { current ->
             item(span = { GridItemSpan(maxLineSpan) }) { ContinueReadingCard(current, actions.onOpenBook) }

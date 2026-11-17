@@ -99,6 +99,23 @@ class LibraryScreenTest {
         assertEquals(title.value, (button + 12.dp).value, 0.5f)
     }
 
+    @Test fun formatChipsShowOnlyForMixedLibrariesAndToggle() {
+        val formatToggles = mutableListOf<BookFormat>()
+        val withFormats = actions.copy(onFormatToggle = { formatToggles += it })
+        val pdf = dune.copy(book = dune.book.copy(id = "2", format = BookFormat.PDF))
+        compose.setContent {
+            LibraryScreen(library(dune, pdf).copy(availableFormats = listOf(BookFormat.EPUB, BookFormat.PDF)), withFormats)
+        }
+        compose.onNodeWithText("EPUB").assertIsDisplayed()
+        compose.onNodeWithText("PDF").assertIsDisplayed().performClick()
+        assertEquals(listOf(BookFormat.PDF), formatToggles)
+    }
+
+    @Test fun singleFormatLibraryShowsNoFormatChips() {
+        compose.setContent { LibraryScreen(library(dune).copy(availableFormats = listOf(BookFormat.EPUB)), actions) }
+        compose.onNodeWithText("EPUB").assertDoesNotExist()
+    }
+
     @Config(qualifiers = "vi")
     @Test fun headerCountInVietnamese() {
         compose.setContent { LibraryScreen(library(dune).copy(bookCount = 12), actions) }

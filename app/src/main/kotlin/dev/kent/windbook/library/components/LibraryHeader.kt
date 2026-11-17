@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.kent.windbook.R
+import dev.kent.windbook.core.model.BookFormat
 import dev.kent.windbook.core.model.LibraryLayout
 import dev.kent.windbook.core.model.LibrarySort
 import dev.kent.windbook.core.model.StatusFilter
@@ -55,6 +56,7 @@ import dev.kent.windbook.ui.theme.PillShape
 
 const val LIBRARY_SEARCH_TAG = "library-search"
 const val LIBRARY_FILTERS_TAG = "library-filters"
+const val LIBRARY_FORMATS_TAG = "library-formats"
 
 /** "Library │ 12 books", then the search pill and the sort pill (reference image 01). */
 @Composable
@@ -175,6 +177,25 @@ internal fun FilterRow(selected: StatusFilter, onSelect: (StatusFilter) -> Unit)
     ) {
         StatusFilter.entries.forEach { filter ->
             Pill(stringResource(filter.labelRes()), onClick = { onSelect(filter) }, selected = filter == selected)
+        }
+    }
+}
+
+/** One pill per format present in the library; nothing selected means every format. Hidden for a single format. */
+@Composable
+internal fun FormatFilterRow(available: List<BookFormat>, selected: Set<BookFormat>, onToggle: (BookFormat) -> Unit) {
+    if (available.size < 2) return
+    val scroll = rememberScrollState()
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .testTag(LIBRARY_FORMATS_TAG)
+            .edgeFade(scroll)
+            .horizontalScroll(scroll),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        available.forEach { format ->
+            Pill(format.extension.uppercase(), onClick = { onToggle(format) }, selected = format in selected)
         }
     }
 }

@@ -13,6 +13,7 @@ import dev.kent.windbook.core.data.importer.BookImporter
 import dev.kent.windbook.core.data.importer.ImportError
 import dev.kent.windbook.core.data.importer.ImportSource
 import dev.kent.windbook.core.model.ExtractedMetadata
+import dev.kent.windbook.core.model.BookFormat
 import dev.kent.windbook.core.model.LibrarySort
 import dev.kent.windbook.core.model.ReadingStatus
 import dev.kent.windbook.core.model.StatusFilter
@@ -112,6 +113,32 @@ class LibraryViewModelTest {
         vm.messages.test {
             vm.import(listOf(uri))
             assertEquals(LibraryMessage.ImportFailed("notes.txt", ImportError.UNSUPPORTED_FORMAT), awaitItem())
+        }
+    }
+
+    @Test fun formatToggleFiltersAndADroppedFormatDoesNotHideEverything() = runTest {
+        val vm = viewModel(backgroundScope)
+        vm.messages.test {
+            vm.import(listOf(uriFor(TestBooks.epub(tmp.root, "Dune.epub")), uriFor(TestBooks.pdf(tmp.root, "Atlas.pdf"))))
+            awaitItem()
+        }
+        vm.state.test {
+            var state = awaitItem()
+            while (state.items.size < 2) state = awaitItem()
+            assertEquals(listOf(BookFormat.EPUB, BookFormat.PDF), state.availableFormats)
+
+            vm.onFormatToggle(BookFormat.PDF)
+            while (state.items.size != 1) state = awaitItem()
+            assertEquals(BookFormat.PDF, state.items.single().book.format)
+            assertEquals(setOf(BookFormat.PDF), state.formats)
+
+            // Deleting the last PDF must not leave an empty list behind a hidden filter.
+            val pdfId = state.items.single().book.id
+            vm.delete(pdfId)
+            while (state.items.none { it.book.format == BookFormat.EPUB }) state = awaitItem()
+            assertEquals(emptySet<BookFormat>(), state.formats)
+            assertEquals(listOf(BookFormat.EPUB), state.availableFormats)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 

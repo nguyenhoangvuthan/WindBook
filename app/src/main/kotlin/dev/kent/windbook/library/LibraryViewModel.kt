@@ -14,6 +14,7 @@ import dev.kent.windbook.core.model.LibraryLayout
 import dev.kent.windbook.core.model.LibraryQuery
 import dev.kent.windbook.core.model.LibrarySort
 import dev.kent.windbook.core.model.ReadingStatus
+import dev.kent.windbook.core.model.BookFormat
 import dev.kent.windbook.core.model.StatusFilter
 import dev.kent.windbook.core.model.continueReading
 import javax.inject.Inject
@@ -34,6 +35,10 @@ data class LibraryUiState(
     val continueReading: LibraryItem? = null,
     val query: String = "",
     val filter: StatusFilter = StatusFilter.ALL,
+    /** Selected formats, already limited to formats that still exist in the library. */
+    val formats: Set<BookFormat> = emptySet(),
+    /** Formats present anywhere in the library, in enum order. */
+    val availableFormats: List<BookFormat> = emptyList(),
     val sort: LibrarySort = LibrarySort.RECENT,
     val layout: LibraryLayout = LibraryLayout.GRID,
     val isImporting: Boolean = false,
@@ -58,6 +63,7 @@ class LibraryViewModel @Inject constructor(
 
     private val query = MutableStateFlow("")
     private val filter = MutableStateFlow(StatusFilter.ALL)
+    private val formats = MutableStateFlow<Set<BookFormat>>(emptySet())
     private val importing = MutableStateFlow(false)
     private val _messages = Channel<LibraryMessage>(Channel.BUFFERED)
 
@@ -67,14 +73,28 @@ class LibraryViewModel @Inject constructor(
         repository.observeLibrary(),
         query,
         filter,
+        formats,
         preferences.sort,
         preferences.layout,
-    ) { all, text, statusFilter, sort, layout ->
+    ) { values ->
+        @Suppress("UNCHECKED_CAST")
+        val all = values[0] as List<LibraryItem>
+        val text = values[1] as String
+        val statusFilter = values[2] as StatusFilter
+        @Suppress("UNCHECKED_CAST")
+        val selectedFormats = values[3] as Set<BookFormat>
+        val sort = values[4] as LibrarySort
+        val layout = values[5] as LibraryLayout
+        val available = BookFormat.entries.filter { format -> all.any { it.book.format == format } }
+        // A format that vanished from the library must not keep hiding everything.
+        val effective = selectedFormats.intersect(available.toSet())
         LibraryUiState(
-            items = LibraryQuery(text, sort, statusFilter).apply(all),
+            items = LibraryQuery(text, sort, statusFilter, effective).apply(all),
             continueReading = continueReading(all),
             query = text,
             filter = statusFilter,
+            formats = effective,
+            availableFormats = available,
             sort = sort,
             layout = layout,
             isLibraryEmpty = all.isEmpty(),
@@ -86,6 +106,8 @@ class LibraryViewModel @Inject constructor(
     fun onQueryChange(text: String) = query.update { text }
 
     fun onFilterChange(value: StatusFilter) = filter.update { value }
+
+    fun onFormatToggle(format: BookFormat) = formats.update { if (format in it) it - format else it + format }
 
     fun onSortChange(sort: LibrarySort) {
         viewModelScope.launch { preferences.setSort(sort) }

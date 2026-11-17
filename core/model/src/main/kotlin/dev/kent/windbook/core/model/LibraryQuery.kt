@@ -40,11 +40,14 @@ data class LibraryQuery(
     val text: String = "",
     val sort: LibrarySort = LibrarySort.RECENT,
     val filter: StatusFilter = StatusFilter.ALL,
+    /** Empty means every format. */
+    val formats: Set<BookFormat> = emptySet(),
 ) {
     fun apply(items: List<LibraryItem>): List<LibraryItem> {
         val needle = SearchText.normalize(text.trim())
         return items
             .filter { filter.matches(it.book.status) }
+            .filter { formats.isEmpty() || it.book.format in formats }
             .filter { needle.isEmpty() || it.matches(needle) }
             .sortedWith(sort.comparator)
     }

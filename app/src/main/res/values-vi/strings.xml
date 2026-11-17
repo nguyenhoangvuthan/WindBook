@@ -204,7 +204,7 @@
     <string name="reader_value_publisher">Mặc định của sách</string>
     <string name="reader_line_height_reset">Đặt lại giãn dòng</string>
     <string name="reader_keep_original_layout">Giữ định dạng gốc của sách</string>
-    <string name="reader_keep_original_layout_hint">Tắt: app tự chỉnh giãn dòng, căn lề và khoảng cách đoạn.</string>
+    <string name="reader_keep_original_layout_hint">Bật để giữ nguyên giãn dòng, căn lề và khoảng cách đoạn của sách.</string>
     <string name="reader_tap_hint">Chạm mép trái/phải để lật trang · chạm giữa để mở menu</string>
     <string name="reader_tap_hint_ok">Đã hiểu</string>
     <string name="reader_reset_global">Dùng mặc định chung</string>

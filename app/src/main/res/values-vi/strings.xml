@@ -202,7 +202,9 @@
     <string name="reader_scope_hint_book">Chỉ sách này thay đổi.</string>
     <string name="reader_scope_hint_global">Mọi sách đều thay đổi, trừ những sách bạn đã chỉnh riêng.</string>
     <string name="reader_value_publisher">Mặc định của sách</string>
-    <string name="reader_line_height_use_publisher">Dùng giãn dòng của sách</string>
+    <string name="reader_line_height_reset">Đặt lại giãn dòng</string>
+    <string name="reader_keep_original_layout">Giữ định dạng gốc của sách</string>
+    <string name="reader_keep_original_layout_hint">Tắt: app tự chỉnh giãn dòng, căn lề và khoảng cách đoạn.</string>
     <string name="reader_reset_global">Dùng mặc định chung</string>
     <string name="reader_reset_defaults">Đặt lại mặc định đọc</string>
     <string name="reader_fixed_appearance">Không thể chỉnh chữ trong sách có bố cục cố định.</string>

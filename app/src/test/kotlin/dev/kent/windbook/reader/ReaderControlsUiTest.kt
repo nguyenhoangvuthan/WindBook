@@ -65,12 +65,37 @@ class ReaderControlsUiTest {
     @Test fun lineHeightResetIsOnlyOfferedWhenAValueIsSet() {
         var latest=dev.kent.windbook.core.model.ReaderTypography(lineHeight=1.6)
         sheet(latest) {edit,_->latest=edit(latest)}
-        compose.onNodeWithText("Use the book's own line height").performScrollTo().performClick()
+        compose.onNodeWithText("Reset line height").performScrollTo().performClick()
         assertEquals(0.0,latest.lineHeight!!,0.0)
     }
     @Test fun noLineHeightResetWhenUnset() {
         sheet(dev.kent.windbook.core.model.ReaderTypography())
-        compose.onNodeWithText("Use the book's own line height").assertDoesNotExist()
+        compose.onNodeWithText("Reset line height").assertDoesNotExist()
+    }
+    @Test fun keepOriginalFormattingSwitchTogglesTheField() {
+        var latest=dev.kent.windbook.core.model.ReaderTypography()
+        sheet(latest) {edit,_->latest=edit(latest)}
+        compose.onNodeWithText("Keep original formatting").assertIsOff()
+        compose.onNodeWithText("Keep original formatting").performScrollTo().performClick()
+        assertEquals(true,latest.originalLayout)
+    }
+    @Test fun switchShowsOnWhenTheBookKeepsItsOriginalFormatting() {
+        sheet(dev.kent.windbook.core.model.ReaderTypography(originalLayout=true))
+        compose.onNodeWithText("Keep original formatting").assertIsOn()
+    }
+    @Test fun lineHeightShowsTheAppDefaultInCleanLayoutAndPublisherInOriginal() {
+        sheet(dev.kent.windbook.core.model.ReaderTypography())
+        compose.onNodeWithText("Line height · 1.5").assertExists()
+        compose.onNodeWithTag(LINE_HEIGHT_SLIDER_TAG).assertIsEnabled()
+    }
+    @Test fun lineHeightIsPublisherDefaultAndDisabledWhenKeepingTheOriginal() {
+        sheet(dev.kent.windbook.core.model.ReaderTypography(originalLayout=true))
+        compose.onNodeWithText("Line height · Publisher default").assertExists()
+        compose.onNodeWithTag(LINE_HEIGHT_SLIDER_TAG).assertIsNotEnabled()
+    }
+    @Test fun noLayoutSwitchForFixedLayoutBooks() {
+        compose.setContent {ReaderTypographySheet(dev.kent.windbook.core.model.ReaderTypography(),dev.kent.windbook.core.model.ReaderTypography(),{},{_,_->},reflowable=false)}
+        compose.onNodeWithText("Keep original formatting").assertDoesNotExist()
     }
     @Test fun colourChipsCarrySwatches() {
         sheet(dev.kent.windbook.core.model.ReaderTypography())

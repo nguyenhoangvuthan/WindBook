@@ -10,6 +10,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -18,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import dev.kent.windbook.R
 import dev.kent.windbook.core.model.*
 import kotlin.math.roundToInt
+
+internal const val LINE_HEIGHT_SLIDER_TAG="line-height-slider"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -37,6 +42,15 @@ internal fun ReaderTypographySheet(book: ReaderTypography,global: ReaderTypograp
             }
             Text(stringResource(if(editingGlobal) R.string.reader_scope_hint_global else R.string.reader_scope_hint_book),style=MaterialTheme.typography.bodySmall)
             if(!reflowable && !editingGlobal) Text(stringResource(R.string.reader_fixed_appearance)) else {
+                val original=effective.originalLayout==true
+                Row(Modifier.fillMaxWidth().heightIn(min=48.dp).toggleable(value=original,role=Role.Switch,onValueChange={on->change {it.copy(originalLayout=on)}}),
+                    verticalAlignment=Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.reader_keep_original_layout))
+                        Text(stringResource(R.string.reader_keep_original_layout_hint),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked=original,onCheckedChange=null)
+                }
                 Text(stringResource(R.string.reader_font),style=MaterialTheme.typography.titleSmall)
                 FlowRow {
                     listOf(ReaderFont.PUBLISHER to R.string.reader_font_publisher,ReaderFont.LITERATA to R.string.reader_font_literata,ReaderFont.SERIF to R.string.reader_font_serif,ReaderFont.SANS to R.string.reader_font_sans).forEach {(font,label)->
@@ -46,10 +60,13 @@ internal fun ReaderTypographySheet(book: ReaderTypography,global: ReaderTypograp
                 Text(stringResource(R.string.reader_text_size)+" · "+(effective.size?.let {"$it%"} ?: stringResource(R.string.reader_value_publisher)))
                 // 10 % steps from 80 to 200; the label above always says the number.
                 Slider(value=(effective.size ?: 100).toFloat(),valueRange=80f..200f,steps=11,onValueChange={change {current -> current.copy(size=(it/10).roundToInt()*10)}})
+                // Clean layout always has a number (the app default 1.5); the book's own value only exists when keeping the original.
                 val lineHeight=effective.lineHeight?.takeIf {it>0}
-                Text(stringResource(R.string.reader_line_height)+" · "+(lineHeight?.toString() ?: stringResource(R.string.reader_value_publisher)))
-                Slider(value=(lineHeight ?: 1.5).toFloat(),valueRange=1.2f..2f,steps=7,onValueChange={change {current -> current.copy(lineHeight=(it*10).roundToInt()/10.0)}})
-                if(lineHeight!=null) TextButton(onClick={change {it.copy(lineHeight=0.0)}}) {Text(stringResource(R.string.reader_line_height_use_publisher))}
+                val shownLineHeight=if(original) null else (lineHeight ?: 1.5)
+                Text(stringResource(R.string.reader_line_height)+" · "+(shownLineHeight?.toString() ?: stringResource(R.string.reader_value_publisher)))
+                Slider(value=(shownLineHeight ?: 1.5).toFloat(),valueRange=1.2f..2f,steps=7,enabled=!original,modifier=Modifier.testTag(LINE_HEIGHT_SLIDER_TAG),
+                    onValueChange={change {current -> current.copy(lineHeight=(it*10).roundToInt()/10.0)}})
+                if(lineHeight!=null && !original) TextButton(onClick={change {it.copy(lineHeight=0.0)}}) {Text(stringResource(R.string.reader_line_height_reset))}
                 Text(stringResource(R.string.reader_margins),style=MaterialTheme.typography.titleSmall)
                 FlowRow {listOf(R.string.reader_margin_narrow,R.string.reader_margin_normal,R.string.reader_margin_wide).forEachIndexed {index,label->
                     FilterChip(selected=(effective.margin ?: 1)==index,onClick={change {it.copy(margin=index)}},label={Text(stringResource(label))},modifier=Modifier.padding(end=8.dp))

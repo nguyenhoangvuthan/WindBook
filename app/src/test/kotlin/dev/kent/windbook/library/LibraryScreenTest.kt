@@ -7,6 +7,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isHeading
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import dev.kent.windbook.core.model.Book
 import dev.kent.windbook.core.model.BookFormat
 import dev.kent.windbook.core.model.LibraryItem
@@ -85,6 +87,16 @@ class LibraryScreenTest {
         compose.setContent { LibraryScreen(library(dune).copy(bookCount = 12), actions) }
         compose.onNodeWithText("Library").assertIsDisplayed()
         compose.onNodeWithText("12 books").assertIsDisplayed()
+    }
+
+    @Test fun bookFoldersTextAlignsWithLibraryTitle() {
+        compose.setContent { LibraryScreen(library(dune), actions) }
+        // Robolectric measures glyphs too narrowly, so the text is centred inside the button's 58 dp
+        // minimum width and its own bounds are meaningless. The button's left edge is reliable:
+        // TextButton pads its text by 12 dp, so a 4 dp start offset puts the text at the title's 16 dp.
+        val title = compose.onNodeWithText("Library", useUnmergedTree = true).getBoundsInRoot().left
+        val button = compose.onNodeWithText("Book folders").getBoundsInRoot().left
+        assertEquals(title.value, (button + 12.dp).value, 0.5f)
     }
 
     @Config(qualifiers = "vi")

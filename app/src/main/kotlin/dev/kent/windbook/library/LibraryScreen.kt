@@ -158,7 +158,8 @@ fun LibraryScreen(
     Scaffold(
         topBar = {
             androidx.compose.foundation.layout.Column(Modifier.windowInsetsPadding(TabScreenInsets)) {
-            androidx.compose.material3.TextButton(onClick = actions.onFolderManagerClick) {
+            // 4 dp + the button's 12 dp text padding = the 16 dp gutter of the header below.
+            androidx.compose.material3.TextButton(onClick = actions.onFolderManagerClick, modifier = Modifier.padding(start = 4.dp)) {
                 androidx.compose.material3.Text(stringResource(R.string.folder_title))
             }
             if (!state.isLibraryEmpty) {

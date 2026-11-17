@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
@@ -25,8 +27,13 @@ internal val GeneratedCoverTints = listOf(
     Color(0xFFEFE2C4), Color(0xFFE9D8B8), Color(0xFFF3E7D3),
     Color(0xFFE6D5C3), Color(0xFFEBD6C8), Color(0xFFEAD9DF),
 )
-internal fun generatedCoverTint(bookId: String): Color =
-    GeneratedCoverTints[Math.floorMod(bookId.hashCode(), GeneratedCoverTints.size)]
+private val DarkPaper = Color(0xFF17130F)
+
+/** The dark variant keeps the hue but sinks it toward the dark paper so a placeholder never glares at night. */
+internal fun generatedCoverTint(bookId: String, dark: Boolean = false): Color {
+    val tint = GeneratedCoverTints[Math.floorMod(bookId.hashCode(), GeneratedCoverTints.size)]
+    return if (dark) lerp(tint, DarkPaper, 0.62f) else tint
+}
 
 /** Metadata remains available to screen readers without rendering captions on the shelf. */
 internal fun LibraryItem.accessibleBookLabel(): String =
@@ -38,7 +45,7 @@ fun BookCover(bookId: String, coverPath: String?, modifier: Modifier = Modifier)
     val model = remember(coverPath) { coverPath?.let(::File) }
     var loaded by remember(coverPath) { mutableStateOf(false) }
     Box(modifier.aspectRatio(2f / 3f).shadow(3.dp, CoverShape).clip(CoverShape)
-        .background(generatedCoverTint(bookId)), contentAlignment = Alignment.Center) {
+        .background(generatedCoverTint(bookId, dark = MaterialTheme.colorScheme.background.luminance() < 0.5f)), contentAlignment = Alignment.Center) {
         if (!loaded) Icon(WindBookIcons.OpenBook, contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .35f), modifier = Modifier.size(28.dp))
         if (model != null) AsyncImage(model = model, contentDescription = null,

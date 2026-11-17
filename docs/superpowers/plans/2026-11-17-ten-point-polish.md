@@ -14,17 +14,17 @@
 
 | # | Task | Status |
 |---|---|---|
-| 0 | Branch `ten-point-polish`, spec, plan committed | todo |
-| 1 | Format filter (EPUB/PDF/TXT) | todo |
-| 2 | Paged PDF tap zones (no accidental zoom) | todo |
-| 3 | EPUB clean-layout preferences + stored switch | todo |
-| 4 | Injected CSS: wrapping, links, image tiles | todo |
-| 5 | Aa sheet: "Keep original formatting" | todo |
-| 6 | Notes and Settings alignment, pill search | todo |
-| 7 | Dark-theme placeholder covers | todo |
-| 8 | Empty Library direct add buttons | todo |
-| 9 | One-time tap-zone hint | todo |
-| 10 | CI, owner-book checks on emulator, docs, 0.1.13 APK | todo |
+| 0 | Branch `ten-point-polish`, spec, plan committed | done |
+| 1 | Format filter (EPUB/PDF/TXT) | done |
+| 2 | Paged PDF tap zones (no accidental zoom) | done |
+| 3 | EPUB clean-layout preferences + stored switch | done |
+| 4 | Injected CSS: wrapping, links, image tiles | done |
+| 5 | Aa sheet: "Keep original formatting" | done |
+| 6 | Notes and Settings alignment, pill search | done |
+| 7 | Dark-theme placeholder covers | done |
+| 8 | Empty Library direct add buttons | done |
+| 9 | One-time tap-zone hint | done |
+| 10 | CI, owner-book checks on emulator, docs, 0.1.13 APK | done |
 
 ## Global Constraints
 

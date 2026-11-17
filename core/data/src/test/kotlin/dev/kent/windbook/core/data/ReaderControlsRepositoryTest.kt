@@ -42,6 +42,14 @@ class ReaderControlsRepositoryTest {
         assertEquals(ContentsStatus.EMPTY,repo.find("b","sha")!!.status)
         assertNull(repo.find("b","other"))
     }
+    @Test fun originalLayoutRoundTripsAndKeepsUnknownKeys() = runTest {
+        val json=TypographyCodec.merge("""{"future":1}""",ReaderTypography(size=120,originalLayout=true))
+        assertEquals(ReaderTypography(size=120,originalLayout=true),TypographyCodec.decode(json))
+        assertEquals(1,org.json.JSONObject(json).getInt("future"))
+        val cleared=TypographyCodec.merge(json,ReaderTypography(size=120,originalLayout=false))
+        assertEquals(false,TypographyCodec.decode(cleared).originalLayout)
+        assertNull(TypographyCodec.decode(TypographyCodec.merge(cleared,ReaderTypography())).originalLayout)
+    }
     @Test fun atomicTypographyAndPdfUpdatesKeepUnknownKeys() = runTest {
         db.bookPreferencesDao().upsert(BookPreferencesEntity("b","{\"future\":7}",1))
         val typography=BookTypographyRepository(db.bookPreferencesDao())

@@ -11,7 +11,7 @@ internal object TypographyCodec {
     fun encode(value: ReaderTypography): String = merge(null,value)
     fun merge(previous: String?,value: ReaderTypography): String = (try {JSONObject(previous ?: "{}")} catch(_: Exception) {JSONObject()}).apply {
         put("font",value.font?.name);put("size",value.size);put("lineHeight",value.lineHeight)
-        put("margin",value.margin);put("colors",value.colors?.name)
+        put("margin",value.margin);put("colors",value.colors?.name);put("originalLayout",value.originalLayout)
     }.toString()
     fun decode(json: String?): ReaderTypography = try {
         val o=JSONObject(json ?: "{}")
@@ -19,7 +19,8 @@ internal object TypographyCodec {
             size=if(o.has("size")) o.optInt("size") else null,
             lineHeight=if(o.has("lineHeight")) o.optDouble("lineHeight") else null,
             margin=if(o.has("margin")) o.optInt("margin") else null,
-            colors=o.optString("colors").let {s->ReaderColors.entries.find {it.name==s}}).normalized()
+            colors=o.optString("colors").let {s->ReaderColors.entries.find {it.name==s}},
+            originalLayout=if(o.has("originalLayout") && !o.isNull("originalLayout")) o.optBoolean("originalLayout") else null).normalized()
     } catch(_: Exception) { ReaderTypography() }
 }
 class BookTypographyRepository(private val dao: BookPreferencesDao) {

@@ -18,4 +18,10 @@ class ReaderTypographyTest {
         assertNull(value.lineHeight)
         assertEquals(2, value.margin)
     }
+    @Test fun originalLayoutInheritsAndCanBeOverriddenPerBook() {
+        val global = ReaderTypography(originalLayout = true)
+        assertEquals(true, ReaderTypography().resolveOver(global).originalLayout)
+        assertEquals(false, ReaderTypography(originalLayout = false).resolveOver(global).originalLayout)
+        assertNull(ReaderTypography().resolveOver(ReaderTypography()).originalLayout)
+    }
 }

@@ -199,7 +199,10 @@
     <string name="reader_search_loading">Đang tìm…</string>
     <string name="reader_scope_book">Sách này</string>
     <string name="reader_scope_global">Tất cả sách</string>
-    <string name="reader_scope_hint">Thay đổi áp dụng cho phạm vi đã chọn. Tùy chọn riêng của từng sách được giữ lại.</string>
+    <string name="reader_scope_hint_book">Chỉ sách này thay đổi.</string>
+    <string name="reader_scope_hint_global">Mọi sách đều thay đổi, trừ những sách bạn đã chỉnh riêng.</string>
+    <string name="reader_value_publisher">Mặc định của sách</string>
+    <string name="reader_line_height_use_publisher">Dùng giãn dòng của sách</string>
     <string name="reader_reset_global">Dùng mặc định chung</string>
     <string name="reader_reset_defaults">Đặt lại mặc định đọc</string>
     <string name="reader_fixed_appearance">Không thể chỉnh chữ trong sách có bố cục cố định.</string>
@@ -220,7 +223,6 @@
     <string name="reader_color_sepia">Giấy ngả vàng</string>
     <string name="reader_color_dark">Tối</string>
     <string name="reader_defaults">Mặc định đọc</string>
-    <string name="reader_inherit_hint">Những mục chưa chỉnh dùng mặc định chung.</string>
     <string name="reader_search_limit">Có phần quá lớn để tìm kiếm an toàn. Anh vẫn có thể dùng các công cụ đọc khác.</string>
     <string name="add_books_files">Chọn tệp sách</string>
     <string name="add_books_folder">Chọn thư mục</string>

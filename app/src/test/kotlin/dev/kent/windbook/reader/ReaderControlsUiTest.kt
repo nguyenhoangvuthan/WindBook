@@ -42,6 +42,40 @@ class ReaderControlsUiTest {
         assertEquals(dev.kent.windbook.core.model.ReaderFont.LITERATA,latest.font)
         assertEquals(dev.kent.windbook.core.model.ReaderColors.DARK,latest.colors)
     }
+    private fun sheet(book: dev.kent.windbook.core.model.ReaderTypography,onChange: ((dev.kent.windbook.core.model.ReaderTypography)->dev.kent.windbook.core.model.ReaderTypography,Boolean)->Unit={_,_->}) {
+        compose.setContent {ReaderTypographySheet(book,dev.kent.windbook.core.model.ReaderTypography(),{},onChange)}
+    }
+    @Test fun scopeSelectorShowsTheSelectedSegmentAndItsHint() {
+        sheet(dev.kent.windbook.core.model.ReaderTypography())
+        compose.onNodeWithText("This book").assertIsSelected()
+        compose.onNodeWithText("All books").assertIsNotSelected()
+        compose.onNodeWithText("Only this book changes.").assertIsDisplayed()
+        compose.onNodeWithText("All books").performClick()
+        compose.onNodeWithText("All books").assertIsSelected()
+        compose.onNodeWithText("Every book changes, except books you set separately.").assertIsDisplayed()
+    }
+    @Test fun textSizeShowsItsNumberOrThePublisherDefault() {
+        sheet(dev.kent.windbook.core.model.ReaderTypography(size=120))
+        compose.onNodeWithText("Text size · 120%").assertExists()
+    }
+    @Test fun unsetTextSizeSaysPublisherDefault() {
+        sheet(dev.kent.windbook.core.model.ReaderTypography())
+        compose.onNodeWithText("Text size · Publisher default").assertExists()
+    }
+    @Test fun lineHeightResetIsOnlyOfferedWhenAValueIsSet() {
+        var latest=dev.kent.windbook.core.model.ReaderTypography(lineHeight=1.6)
+        sheet(latest) {edit,_->latest=edit(latest)}
+        compose.onNodeWithText("Use the book's own line height").performScrollTo().performClick()
+        assertEquals(0.0,latest.lineHeight!!,0.0)
+    }
+    @Test fun noLineHeightResetWhenUnset() {
+        sheet(dev.kent.windbook.core.model.ReaderTypography())
+        compose.onNodeWithText("Use the book's own line height").assertDoesNotExist()
+    }
+    @Test fun colourChipsCarrySwatches() {
+        sheet(dev.kent.windbook.core.model.ReaderTypography())
+        listOf("PAPER","SEPIA","DARK").forEach {compose.onNodeWithTag("swatch:$it",useUnmergedTree=true).assertExists()}
+    }
     @Test fun seekingCommitsOnceOnRelease() {
         val jumps=mutableListOf<Double>()
         compose.setContent {ReaderPositionSlider(.2, true) {jumps+=it}}

@@ -205,7 +205,10 @@
     <string name="reader_search_loading">Searching…</string>
     <string name="reader_scope_book">This book</string>
     <string name="reader_scope_global">All books</string>
-    <string name="reader_scope_hint">Changes apply to the selected scope. Individual book overrides are kept.</string>
+    <string name="reader_scope_hint_book">Only this book changes.</string>
+    <string name="reader_scope_hint_global">Every book changes, except books you set separately.</string>
+    <string name="reader_value_publisher">Publisher default</string>
+    <string name="reader_line_height_use_publisher">Use the book\'s own line height</string>
     <string name="reader_reset_global">Reset to global defaults</string>
     <string name="reader_reset_defaults">Reset reading defaults</string>
     <string name="reader_fixed_appearance">Font controls are unavailable for fixed-layout books.</string>
@@ -226,7 +229,6 @@
     <string name="reader_color_sepia">Sepia</string>
     <string name="reader_color_dark">Dark</string>
     <string name="reader_defaults">Reading defaults</string>
-    <string name="reader_inherit_hint">Unchanged fields use the global defaults.</string>
     <string name="reader_search_limit">A section is too large to search safely. Other reading controls remain available.</string>
     <string name="add_books_files">Choose files</string>
     <string name="add_books_folder">Choose folder</string>

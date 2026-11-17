@@ -21,9 +21,9 @@ import dev.kent.windbook.ui.icons.WindBookIcons
 import dev.kent.windbook.ui.theme.CoverShape
 import java.io.File
 
-private val GeneratedCoverTints = listOf(
-    Color(0xFFEFE2C4), Color(0xFFD9E8E2), Color(0xFFF3E7D3),
-    Color(0xFFE6D5C3), Color(0xFFDCE3EC), Color(0xFFEAD9DF),
+internal val GeneratedCoverTints = listOf(
+    Color(0xFFEFE2C4), Color(0xFFE9D8B8), Color(0xFFF3E7D3),
+    Color(0xFFE6D5C3), Color(0xFFEBD6C8), Color(0xFFEAD9DF),
 )
 internal fun generatedCoverTint(bookId: String): Color =
     GeneratedCoverTints[Math.floorMod(bookId.hashCode(), GeneratedCoverTints.size)]

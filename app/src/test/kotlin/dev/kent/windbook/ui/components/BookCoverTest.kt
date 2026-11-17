@@ -3,6 +3,7 @@ package dev.kent.windbook.ui.components
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -21,6 +22,12 @@ class BookCoverTest {
         // TalkBack reads the merged tree, which is the default one here.
         compose.setContent { BookCover("x", coverPath = null) }
         compose.onNodeWithText("A very long title", substring = true).assertDoesNotExist()
+    }
+
+    @Test fun generatedCoverTintsAreAllWarm() {
+        // Cool tints clash with the cream paper; warm means red is never below blue.
+        assertTrue(GeneratedCoverTints.size >= 6)
+        GeneratedCoverTints.forEach { assertTrue("$it is not warm", it.red >= it.blue) }
     }
 
     @Test fun percentIsRounded() {

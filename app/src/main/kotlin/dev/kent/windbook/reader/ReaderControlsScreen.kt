@@ -93,6 +93,11 @@ internal fun ReaderReadyScreen(bookId: String,current: ReaderUiState.Ready,reade
                 canBookmark=canBookmark,onSeek=controls::seek,canSeek=current.session.positionCount>0 && request==null,pdfPage=page,pdfPageCount=pdf?.pageCount,onPageEntry={pageEntry=true},
                 canReturn=canReturn,onReturn=controls::backToLocation,seekFraction=sliderFraction)
             }
+            val hint=hiltViewModel<TapHintViewModel>()
+            val hintSeen by hint.seen.collectAsStateWithLifecycle()
+            // Edge taps turn pages in EPUB and paged PDF; vertical PDF scrolls, so the hint would be wrong there.
+            TapHint(visible=hintSeen==false && (pdf==null || display?.layout==PdfLayout.PAGED),onDismiss=hint::markSeen,
+                modifier=Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom=96.dp))
             message?.let {res -> Snackbar(modifier=Modifier.align(Alignment.BottomCenter),action={TextButton(onClick={controls.message.value=null}) {Text(stringResource(R.string.close))}}) {Text(stringResource(res))}}
         }
     }

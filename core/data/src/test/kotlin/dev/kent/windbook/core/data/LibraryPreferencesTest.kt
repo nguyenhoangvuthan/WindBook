@@ -27,6 +27,15 @@ class LibraryPreferencesTest {
         assertEquals(emptySet<dev.kent.windbook.core.model.BookFormat>(), prefs.scanOptions.first().extensions)
     }
 
+    @Test fun tapHintIsUnseenUntilMarkedAndStaysSeenAfterReopening() = runTest {
+        val store = PreferenceDataStoreFactory.create(scope = backgroundScope) { java.io.File(tmp.root, "hint.preferences_pb") }
+        val prefs = LibraryPreferences(store)
+        assertEquals(false, prefs.tapHintSeen.first())
+        prefs.setTapHintSeen()
+        assertEquals(true, prefs.tapHintSeen.first())
+        assertEquals(true, LibraryPreferences(store).tapHintSeen.first())
+    }
+
     @Test fun pausedFormatsCannotLeakIntoPersistedDefaults() = runTest {
         val store = PreferenceDataStoreFactory.create(scope = backgroundScope) { java.io.File(tmp.root, "paused.preferences_pb") }
         val prefs = LibraryPreferences(store)

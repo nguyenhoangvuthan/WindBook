@@ -51,10 +51,18 @@ class LibraryPreferences(private val dataStore: DataStore<Preferences>) {
         }
     }
 
+    /** The one-time "tap the edges to turn pages" hint in the reader. */
+    val tapHintSeen: Flow<Boolean> = dataStore.data.map { prefs -> prefs[TAP_HINT_SEEN] ?: false }
+
+    suspend fun setTapHintSeen() {
+        dataStore.edit { it[TAP_HINT_SEEN] = true }
+    }
+
     private companion object {
         val SCAN_EXTENSIONS = stringSetPreferencesKey("scan_extensions")
         val SCAN_RECURSIVE = booleanPreferencesKey("scan_recursive")
         val SORT = stringPreferencesKey("sort")
         val LAYOUT = stringPreferencesKey("layout")
+        val TAP_HINT_SEEN = booleanPreferencesKey("tap_hint_seen")
     }
 }

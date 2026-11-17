@@ -211,6 +211,8 @@
     <string name="reader_line_height_reset">Reset line height</string>
     <string name="reader_keep_original_layout">Keep original formatting</string>
     <string name="reader_keep_original_layout_hint">Off: the app sets spacing, alignment and line height.</string>
+    <string name="reader_tap_hint">Tap the edges to turn pages · tap the middle for the menu</string>
+    <string name="reader_tap_hint_ok">Got it</string>
     <string name="reader_reset_global">Reset to global defaults</string>
     <string name="reader_reset_defaults">Reset reading defaults</string>
     <string name="reader_fixed_appearance">Font controls are unavailable for fixed-layout books.</string>

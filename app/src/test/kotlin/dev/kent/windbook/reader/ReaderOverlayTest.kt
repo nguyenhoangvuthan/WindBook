@@ -2,13 +2,17 @@ package dev.kent.windbook.reader
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import dev.kent.windbook.core.model.EffectiveDisplay
 import dev.kent.windbook.core.model.PdfLayout
+import androidx.compose.ui.unit.dp
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -28,11 +32,59 @@ class ReaderOverlayTest {
             )
         }
         compose.onNodeWithText("DUNE").assertIsDisplayed()
+        // Chapter and percentage are two separate texts, never one "chapter · percent" caption.
+        compose.onNodeWithText("Book One").assertIsDisplayed()
         compose.onNodeWithText("37%").assertIsDisplayed()
         compose.onNodeWithText("Book One · 37%").assertDoesNotExist()
         compose.onNodeWithText("Mark as finished").assertDoesNotExist()
         compose.onNodeWithContentDescription("Back").performClick()
         assertEquals(1, backs)
+    }
+
+    @Test fun sliderKeepsASideGutter() {
+        compose.setContent {
+            ReaderOverlay(
+                visible = true, title = "Dune", chapterTitle = "Book One", progression = 0.37,
+                canMarkFinished = false, onMarkFinished = {}, onBack = {}, onSeek = {},
+                seekFraction = 0.0,
+            )
+        }
+        // At 0 % the thumb must stay clear of the system back-gesture zone at the screen edge.
+        // (The slider's semantic bounds also cover touch slop, so measure the thumb itself.)
+        val left = compose.onNodeWithTag(READER_SLIDER_THUMB_TAG, useUnmergedTree = true).getBoundsInRoot().left
+        assertTrue("thumb starts at $left", left >= 16.dp)
+    }
+
+    @Test fun blankChapterShowsOnlyThePercentage() {
+        compose.setContent {
+            ReaderOverlay(
+                visible = true, title = "Dune", chapterTitle = "   ", progression = 0.37,
+                canMarkFinished = false, onMarkFinished = {}, onBack = {},
+            )
+        }
+        compose.onNodeWithText("37%").assertIsDisplayed()
+    }
+
+    @Test fun longVietnameseChapterKeepsPercentageVisible() {
+        val long = "Chương mười hai: Quyết định của người đàn ông đã đứng một mình trước ngã ba đường " .repeat(4)
+        compose.setContent {
+            ReaderOverlay(
+                visible = true, title = "Dune", chapterTitle = long, progression = 0.37,
+                canMarkFinished = false, onMarkFinished = {}, onBack = {},
+            )
+        }
+        compose.onNodeWithText("37%").assertIsDisplayed()
+    }
+
+    @Test fun pdfFooterKeepsThePageButton() {
+        compose.setContent {
+            ReaderOverlay(
+                visible = true, title = "Dune", chapterTitle = null, progression = 0.0,
+                canMarkFinished = false, onMarkFinished = {}, onBack = {},
+                pdfDisplay = EffectiveDisplay(PdfLayout.PAGED, false), pdfPage = 3, pdfPageCount = 42,
+            )
+        }
+        compose.onNodeWithText("Page 3 / 42").assertIsDisplayed()
     }
 
     @Test fun nearEndOffersMarkFinished() {

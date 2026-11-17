@@ -312,7 +312,7 @@ fun ReaderOverlay(
                     .background(bar)
                     .navigationBarsPadding(),
             ) {
-                if(onSeek!=null) ReaderPositionSlider(seekFraction,canSeek,onPreview={preview=it},onSeek=onSeek) else ProgressLine(progression)
+                if(onSeek!=null) ReaderPositionSlider(seekFraction,canSeek,Modifier.padding(horizontal=16.dp),onPreview={preview=it},onSeek=onSeek) else ProgressLine(progression)
                 Row(
                     Modifier.padding(start = 16.dp, end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -321,15 +321,29 @@ fun ReaderOverlay(
                         Text(stringResource(R.string.reader_page_count,preview?.let {dev.kent.windbook.core.model.seekPage(it,pdfPageCount)?.plus(1)} ?: pdfPage,pdfPageCount))
                     }
                     if(canReturn) IconButton(onClick=onReturn) {Icon(WindBookIcons.Back,contentDescription=stringResource(R.string.reader_return))}
-                    val percent = formatPercent(preview ?: seekFraction)
-                    Text(
-                        text = if(pdfPage==null) percent else "",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
+                    // Chapter on the left (ellipsized), percentage on the right, never one joined caption.
+                    val chapter = chapterTitle?.takeIf { it.isNotBlank() }
+                    if (chapter != null) {
+                        Text(
+                            text = chapter,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
+                    if (pdfPage == null) {
+                        Text(
+                            text = formatPercent(preview ?: seekFraction),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            modifier = Modifier.padding(start = 12.dp, end = 4.dp),
+                        )
+                    }
                     if (canMarkFinished) {
                         TextButton(onClick = onMarkFinished) { Text(stringResource(R.string.mark_finished)) }
                     }

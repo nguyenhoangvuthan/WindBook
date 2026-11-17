@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -18,9 +19,11 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.kent.windbook.R
 
+internal const val READER_SLIDER_THUMB_TAG="reader-slider-thumb"
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ReaderPositionSlider(fraction: Double,enabled: Boolean,onPreview: (Double?)->Unit = {},onSeek: (Double)->Unit) {
+internal fun ReaderPositionSlider(fraction: Double,enabled: Boolean,modifier: Modifier = Modifier,onPreview: (Double?)->Unit = {},onSeek: (Double)->Unit) {
     val current=if(fraction.isFinite()) fraction.coerceIn(0.0,1.0).toFloat() else 0f
     var draft by remember {mutableStateOf<Float?>(null)}
     val interactions=remember {MutableInteractionSource()}
@@ -39,12 +42,12 @@ internal fun ReaderPositionSlider(fraction: Double,enabled: Boolean,onPreview: (
     Slider(value=draft ?: current,onValueChange={draft=it;preview(it.toDouble())},enabled=enabled,
         onValueChangeFinished={val target=draft;draft=null;preview(null);if(target!=null) seek(target.toDouble())},
         interactionSource=interactions,
-        thumb={Box(Modifier.size(12.dp).background(if(enabled) active else inactive,CircleShape))},
+        thumb={Box(Modifier.size(12.dp).testTag(READER_SLIDER_THUMB_TAG).background(if(enabled) active else inactive,CircleShape))},
         track={state ->Canvas(Modifier.fillMaxWidth().height(2.dp)) {
             val start=if(rtl) size.width else 0f
             val end=if(rtl) 0f else size.width
             drawLine(inactive,Offset(start,center.y),Offset(end,center.y),strokeWidth=size.height,cap=StrokeCap.Round)
             drawLine(if(enabled) active else inactive,Offset(start,center.y),Offset(start+(end-start)*state.value,center.y),strokeWidth=size.height,cap=StrokeCap.Round)
         }},
-        modifier=Modifier.heightIn(min=48.dp).semantics {contentDescription=label})
+        modifier=modifier.heightIn(min=48.dp).semantics {contentDescription=label})
 }

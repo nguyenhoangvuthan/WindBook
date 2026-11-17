@@ -2,6 +2,7 @@ package dev.kent.windbook.notes
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.dp
 import dev.kent.windbook.core.model.*
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -22,6 +23,14 @@ class NotesScreenTest {
     @Test fun vietnamese() {
         compose.setContent { NotesScreen() }
         compose.onNodeWithText("Ghi chú").assertIsDisplayed()
+    }
+    @Test fun vocabularyButtonAlignsWithTheTitle() {
+        compose.setContent { NotesScreen(onVocabulary={}) }
+        // TextButton pads its text by 12 dp; a 4 dp start offset puts the text on the title's 16 dp gutter.
+        // (Robolectric measures glyphs too narrowly to compare the text itself, so compare the button edge.)
+        val title=compose.onNodeWithText("Notes",useUnmergedTree=true).getBoundsInRoot().left
+        val button=compose.onNodeWithText("Vocabulary").getBoundsInRoot().left
+        assertEquals(title.value,(button+12.dp).value,0.5f)
     }
     @Test fun showsSavedQuoteBodyAndOpensSpecificAnnotation() {
         var opened=""

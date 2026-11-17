@@ -105,7 +105,10 @@ fun SettingsScreen(state: SettingsUiState, onLanguageChange: (AppLanguage) -> Un
         }
 
         if(onReadingDefaults!=null) SettingsGroup(stringResource(R.string.reader_defaults)) {
-            TextButton(onClick=onReadingDefaults,modifier=Modifier.padding(horizontal=16.dp).heightIn(min=48.dp)) {Text(stringResource(R.string.reader_appearance))}
+            // A plain row (not a TextButton, which centres and pads its text) so the text sits on the same 16 dp gutter as the other rows.
+            Row(Modifier.fillMaxWidth().clickable(role=Role.Button,onClick=onReadingDefaults).heightIn(min=48.dp).padding(horizontal=16.dp),verticalAlignment=Alignment.CenterVertically) {
+                Text(stringResource(R.string.reader_appearance),style=MaterialTheme.typography.labelLarge,color=MaterialTheme.colorScheme.primary)
+            }
         }
 
         SettingsGroup(stringResource(R.string.settings_folder_scanning)) {

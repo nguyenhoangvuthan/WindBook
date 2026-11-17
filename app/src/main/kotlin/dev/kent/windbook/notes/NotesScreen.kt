@@ -40,9 +40,12 @@ fun NotesScreen(annotations: List<PdfTextAnnotation> = emptyList(), onOpen: (Pdf
     var query by rememberSaveable { mutableStateOf("") }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).windowInsetsPadding(TabScreenInsets)) {
         ScreenTitle(stringResource(R.string.tab_notes))
-        onVocabulary?.let {TextButton(onClick=it) {Text(stringResource(R.string.ai_vocabulary))}}
+        // 4 dp + the button's 12 dp text padding = the 16 dp gutter of the title.
+        onVocabulary?.let {TextButton(onClick=it,modifier=Modifier.padding(start=4.dp)) {Text(stringResource(R.string.ai_vocabulary))}}
+        // Same pill and search icon as the Library search field.
         OutlinedTextField(value=query,onValueChange={query=it},label={Text(stringResource(R.string.notes_search))},
-            singleLine=true,modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp))
+            leadingIcon={androidx.compose.material3.Icon(dev.kent.windbook.ui.icons.WindBookIcons.Search,contentDescription=null)},
+            singleLine=true,shape=dev.kent.windbook.ui.theme.PillShape,modifier=Modifier.fillMaxWidth().padding(horizontal=16.dp,vertical=8.dp))
         val visible=annotations.filter { query.isBlank() || it.quote.contains(query,true) || it.body.orEmpty().contains(query,true) }
         if(visible.isEmpty()) EmptyState(stringResource(R.string.notes_empty_title),stringResource(R.string.notes_empty_body))
         else LazyColumn(contentPadding=PaddingValues(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {

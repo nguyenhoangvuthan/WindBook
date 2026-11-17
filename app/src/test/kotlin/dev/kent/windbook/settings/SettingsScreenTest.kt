@@ -6,6 +6,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -37,6 +38,13 @@ class SettingsScreenTest {
         compose.onNodeWithText("Folder scanning", ignoreCase = true).performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Include subfolders").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(".txt").performScrollTo().assertIsDisplayed()
+    }
+
+    @Test fun readingAppearanceRowTextAlignsWithTheOtherRows() {
+        compose.setContent { SettingsScreen(state, onLanguageChange = {}, onReadingDefaults = {}) }
+        val aa = compose.onNodeWithText("Reading appearance (Aa)", useUnmergedTree = true).performScrollTo().getBoundsInRoot().left
+        val other = compose.onNodeWithText("Include subfolders", useUnmergedTree = true).performScrollTo().getBoundsInRoot().left
+        assertEquals(other.value, aa.value, 0.5f)
     }
 
     @Test fun showsStorageAndVersion() {

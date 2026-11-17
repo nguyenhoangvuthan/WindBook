@@ -19,7 +19,19 @@ class ReaderControlsUiTest {
         compose.onNodeWithContentDescription("More reading options").performClick()
         compose.onNodeWithText("Bookmark this location").assertIsDisplayed()
         compose.onNodeWithText("Search in book").assertIsDisplayed()
-        compose.onNodeWithText("Reading appearance (Aa)").assertIsDisplayed()
+        // Aa moved to the top bar; it must not be duplicated in the menu.
+        compose.onNodeWithText("Reading appearance (Aa)").assertDoesNotExist()
+    }
+    @Test fun appearanceIsOneTapAwayForReflowableBooks() {
+        var taps=0
+        compose.setContent {ReaderOverlay(true,"Book",null,.5,false,{}, {},onAppearance={taps++})}
+        compose.onNodeWithContentDescription("Reading appearance (Aa)").performClick()
+        assertEquals(1,taps)
+    }
+    @Test fun pdfHasNoAppearanceButton() {
+        compose.setContent {ReaderOverlay(true,"Book",null,.5,false,{}, {},
+            pdfDisplay=dev.kent.windbook.core.model.EffectiveDisplay(dev.kent.windbook.core.model.PdfLayout.PAGED,false))}
+        compose.onNodeWithContentDescription("Reading appearance (Aa)").assertDoesNotExist()
     }
     @Test fun twoAppearanceFieldsSurviveBeforeObservedValueCatchesUp() {
         var latest=dev.kent.windbook.core.model.ReaderTypography()

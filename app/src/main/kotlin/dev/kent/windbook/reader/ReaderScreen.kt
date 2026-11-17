@@ -301,9 +301,15 @@ fun ReaderOverlay(
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f),
                 )
+                if(pdfDisplay==null) {
+                    val appearanceLabel=stringResource(R.string.reader_appearance)
+                    IconButton(onClick=onAppearance,modifier=Modifier.semantics {contentDescription=appearanceLabel}) {
+                        Text("Aa",style=MaterialTheme.typography.titleSmall)
+                    }
+                }
                 IconButton(onClick=onContents) {Icon(WindBookIcons.List,contentDescription=stringResource(R.string.reader_contents))}
                 ReaderMoreMenu(pdfDisplay,onPdfLayoutChange,onCropMarginsChange,onFitPdfPage,
-                    onBookmark,onBookmarks,onSearch,onAppearance,onEncoding,canBookmark)
+                    onBookmark,onBookmarks,onSearch,onEncoding,canBookmark)
             }
             Column(
                 Modifier
@@ -355,7 +361,7 @@ fun ReaderOverlay(
 
 @Composable
 private fun ReaderMoreMenu(display: EffectiveDisplay?,onLayoutChange: (PdfLayout)->Unit,onCropChange: (Boolean)->Unit,
-    onFitPage: ()->Unit,onBookmark: ()->Unit,onBookmarks: ()->Unit,onSearch: ()->Unit,onAppearance: ()->Unit,
+    onFitPage: ()->Unit,onBookmark: ()->Unit,onBookmarks: ()->Unit,onSearch: ()->Unit,
     onEncoding: (() -> Unit)?,canBookmark: Boolean) {
     var open by remember {mutableStateOf(false)}
     var showView by remember {mutableStateOf(false)}
@@ -366,7 +372,6 @@ private fun ReaderMoreMenu(display: EffectiveDisplay?,onLayoutChange: (PdfLayout
             DropdownMenuItem(text={Text(stringResource(R.string.reader_bookmarks))},onClick={open=false;onBookmarks()})
             if(display==null) {
                 DropdownMenuItem(text={Text(stringResource(R.string.reader_search))},onClick={open=false;onSearch()})
-                DropdownMenuItem(text={Text(stringResource(R.string.reader_appearance))},onClick={open=false;onAppearance()})
             } else {
                 val viewLabel=stringResource(R.string.cd_view_mode)
                 DropdownMenuItem(text={Text(viewLabel)},onClick={open=false;showView=true},modifier=Modifier.semantics {contentDescription=viewLabel})

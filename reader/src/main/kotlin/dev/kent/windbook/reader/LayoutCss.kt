@@ -11,12 +11,14 @@ private const val STYLE_ID = "wb-layout"
 /**
  * Style added to every EPUB chapter. The wrapping rule applies in both layouts so an unbreakable
  * run (the U+FFFD dot leaders some PDF conversions leave in a table of contents, a long URL) can
- * never overflow the column. The other rules sit behind Readium's own selector, which is only
+ * never overflow the column. It is `!important` because publisher rules such as
+ * `.ProgramCode .FixedLine { word-wrap: break-word }` are more specific, and `break-word` still lets a
+ * code listing laid out as a table grow past the column onto the next page. The other rules sit behind Readium's own selector, which is only
  * present when publisher styles are off, so "keep original formatting" turns them off with no reload.
  */
 internal fun layoutCss(): String {
     val clean = ":root[style*=readium-advanced-on]"
-    return "html,body,p,li,td,th,a,span,div,h1,h2,h3,h4,h5,h6{overflow-wrap:anywhere}" +
+    return "html,body,p,li,td,th,a,span,div,h1,h2,h3,h4,h5,h6{overflow-wrap:anywhere!important}" +
         "$clean a,$clean a:link,$clean a:visited{color:inherit!important;text-decoration:none!important}" +
         // Converted PDFs often split a picture into many image-only paragraphs; remove the gaps between them.
         "$clean p:has(>img:only-child){margin-block:0!important}"

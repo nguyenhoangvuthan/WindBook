@@ -50,4 +50,9 @@ class LayoutCssTest {
         // The wrapping rule must not be limited to clean layout.
         assertTrue(css.substringBefore(":root[style*=readium-advanced-on]").contains("overflow-wrap:anywhere"))
     }
+
+    /** Publisher rules such as `.ProgramCode .FixedLine { word-wrap: break-word }` are more specific than ours. */
+    @Test fun wrappingRuleWinsOverMoreSpecificPublisherWordWrap() {
+        assertTrue(layoutCss().contains("overflow-wrap:anywhere!important"))
+    }
 }

@@ -20,7 +20,9 @@ import org.readium.r2.navigator.Navigator
 import org.readium.r2.navigator.OverflowableNavigator
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
+import org.readium.r2.navigator.input.DragEvent
 import org.readium.r2.navigator.input.InputListener
+import org.readium.r2.navigator.input.KeyEvent
 import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.navigator.util.DirectionalNavigationAdapter
@@ -49,6 +51,7 @@ class ReaderHostFragment : Fragment() {
     private var callbacks: Callbacks? = null
     private var locatorJob: Job? = null
     private var restoringAnchor = false
+    private var restoreJob: Job? = null
     private var appliedTypography: Pair<dev.kent.windbook.core.model.ReaderTypography,Boolean>? = null
 
     private val navigator: Navigator?
@@ -131,6 +134,11 @@ class ReaderHostFragment : Fragment() {
 
     /** A deliberate jump completes only when its resource and requested anchor are visible. */
     suspend fun navigate(locatorJson: String): NavigationResult {
+        readerMoved()
+        return navigateTo(locatorJson)
+    }
+
+    private suspend fun navigateTo(locatorJson: String): NavigationResult {
         val current=navigator as? EpubNavigatorFragment ?: return NavigationResult.FAILED
         val expected=boundSession ?: return NavigationResult.FAILED
         val target=locatorJson.toLocatorOrNull() ?: return NavigationResult.FAILED
@@ -175,7 +183,16 @@ class ReaderHostFragment : Fragment() {
     /** Used for volume keys / page keys. */
     fun turnPage(forward: Boolean): Boolean {
         val overflowable = navigator as? OverflowableNavigator ?: return false
+        readerMoved()
         return if (forward) overflowable.goForward() else overflowable.goBackward()
+    }
+
+    /** The reader chose a new place, so a pending restore stops and locations are saved again. */
+    private fun readerMoved() {
+        if(!restoringAnchor) return
+        restoringAnchor=false
+        restoreJob?.cancel()
+        restoreJob=null
     }
 
     /** The theme the EPUB navigator is rendering with; null for PDF or before bind. */
@@ -191,8 +208,17 @@ class ReaderHostFragment : Fragment() {
             }
         })
         (current as? OverflowableNavigator)?.apply {
-            // Edge taps and arrow keys turn pages.
-            addInputListener(DirectionalNavigationAdapter(this))
+            // Edge taps and arrow keys turn pages and end a pending restore. A touch while the book is still
+            // opening is not a choice of place (most drags turn nothing), so a swipe ends only a restore that gave up.
+            val turns=DirectionalNavigationAdapter(this)
+            addInputListener(object : InputListener {
+                override fun onTap(event: TapEvent)=turns.onTap(event).also {if(it) readerMoved()}
+                override fun onKey(event: KeyEvent)=turns.onKey(event).also {if(it) readerMoved()}
+                override fun onDrag(event: DragEvent): Boolean {
+                    if(event.type==DragEvent.Type.Start && restoreJob?.isActive!=true) readerMoved()
+                    return turns.onDrag(event)
+                }
+            })
             addInputListener(object : InputListener {
                 override fun onTap(event: TapEvent): Boolean {
                     callbacks?.onCenterTap()
@@ -204,13 +230,26 @@ class ReaderHostFragment : Fragment() {
         locatorJob = viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 val expected=boundSession
-                if(restore!=null && restoringAnchor) launch {
-                    kotlinx.coroutines.withTimeoutOrNull(8000) {
-                        current.currentLocator.first {it.href==restore.toLocatorOrNull()?.href}
-                        kotlinx.coroutines.delay(250)
-                        while(boundSession===expected && navigate(restore)==NavigationResult.FAILED) kotlinx.coroutines.delay(100)
-                    }
-                    if(boundSession===expected && current===navigator) {
+                if(restore!=null && restoringAnchor) restoreJob=launch {
+                    val epub=current as? EpubNavigatorFragment ?: return@launch
+                    val target=restore.toLocatorOrNull() ?: return@launch
+                    val visibility=navigationVisibilityScript(target)
+                    // The page can still re-flow after the anchor first shows (Readium adds its paginated
+                    // padding late), so keep it on screen until one layout has held for the settle window.
+                    val settled=kotlinx.coroutines.withTimeoutOrNull(RESTORE_DEADLINE_MS) {
+                        epub.currentLocator.first {it.href==target.href}
+                        val settling=RestoreSettling(RESTORE_SETTLE_MS)
+                        while(boundSession===expected) {
+                            val visible=visibility!=null && epub.evaluateJavascript(visibility)=="true"
+                            val layout=parsePageLayout(epub.evaluateJavascript(pageLayoutScript))
+                            if(settling.observe(android.os.SystemClock.uptimeMillis(),layout,visible)) return@withTimeoutOrNull true
+                            if(!visible) navigateTo(restore)
+                            kotlinx.coroutines.delay(RESTORE_POLL_MS)
+                        }
+                        false
+                    }==true
+                    // Giving up keeps the saved position: nothing is reported until the reader moves.
+                    if(settled && boundSession===expected && current===navigator && restoringAnchor) {
                         restoringAnchor=false
                         reportLocation(current,current.currentLocator.value)
                     }

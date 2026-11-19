@@ -1,0 +1,14 @@
+# Opening and resuming a book on Waydroid
+
+On November 19, 2026, Updraft 0.1.13, ReadEra 21.12.12+1335 and Moon+ Reader 4.5.4 opened the same synthetic Vietnamese EPUB on Android 13 x86 Waydroid. The second fixture was a three-page typeset PDF with distinct headings, wide margins and printed page numbers. The comparison used a 1080 × 2400 viewport at 420 dpi. Display size and density were restored after testing. The competitor results describe the installed versions. The host and phone differ, and activity launch times do not measure time to readable text.
+
+| Interaction | Updraft | ReadEra | Moon+ Reader |
+|---|---|---|---|
+| First EPUB page | Black background, white serif type, separated paragraphs. The first-use tap hint covers body lines. | Sepia, indented paragraphs and narrow bottom hint. Wide margins and justification produce conspicuous spaces on some lines. | Displays a diagram of page-turn and menu zones. At the emulated phone size the two-column reader occupied only the top strip. The native landscape desktop size displayed both columns normally. |
+| Reader controls | Center tap reveals Aa, contents, chapter name and percentage. | Center tap reveals section, page x of y and slider. | Edge tap advances the text. Progress, clock and battery indicators share the footer. |
+| Reopen EPUB | From the reader, exit with its back arrow and use Continue reading. First pass went from 40% to 0% with the chapter heading visible again. Second pass went from 60% to 40%. | Returned to page 2 of 4, including after force-stop and reopen. | Back and reopen retained the same visible sentence and 2.9% in the portrait test. |
+| PDF | Cropped page occupies more width, one page at a time. Right-edge tap advanced to page 2. Reopening from the shelf restored the second heading and printed page 2. | Default vertical view shows the first page and beginning of the second. More white margin leaves smaller text on this fixture. | Reported PDF initialization failure and prompted to install a plugin. Also reproduced at native size with a direct file URI. |
+
+Prioritize EPUB restoration. Use numbered, unique paragraphs to test the visible passage after leaving by toolbar back, returning via the shelf or Continue reading, and cold reopening. Record the saved location and first settled visible text as well as the progress indicator. Then move the tap hint away from body text, retaining easy access to Aa and contents. Preserve the current PDF crop and paging defaults for this type of document. The result supports no general speed, colour preference or scan-quality ranking.
+
+Original PNGs and the synthetic fixtures remain under the ignored local directory `.superpowers/checks/reader-comparison/`. Compare `up-before-exit` with `up-continued-menu` and `up-before-exit2` with `up-continued-menu2` for the two restoration cases.
